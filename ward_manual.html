@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>病棟共有マニュアル＆日誌</title>
+    <!-- TinyMCEはローカルパスから読み込む（完全オフライン環境対応） -->
+    <script src="lib/tinymce/tinymce.min.js"></script>
+    <style>
+        /* ================= ベーススタイル ================= */
+        body { margin: 0; padding: 0; font-family: "Meiryo", "Yu Gothic", sans-serif; background: #f4f6f9; color: #333; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #2c3e50; color: white; padding: 8px 20px; z-index: 1000; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .btn { background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .btn:hover { background: #2980b9; }
+        .btn-connect { background: #e74c3c; }
+        #sync-status { font-size: 12px; color: #ecf0f1; background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px; }
+        #search-box { padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; width: 200px; font-size: 13px; }
+
+        /* ================= セクションタブ (上部) ================= */
+        #section-bar { display: flex; background: #e9ecef; border-bottom: 2px solid #bdc3c7; padding: 8px 20px 0 20px; overflow-x: auto; flex-shrink: 0; }
+        .sec-tab { padding: 8px 16px; background: #dee2e6; border: 1px solid #ccc; border-bottom: none; margin-right: 4px; border-radius: 6px 6px 0 0; cursor: pointer; color: #555; font-size: 14px; font-weight: bold; }
+        .sec-tab.active { background: white; border-top: 3px solid #3498db; border-bottom: 2px solid white; margin-bottom: -2px; color: #2c3e50; }
+        .add-btn-small { padding: 8px 12px; cursor: pointer; color: #3498db; font-weight: bold; font-size: 14px; }
+
+        /* ================= メインコンテナ ================= */
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+
+        /* ================= エディタエリア (左側) ================= */
+        .editor-pane { flex: 1; display: flex; flex-direction: column; background: white; padding: 20px 30px; overflow: hidden; position: relative; }
+        #empty-msg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #fff; z-index: 10; display: flex; justify-content: center; align-items: center; color: #999; font-size: 14px; }
+        #editor-wrapper { display: flex; flex-direction: column; height: 100%; width: 100%; opacity: 0; }
+        
+        #page-title { font-size: 24px; font-weight: bold; border: none; border-bottom: 1px dashed #ccc; padding-bottom: 5px; margin-bottom: 15px; outline: none; width: 100%; color: #2c3e50; }
+        
+        /* 添付ファイルバー */
+        .attachment-bar { padding: 0 0 10px 0; display: flex; gap: 10px; align-items: center; }
+        .tox-tinymce { border-radius: 4px; border: 1px solid #ddd; flex: 1; display: flex; flex-direction: column; }
+        
+        /* TinyMCE未読込時のテキストエリアスタイル */
+        #tinymce-editor { flex: 1; width: 100%; resize: none; border: 1px solid #ccc; border-radius: 4px; padding: 15px; font-size: 14px; font-family: inherit; line-height: 1.6; outline: none; box-sizing: border-box; }
+
+        /* ================= ページリスト (右側) ================= */
+        .page-pane { width: 280px; background: #fdfdfd; border-left: 1px solid #ddd; display: flex; flex-direction: column; flex-shrink: 0; }
+        .page-header { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; color: #555; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .page-list { flex: 1; overflow-y: auto; }
+        .page-item { padding: 8px 15px; border-bottom: 1px dotted #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        .page-item:hover { background: #f1f3f5; }
+        .page-item.active { background: #e3f2fd; border-left: 4px solid #3498db; }
+        .page-title { font-size: 14px; font-weight: bold; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+        .page-del-btn { color: #e74c3c; cursor: pointer; font-size: 12px; border: none; background: none; margin-left: 10px; }
+        .page-del-btn:hover { background: #fee; border-radius: 3px; }
+        .indent-btn { background: #fff; border: 1px solid #b3d7ff; color: #0d6efd; padding: 0 4px; font-size: 10px; cursor: pointer; border-radius: 2px; margin-left: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-left">
+            <h2 style="margin:0; font-size:16px;">病棟マニュアル＆日誌</h2>
+            <div style="position:relative; margin-left:15px; display:flex; align-items:center; gap:10px;">
+                <button class="btn btn-connect" id="btn-connect" onclick="UI.toggleBookMenu(event)">📁 ブックを開く ▼</button>
+                <div id="book-menu" style="display:none; position:absolute; top:35px; left:0; background:white; border:1px solid #ccc; box-shadow:0 4px 8px rgba(0,0,0,0.2); border-radius:4px; z-index:100; min-width:250px; color:#333;">
+                    <div style="padding:10px; border-bottom:1px solid #eee; font-size:12px; color:#666;">最近開いたブック (フォルダ)</div>
+                    <div id="book-history-list" style="max-height:200px; overflow-y:auto;"></div>
+                    <div style="padding:10px; border-top:1px solid #eee; cursor:pointer; color:#3498db; font-weight:bold; font-size:13px;" onclick="AppCore.connectNew()" onmouseover="this.style.background='#f1f3f5'" onmouseout="this.style.background='none'">＋ 新しいフォルダを開く...</div>
+                </div>
+                <span id="sync-status">未接続</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <input type="text" id="search-box" placeholder="🔍 ページを検索..." oninput="UI.renderPages()">
+            <button class="btn" style="background:#6c757d;" onclick="AppCore.forceMerge()">🔄 手動最適化</button>
+        </div>
+    </div>
+
+    <!-- セクションタブ -->
+    <div id="section-bar"></div>
+
+    <div class="main-container">
+        <!-- エディタエリア -->
+        <div class="editor-pane">
+            <div id="empty-msg">上部のセクションと右側のページを選択してください。</div>
+            
+            <div id="editor-wrapper">
+                <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()">
+                <div class="attachment-bar">
+                    <button class="btn" onclick="document.getElementById('file-upload').click()" style="background:#f39c12; color:white;">📎 添付ファイル追加</button>
+                    <input type="file" id="file-upload" style="display:none" onchange="AppCore.attachFile(this.files[0])">
+                </div>
+                <textarea id="tinymce-editor"></textarea>
+            </div>
+        </div>
+
+        <!-- ページリストエリア -->
+        <div class="page-pane">
+            <div class="page-header">
+                <span id="current-sec-name">ページ一覧</span>
+                <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="UI.addPage()">＋ 追加</button>
+            </div>
+            <div class="page-list" id="page-list"></div>
+        </div>
+    </div>
+
+<script>
+// =========================================================
+// アプリケーション状態
+// =========================================================
+const State = {
+    userId: "User_" + Math.floor(Math.random() * 10000), 
+    index: { 
+        sections: [{ id: "sec1", name: "業務マニュアル" }, { id: "sec2", name: "業務日誌" }], 
+        pages: [], 
+        last_merge_date: "" 
+    },
+    pageDataCache: {}, 
+    currentSecId: "sec1", 
+    currentPageId: null,
+    isConnecting: false,
+    collapsedPages: new Set()
+};
+
+const BookManager = {
+    db: null,
+    init: function() {
+        return new Promise((resolve, reject) => {
+            try {
+                const req = indexedDB.open('WardManualDB', 2);
+                req.onupgradeneeded = e => {
+                    if (!e.target.result.objectStoreNames.contains('books')) {
+                        e.target.result.createObjectStore('books', { keyPath: 'name' });
+                    }
+                };
+                req.onsuccess = e => {
+                    this.db = e.target.result;
+                    resolve();
+                };
+                req.onerror = e => resolve(); 
+            } catch(e) {
+                console.error(e);
+                resolve(); 
+            }
+        });
+    },
+    saveBook: function(handle) {
+        if(!this.db) return;
+        try {
+            const tx = this.db.transaction('books', 'readwrite');
+            tx.objectStore('books').put({ name: handle.name, handle: handle, lastAccessed: Date.now() });
+        } catch(e) { console.error(e); }
+    },
+    getBooks: function() {
+        return new Promise((resolve) => {
+            if(!this.db) return resolve([]);
+            try {
+                const tx = this.db.transaction('books', 'readonly');
+                const req = tx.objectStore('books').getAll();
+                req.onsuccess = e => resolve(e.target.result.sort((a,b) => b.lastAccessed - a.lastAccessed));
+                req.onerror = () => resolve([]);
+            } catch(e) {
+                console.error(e);
+                resolve([]);
+            }
+        });
+    }
+};
+
+// =========================================================
+// 1. 同期・ファイルシステムエンジン (AppCore)
+// =========================================================
+const AppCore = (function() {
+    let dirHandle = null, txDirHandle = null, pagesDirHandle = null, attachDirHandle = null;
+    let processedTxIds = new Set();
+    let syncInterval = null;
+
+    function setStatus(msg, isError = false) {
+        const el = document.getElementById('sync-status');
+        el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        el.style.color = isError ? "#ffcccc" : "#2ecc71";
+    }
+
+    async function connectNew() {
+        if (State.isConnecting) return;
+        document.getElementById('book-menu').style.display = 'none';
+        try {
+            const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            BookManager.saveBook(handle);
+            await startWithHandle(handle);
+        } catch(e) {}
+    }
+
+    async function connectHistory(handle) {
+        document.getElementById('book-menu').style.display = 'none';
+        try {
+            if ((await handle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
+                if ((await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+                    alert("アクセス権限が付与されませんでした。");
+                    return;
+                }
+            }
+            BookManager.saveBook(handle);
+            await startWithHandle(handle);
+        } catch(e) {
+            alert("フォルダが見つからないか、アクセスできません。");
+        }
+    }
+
+    async function startWithHandle(handle) {
+        State.isConnecting = true;
+        try {
+            dirHandle = handle;
+            txDirHandle = await dirHandle.getDirectoryHandle('tx', { create: true });
+            pagesDirHandle = await dirHandle.getDirectoryHandle('pages', { create: true }); 
+            attachDirHandle = await dirHandle.getDirectoryHandle('attachments', { create: true });
+            
+            document.getElementById('btn-connect').innerText = `📁 ${handle.name} ▼`;
+            document.getElementById('btn-connect').style.background = '#27ae60';
+            setStatus("読込中...");
+
+            State.index = { sections: [], pages: [], last_merge_date: "" };
+            State.pageDataCache = {};
+            State.currentPageId = null;
+            State.currentSecId = null;
+            processedTxIds.clear();
+
+            await loadIndex();
+            if(!State.index.sections || State.index.sections.length === 0) {
+                State.index.sections = [{ id: "sec1", name: "新しいセクション" }];
+                State.currentSecId = "sec1";
+            } else if (!State.currentPageId) {
+                State.currentSecId = State.index.sections[0].id;
+                const firstPage = State.index.pages.find(p => p.secId === State.currentSecId);
+                State.currentPageId = firstPage ? firstPage.id : null;
+            }
+            
+            await checkDailyMerge();
+            await replayTransactions();
+            UI.renderAll();
+            
+            if(syncInterval) clearInterval(syncInterval);
+            syncInterval = setInterval(async () => {
+                if (await replayTransactions()) UI.renderAll();
+            }, 60000);
+            
+            setStatus("接続済み・同期中");
+        } catch (e) {
+            setStatus("接続エラー", true);
+            alert("接続エラーの詳細:\n" + e.message);
+            console.error(e);
+        } finally {
+            State.isConnecting = false;
+        }
+    }
+
+    async function loadIndex() {
+        try {
+            const fh = await dirHandle.getFileHandle('index.json', { create: false });
+            const file = await fh.getFile();
+            const loaded = JSON.parse(await file.text());
+            
+            if (loaded.categories && loaded.sections && !loaded.pages) {
+                State.index.sections = loaded.categories; 
+                State.index.pages = loaded.sections.map(s => ({
+                    id: s.id,
+                    secId: s.catId, 
+                    title: s.title || "無題",
+                    updatedAt: s.updatedAt,
+                    sortOrder: s.sortOrder,
+                    indentLevel: s.indentLevel || 0
+                }));
+                State.index.last_merge_date = loaded.last_merge_date || "";
+            } else {
+                State.index = {
+                    sections: loaded.sections || State.index.sections,
+                    pages: loaded.pages || [],
+                    last_merge_date: loaded.last_merge_date || ""
+                };
+            }
+            
+            if (State.index.sections && State.index.sections.length > 0) {
+                State.currentSecId = State.index.sections[0].id;
+            }
+        } catch (e) {} 
+    }
+
+    async function loadPageData(pageId) {
+        if (State.pageDataCache[pageId]) return State.pageDataCache[pageId];
+        try {
+            const fh = await pagesDirHandle.getFileHandle(`${pageId}.json`, { create: false });
+            const file = await fh.getFile();
+            const data = JSON.parse(await file.text());
+            State.pageDataCache[pageId] = data;
+            return data;
+        } catch (e) {
+            return { content: "" };
+        }
+    }
+
+    async function appendTransaction(op, payload) {
+        if (!txDirHandle) return;
+        setStatus("✍️ 保存中...");
+        const txId = Date.now() + "_" + State.userId + "_" + Math.floor(Math.random() * 1000);
+        const txData = { id: txId, ts: Date.now(), op: op, data: payload, userId: State.userId };
+
+        applyDelta(txData); 
+
+        try {
+            const fh = await txDirHandle.getFileHandle(`tx_${txId}.json`, { create: true });
+            const w = await fh.createWritable();
+            await w.write(JSON.stringify(txData));
+            await w.close();
+            processedTxIds.add(txId);
+            setStatus("保存完了");
+        } catch (e) {
+            setStatus("保存エラー", true);
+            console.error(e);
+        }
+    }
+
+    async function replayTransactions() {
+        if (!txDirHandle) return false;
+        let targets = [];
+        for await (const entry of txDirHandle.values()) {
+            if (entry.kind === 'file' && entry.name.startsWith('tx_')) {
+                const txId = entry.name.replace('tx_', '').replace('.json', '');
+                if (!processedTxIds.has(txId)) {
+                    try {
+                        const file = await entry.getFile();
+                        targets.push(JSON.parse(await file.text()));
+                        processedTxIds.add(txId);
+                    } catch(e) {}
+                }
+            }
+        }
+        if (targets.length === 0) return false;
+        
+        targets.sort((a, b) => a.ts - b.ts).forEach(tx => applyDelta(tx));
+        setStatus("他者の更新を受信");
+        return true; 
+    }
+
+    function applyDelta(tx) {
+        const d = tx.data;
+        if (tx.op === 'UPDATE_PAGE') {
+            let idxPage = State.index.pages.find(p => p.id === d.id);
+            if (idxPage) {
+                Object.assign(idxPage, d.indexData);
+                idxPage.updatedAt = tx.ts;
+            } else {
+                State.index.pages.push({ ...d.indexData, id: d.id, updatedAt: tx.ts });
+            }
+            State.pageDataCache[d.id] = d.pageData;
+            
+            if (State.currentPageId === d.id && tx.userId !== State.userId) {
+                if (document.activeElement !== document.querySelector('.tox-edit-area__iframe')) {
+                    Editor.loadContent(d.pageData.content);
+                }
+            }
+        } else if (tx.op === 'DELETE_PAGE') {
+            State.index.pages = State.index.pages.filter(p => p.id !== d.id);
+            delete State.pageDataCache[d.id];
+            if (State.currentPageId === d.id) {
+                State.currentPageId = null;
+                UI.renderEditor();
+            }
+        } else if (tx.op === 'ADD_SECTION') {
+            if (!State.index.sections.find(s => s.id === d.id)) State.index.sections.push(d);
+        } else if (tx.op === 'UPDATE_SECTION') {
+            let s = State.index.sections.find(s => s.id === d.id);
+            if (s) {
+                s.bgColor = d.bgColor;
+                if (d.name) s.name = d.name;
+            }
+        }
+    }
+
+    async function checkDailyMerge(force = false) {
+        const today = new Date().toLocaleDateString('ja-JP');
+        if (!force && State.index.last_merge_date === today) return;
+
+        let syncState = { locked: false, ts: 0 };
+        try { 
+            const fh = await dirHandle.getFileHandle('sync_state.json', { create: false });
+            syncState = JSON.parse(await (await fh.getFile()).text()); 
+        } catch(e) {}
+        
+        if (syncState.locked && (Date.now() - syncState.ts < 5 * 60000)) return;
+
+        setStatus("🔄 データ最適化中...");
+        let stateH;
+        try {
+            stateH = await dirHandle.getFileHandle('sync_state.json', { create: true });
+            let wLock = await stateH.createWritable();
+            await wLock.write(JSON.stringify({ locked: true, ts: Date.now() }));
+            await wLock.close();
+        } catch(e) { return; } 
+
+        try {
+            await replayTransactions(); 
+            State.index.last_merge_date = today;
+
+            const wIndex = await (await dirHandle.getFileHandle('index.json', { create: true })).createWritable();
+            await wIndex.write(JSON.stringify(State.index));
+            await wIndex.close();
+
+            for (const pId in State.pageDataCache) {
+                const wPage = await (await pagesDirHandle.getFileHandle(`${pId}.json`, { create: true })).createWritable();
+                await wPage.write(JSON.stringify(State.pageDataCache[pId]));
+                await wPage.close();
+            }
+
+            for await (const entry of txDirHandle.values()) {
+                if (entry.kind === 'file' && entry.name.startsWith('tx_')) {
+                    await txDirHandle.removeEntry(entry.name);
+                }
+            }
+            processedTxIds.clear();
+            setStatus("✨ 最適化(マージ)完了");
+        } catch (e) {
+            setStatus("最適化エラー", true);
+        } finally {
+            try {
+                let wLock = await stateH.createWritable();
+                await wLock.write(JSON.stringify({ locked: false, ts: 0 }));
+                await wLock.close();
+            } catch(e) {}
+        }
+    }
+
+    async function attachFile(file) {
+        if (!file || !attachDirHandle) {
+            alert("共有フォルダに接続してください。");
+            return;
+        }
+        document.getElementById('file-upload').value = "";
+        setStatus("📎 添付中...");
+        try {
+            const safeName = Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+            const fh = await attachDirHandle.getFileHandle(safeName, { create: true });
+            const w = await fh.createWritable();
+            await w.write(file);
+            await w.close();
+            
+            const linkHtml = `<a href="#" data-attachment="${safeName}" style="display:inline-block; background:#e3f2fd; border:1px solid #90caf9; color:#0d47a1; padding:4px 8px; border-radius:4px; font-size:12px; text-decoration:none; margin:2px;" title="クリックでダウンロード">📎 ${file.name}</a>&nbsp;`;
+            if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+                tinymce.activeEditor.insertContent(linkHtml);
+            } else {
+                document.getElementById('tinymce-editor').value += `\n[📎 添付ファイル: ${file.name}]\n`;
+            }
+            
+            setStatus("添付完了");
+            Editor.triggerSave();
+        } catch (e) { 
+            alert("保存に失敗しました。"); 
+            console.error(e);
+        }
+    }
+
+    async function downloadAttachment(filename, originalName) {
+        if (!attachDirHandle) return;
+        try {
+            const fh = await attachDirHandle.getFileHandle(filename, { create: false });
+            const file = await fh.getFile();
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = originalName.replace('📎 ', '').trim();
+            document.body.appendChild(a); 
+            a.click(); 
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) { 
+            alert("ファイルが見つかりません。"); 
+        }
+    }
+
+    return { connectNew, connectHistory, loadPageData, appendTransaction, checkDailyMerge, forceMerge: () => checkDailyMerge(true), attachFile, downloadAttachment };
+})();
+
+// =========================================================
+// 2. TinyMCE エディタ管理 (Editor)
+// =========================================================
+const Editor = {
+    saveTimer: null,
+    
+    init: function() {
+        if (typeof tinymce === 'undefined') {
+            console.error("TinyMCEが読み込めませんでした。ローカルパスを確認してください。");
+            document.getElementById('tinymce-editor').addEventListener('input', function() {
+                Editor.triggerSave();
+            });
+            return; 
+        }
+        
+        tinymce.init({
+            selector: '#tinymce-editor',
+            language: 'ja',
+            height: '100%',
+            resize: false,
+            menubar: false,
+            license_key: 'gpl',
+            promotion: false,
+            plugins: 'table lists advlist image autolink paste contextmenu accordion', 
+            toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image | removeformat',
+            advlist_bullet_styles: 'square,square,disc,circle,default,kome=kome,asterisk=asterisk',
+            advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
+            paste_data_images: true, 
+            contextmenu: 'link image table',
+            content_style: `
+                ol { list-style-type: decimal; }
+                ol ol { list-style-type: upper-alpha; }
+                ol ol ol { list-style-type: lower-roman; }
+                ol ol ol ol { list-style-type: lower-alpha; }
+                ol ol ol ol ol { list-style-type: decimal; }
+                
+                ul { list-style-type: "\\25A0  "; }
+                ul ul { list-style-type: "\\25A1  "; }
+                ul ul ul { list-style-type: disc; }
+                ul ul ul ul { list-style-type: circle; }
+                ul ul ul ul ul { list-style-type: "\\30FB  "; }
+                
+                ul[style*="list-style-type: kome"] { list-style-type: "※ " !important; }
+                ul[style*="list-style-type: asterisk"] { list-style-type: "* " !important; }
+                
+                .note-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-right: 4px; }
+                .note-star { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+                .note-todo { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+                .note-check { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+                .note-question { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+            `,
+            setup: function (editor) {
+                editor.ui.registry.addMenuButton('notetags', {
+                    text: 'ノートシール',
+                    fetch: function (callback) {
+                        const items = [
+                            { type: 'menuitem', text: '★ 重要', onAction: () => editor.insertContent('<span class="note-tag note-star">★重要</span>&nbsp;') },
+                            { type: 'menuitem', text: '☐ TODO', onAction: () => editor.insertContent('<span class="note-tag note-todo">☐TODO</span>&nbsp;') },
+                            { type: 'menuitem', text: '✓ 確認済', onAction: () => editor.insertContent('<span class="note-tag note-check">✓確認済</span>&nbsp;') },
+                            { type: 'menuitem', text: '❓ 質問', onAction: () => editor.insertContent('<span class="note-tag note-question">❓質問</span>&nbsp;') },
+                            { type: 'menuitem', text: '💡 アイデア', onAction: () => editor.insertContent('<span class="note-tag note-star" style="background:#e0f7fa; color:#006064; border-color:#b2ebf2;">💡アイデア</span>&nbsp;') }
+                        ];
+                        callback(items);
+                    }
+                });
+
+                editor.on('input change keyup', function () {
+                    Editor.triggerSave();
+                });
+                
+                editor.on('click', function(e) {
+                    if (e.target.nodeName === 'A' && e.target.hasAttribute('data-attachment')) {
+                        e.preventDefault();
+                        const filename = e.target.getAttribute('data-attachment');
+                        AppCore.downloadAttachment(filename, e.target.innerText);
+                    }
+                });
+            }
+        });
+    },
+    
+    triggerSave: function() {
+        if(!State.currentPageId) return;
+        clearTimeout(this.saveTimer);
+        this.saveTimer = setTimeout(() => {
+            this.saveCurrentPage();
+        }, 2000);
+    },
+    
+    saveCurrentPage: function() {
+        if (!State.currentPageId) return;
+        const title = document.getElementById('page-title').value || "無題のページ";
+        
+        let content = "";
+        try {
+            if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+                content = tinymce.activeEditor.getContent();
+            } else {
+                content = document.getElementById('tinymce-editor').value;
+            }
+        } catch(e) {
+            content = document.getElementById('tinymce-editor').value;
+        }
+        
+        let idxPage = State.index.pages.find(p => p.id === State.currentPageId);
+        let indent = idxPage ? (idxPage.indentLevel || 0) : 0;
+        let sortOrder = idxPage ? (idxPage.sortOrder || 0) : 0;
+        
+        const payload = {
+            id: State.currentPageId,
+            indexData: {
+                title: title,
+                secId: State.currentSecId,
+                indentLevel: indent,
+                sortOrder: sortOrder
+            },
+            pageData: {
+                content: content
+            }
+        };
+        AppCore.appendTransaction('UPDATE_PAGE', payload);
+        UI.renderPages(); 
+    },
+    
+    loadContent: function(content) {
+        if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+            tinymce.activeEditor.setContent(content || '');
+        } else {
+            document.getElementById('tinymce-editor').value = content || '';
+        }
+    }
+};
+
+// =========================================================
+// 3. UI描画エンジン (UI)
+// =========================================================
+const UI = {
+    toggleBookMenu: async function(e) {
+        if (e) e.stopPropagation();
+        try {
+            const menu = document.getElementById('book-menu');
+            if (menu.style.display === 'none') {
+                await UI.renderBookMenu();
+                menu.style.display = 'block';
+            } else {
+                menu.style.display = 'none';
+            }
+        } catch(err) {
+            console.error(err);
+        }
+    },
+    renderBookMenu: async function() {
+        const list = document.getElementById('book-history-list');
+        list.innerHTML = '';
+        let books = [];
+        try {
+            books = await BookManager.getBooks();
+        } catch(e) { console.error(e); }
+        
+        if(!books || books.length === 0) {
+            list.innerHTML = '<div style="padding:10px; font-size:13px; color:#999;">履歴はありません</div>';
+            return;
+        }
+        books.forEach(b => {
+            const item = document.createElement('div');
+            item.style.padding = '8px 10px';
+            item.style.fontSize = '13px';
+            item.style.cursor = 'pointer';
+            item.style.borderBottom = '1px dotted #eee';
+            item.innerText = `📁 ${b.name}`;
+            item.onmouseover = () => item.style.background = '#e3f2fd';
+            item.onmouseout = () => item.style.background = 'none';
+            item.onclick = () => AppCore.connectHistory(b.handle);
+            list.appendChild(item);
+        });
+    },
+
+    renderAll: function() {
+        this.renderSections();
+        this.renderPages();
+        this.renderEditor();
+    },
+
+    renderSections: function() {
+        const container = document.getElementById('section-bar');
+        container.innerHTML = '';
+        State.index.sections.forEach((sec, idx) => {
+            const div = document.createElement('div');
+            div.className = 'sec-tab' + (State.currentSecId === sec.id ? ' active' : '');
+            div.draggable = true;
+            
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', idx);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+            div.ondragover = (e) => e.preventDefault();
+            div.ondrop = (e) => {
+                e.preventDefault();
+                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                if (fromIdx !== idx) {
+                    const movedSec = State.index.sections.splice(fromIdx, 1)[0];
+                    State.index.sections.splice(idx, 0, movedSec);
+                    AppCore.forceMerge(); 
+                    UI.renderSections();
+                }
+            };
+            
+            const textSpan = document.createElement('span');
+            textSpan.innerText = sec.name;
+            div.appendChild(textSpan);
+            
+            if (sec.bgColor) {
+                if (State.currentSecId === sec.id) {
+                    div.style.borderTopColor = sec.bgColor;
+                } else {
+                    div.style.backgroundColor = sec.bgColor;
+                    div.style.color = '#fff';
+                    div.style.textShadow = '0 0 2px rgba(0,0,0,0.5)';
+                }
+            }
+            
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = sec.bgColor || '#dee2e6';
+            colorInput.style.position = 'absolute';
+            colorInput.style.opacity = '0';
+            colorInput.style.width = '1px';
+            colorInput.style.height = '1px';
+            
+            colorInput.onchange = (e) => {
+                AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: e.target.value, name: sec.name });
+                UI.renderSections();
+            };
+            
+            div.onclick = (e) => {
+                if (e.target === colorInput) return;
+                State.currentSecId = sec.id;
+                const firstPage = State.index.pages.find(p => p.secId === sec.id);
+                State.currentPageId = firstPage ? firstPage.id : null;
+                this.renderAll();
+            };
+            
+            div.oncontextmenu = (e) => {
+                e.preventDefault();
+                colorInput.showPicker ? colorInput.showPicker() : colorInput.click();
+            };
+            
+            div.title = "右クリックで色を変更";
+            div.appendChild(colorInput);
+            container.appendChild(div);
+        });
+        
+        const addBtn = document.createElement('div');
+        addBtn.className = 'add-btn-small';
+        addBtn.innerText = '＋ セクション追加';
+        addBtn.onclick = () => {
+            const name = prompt("新しいセクション名を入力してください:");
+            if (name) {
+                const id = "sec_" + Date.now();
+                AppCore.appendTransaction('ADD_SECTION', { id, name });
+                this.renderSections();
+            }
+        };
+        container.appendChild(addBtn);
+    },
+
+    renderPages: function() {
+        const container = document.getElementById('page-list');
+        const searchQ = document.getElementById('search-box').value.toLowerCase();
+        container.innerHTML = '';
+        
+        const secName = State.index.sections.find(s => s.id === State.currentSecId)?.name || "";
+        document.getElementById('current-sec-name').innerText = secName;
+
+        let pages = State.index.pages.filter(p => p.secId === State.currentSecId);
+        if (searchQ) {
+            pages = State.index.pages.filter(p => p.title.toLowerCase().includes(searchQ));
+        }
+
+        pages.sort((a,b) => {
+            if (a.sortOrder !== undefined && b.sortOrder !== undefined) return a.sortOrder - b.sortOrder;
+            return (b.updatedAt || 0) - (a.updatedAt || 0);
+        });
+
+        const visiblePages = [];
+        let currentHiddenIndent = -1;
+        
+        pages.forEach((p, idx) => {
+            if (currentHiddenIndent !== -1) {
+                if ((p.indentLevel || 0) > currentHiddenIndent) {
+                    return; 
+                } else {
+                    currentHiddenIndent = -1; 
+                }
+            }
+            
+            if (State.collapsedPages && State.collapsedPages.has(p.id)) {
+                currentHiddenIndent = p.indentLevel || 0;
+            }
+            
+            const nextP = pages[idx + 1];
+            const hasChildren = nextP && (nextP.indentLevel || 0) > (p.indentLevel || 0);
+            
+            visiblePages.push({ page: p, idx: idx, hasChildren: hasChildren });
+        });
+
+        visiblePages.forEach(item => {
+            const p = item.page;
+            const idx = item.idx;
+            const hasChildren = item.hasChildren;
+            
+            const isActive = State.currentPageId === p.id;
+            const div = document.createElement('div');
+            div.className = 'page-item' + (isActive ? ' active' : '');
+            const paddingLeft = 15 + ((p.indentLevel || 0) * 20);
+            div.style.paddingLeft = paddingLeft + 'px';
+            
+            div.draggable = true;
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', idx);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+            div.ondragover = (e) => {
+                e.preventDefault();
+                div.style.borderTop = '2px solid #3498db';
+            };
+            div.ondragleave = (e) => {
+                div.style.borderTop = '';
+            };
+            div.ondrop = (e) => {
+                e.preventDefault();
+                div.style.borderTop = '';
+                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                if (fromIdx !== idx && !isNaN(fromIdx)) {
+                    const movedPage = pages[fromIdx];
+                    pages.splice(fromIdx, 1);
+                    pages.splice(idx, 0, movedPage);
+                    pages.forEach((page, newSortOrder) => {
+                        AppCore.appendTransaction('UPDATE_PAGE', {
+                            id: page.id,
+                            indexData: {
+                                title: page.title,
+                                secId: page.secId,
+                                indentLevel: page.indentLevel,
+                                sortOrder: newSortOrder
+                            },
+                            pageData: State.pageDataCache[page.id] || { content: "" }
+                        });
+                    });
+                    UI.renderPages();
+                }
+            };
+            
+            const titleArea = document.createElement('div');
+            titleArea.style.display = 'flex';
+            titleArea.style.justifyContent = 'space-between';
+            titleArea.style.alignItems = 'center';
+            titleArea.style.flex = '1';
+            titleArea.style.minWidth = '0'; 
+            
+            const titleTextWrap = document.createElement('div');
+            titleTextWrap.style.display = 'flex';
+            titleTextWrap.style.alignItems = 'center';
+            titleTextWrap.style.flex = '1';
+            titleTextWrap.style.overflow = 'hidden';
+
+            if (hasChildren) {
+                const toggleBtn = document.createElement('span');
+                const isCollapsed = State.collapsedPages && State.collapsedPages.has(p.id);
+                toggleBtn.innerText = isCollapsed ? '▶' : '▼';
+                toggleBtn.style.cursor = 'pointer';
+                toggleBtn.style.fontSize = '10px';
+                toggleBtn.style.marginRight = '5px';
+                toggleBtn.style.color = '#7f8c8d';
+                toggleBtn.style.width = '12px';
+                toggleBtn.style.textAlign = 'center';
+                toggleBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (!State.collapsedPages) State.collapsedPages = new Set();
+                    if (isCollapsed) {
+                        State.collapsedPages.delete(p.id);
+                    } else {
+                        State.collapsedPages.add(p.id);
+                    }
+                    UI.renderPages();
+                };
+                titleTextWrap.appendChild(toggleBtn);
+            } else {
+                const spacer = document.createElement('span');
+                spacer.style.width = '17px';
+                spacer.style.display = 'inline-block';
+                titleTextWrap.appendChild(spacer);
+            }
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'page-title';
+            titleSpan.innerText = p.title || "無題";
+            titleTextWrap.appendChild(titleSpan);
+            
+            const indentControls = document.createElement('div');
+            indentControls.style.display = 'flex';
+            if (isActive && !searchQ) {
+                indentControls.innerHTML = `
+                    <button class="indent-btn" onclick="event.stopPropagation(); UI.changeIndent('${p.id}', -1)">←</button>
+                    <button class="indent-btn" onclick="event.stopPropagation(); UI.changeIndent('${p.id}', 1)">→</button>
+                `;
+            }
+            
+            const delBtn = document.createElement('button');
+            delBtn.className = 'page-del-btn';
+            delBtn.innerText = '🗑';
+            delBtn.title = '削除';
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`ページ「${p.title}」を削除しますか？`)) {
+                    AppCore.appendTransaction('DELETE_PAGE', { id: p.id });
+                }
+            };
+
+            titleArea.appendChild(titleTextWrap);
+            titleArea.appendChild(indentControls);
+            
+            div.appendChild(titleArea);
+            div.appendChild(delBtn);
+            
+            div.onclick = async () => {
+                if (State.currentPageId === p.id) return;
+                State.currentPageId = p.id;
+                this.renderPages(); 
+                await this.renderEditor();
+            };
+            container.appendChild(div);
+        });
+    },
+    
+    changeIndent: function(id, delta) {
+        let p = State.index.pages.find(x => x.id === id);
+        if (!p) return;
+        const newIndent = Math.max(0, Math.min(2, (p.indentLevel || 0) + delta));
+        
+        const payload = {
+            id: p.id,
+            indexData: {
+                title: p.title,
+                secId: p.secId,
+                indentLevel: newIndent,
+                sortOrder: p.sortOrder
+            },
+            pageData: State.pageDataCache[p.id] || { content: "" }
+        };
+        AppCore.appendTransaction('UPDATE_PAGE', payload);
+        this.renderPages();
+    },
+
+    renderEditor: async function() {
+        if (!State.currentPageId) {
+            document.getElementById('empty-msg').style.display = 'flex';
+            document.getElementById('editor-wrapper').style.opacity = '0';
+            document.getElementById('editor-wrapper').style.pointerEvents = 'none';
+            return;
+        }
+        document.getElementById('empty-msg').style.display = 'none';
+        document.getElementById('editor-wrapper').style.opacity = '1';
+        document.getElementById('editor-wrapper').style.pointerEvents = 'auto';
+        
+        const pageMeta = State.index.pages.find(p => p.id === State.currentPageId);
+        if (pageMeta) {
+            document.getElementById('page-title').value = pageMeta.title || "";
+        }
+        
+        const pageData = await AppCore.loadPageData(State.currentPageId);
+        Editor.loadContent(pageData.content);
+    },
+    
+    addPage: function() {
+        const id = "p_" + Date.now();
+        const payload = {
+            id: id,
+            indexData: { title: "無題のページ", secId: State.currentSecId },
+            pageData: { content: "" }
+        };
+        AppCore.appendTransaction('UPDATE_PAGE', payload);
+        State.currentPageId = id;
+        this.renderAll();
+    }
+};
+
+window.onload = async function() {
+    try {
+        await BookManager.init();
+    } catch (e) {
+        console.error("IndexedDB Error:", e);
+    }
+    Editor.init();
+    UI.renderAll();
+    
+    document.addEventListener('click', function(e) {
+        const menu = document.getElementById('book-menu');
+        const btn = document.getElementById('btn-connect');
+        if (menu && menu.style.display === 'block' && !menu.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+};
+</script>
+</body>
+</html>
