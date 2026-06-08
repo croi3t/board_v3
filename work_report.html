@@ -2,15 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>病棟業務日誌 入力支援ツール v2</title>
+    <title>病棟業務日誌 入力支援ツール v3</title>
     <style>
         * { box-sizing: border-box; font-family: "Meiryo", "MS PGothic", sans-serif; }
         body { background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
         h1 { font-size: 20px; color: #2c3e50; margin: 0 0 15px 0; border-left: 5px solid #3498db; padding-left: 10px; }
-        .container { display: flex; gap: 20px; max-width: 1500px; margin: 0 auto; }
-        .left-panel { flex: 1; min-width: 360px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: fit-content; }
+        .container { display: flex; gap: 20px; max-width: 1600px; margin: 0 auto; }
+        .left-panel { flex: 1; min-width: 380px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: fit-content; }
         .right-panel { flex: 2; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .section-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #ddd; color: #555; }
+        .section-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #ddd; color: #555; display: flex; justify-content: space-between; align-items: center;}
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 12px; margin-bottom: 4px; font-weight: bold; }
         select, input[type="text"], input[type="time"] { width: 100%; padding: 6px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
@@ -25,7 +25,15 @@
         .btn-secondary:hover { background-color: #7f8c8d; }
         .btn-orange { background-color: #e67e22; }
         .btn-orange:hover { background-color: #d35400; }
+        .btn-purple { background-color: #9b59b6; }
+        .btn-purple:hover { background-color: #8e44ad; }
         
+        /* モード切替ラジオ */
+        .mode-container { display: flex; gap: 10px; background: #eee; padding: 5px; border-radius: 4px; margin-bottom: 12px; }
+        .mode-label { flex: 1; text-align: center; font-size: 12px; font-weight: bold; padding: 6px; cursor: pointer; border-radius: 3px; background: #fff; border: 1px solid #ccc;}
+        input[type="radio"] { display: none; }
+        input[type="radio"]:checked + .mode-label { background: #3498db; color: white; border-color: #2980b9; }
+
         /* パネルエリア */
         .panel-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px; }
         .work-btn { padding: 10px; font-size: 12px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.1s; }
@@ -37,7 +45,7 @@
 
         /* タイムライン */
         .timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .timeline-list { border: 1px solid #ddd; border-radius: 4px; background: #fafafa; min-height: 300px; max-height: 600px; overflow-y: auto; padding: 5px; }
+        .timeline-list { border: 1px solid #ddd; border-radius: 4px; background: #fafafa; min-height: 350px; max-height: 600px; overflow-y: auto; padding: 5px; }
         .timeline-item { display: flex; align-items: center; background: white; padding: 8px 12px; margin-bottom: 5px; border-radius: 4px; border-left: 6px solid #ccc; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 13px; }
         .timeline-item.target { border-left-color: #3498db; background-color: #f7fbfd; }
         .timeline-item.nontarget { border-left-color: #95a5a6; background-color: #fcfcfc; }
@@ -53,7 +61,7 @@
         .time-slider { width: 100px; cursor: pointer; }
         .time-badge { background: #eee; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; min-width: 45px; text-align: center; }
 
-        /* 設定マスタ編集フォーム */
+        /* 設定マスタ編集 */
         .config-box { background: #fcfcfc; border: 1px dashed #ccc; padding: 10px; border-radius: 4px; margin-top: 15px; font-size: 12px; }
         .editor-row { display: flex; gap: 5px; margin-bottom: 4px; align-items: center; }
         .editor-row input { padding: 3px; font-size: 11px; }
@@ -61,11 +69,11 @@
 </head>
 <body>
 
-    <h1>病棟業務日誌 入力支援ツール v2</h1>
+    <h1>病棟業務日誌 入力支援ツール v3</h1>
     
     <div class="container">
         <div class="left-panel">
-            <div class="section-title">👤 作業者・初期情報</div>
+            <div class="section-title">👤 ①ユーザー基本マスタ（初期雛形）</div>
             <div class="form-group">
                 <label>作業者名 (Excel A列に出力):</label>
                 <select id="userSelect" onchange="loadUserConfig()">
@@ -73,14 +81,31 @@
                     <option value="新規">-- 新規ユーザー追加 --</option>
                 </select>
                 <div style="display:flex; gap:5px; margin-top:5px;">
-                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex:1;" onclick="exportConfigToFile()">⚙️ 設定を保存(ファイル保存)</button>
-                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex:1;" onclick="document.getElementById('importFile').click()">📂 設定を読込</button>
+                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex:1;" onclick="exportConfigToFile()">⚙️ マスタを保存(ファイル保存)</button>
+                    <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; flex:1;" onclick="document.getElementById('importFile').click()">📂 マスタを読込</button>
                     <input type="file" id="importFile" style="display:none" accept=".json" onchange="importConfigFromFile(event)">
                 </div>
             </div>
             <div class="form-group">
-                <label>始業時刻:</label>
+                <label>基本始業時刻:</label>
                 <input type="time" id="dayStartTime" value="08:30" onchange="renderTimeline()">
+            </div>
+
+            <div class="section-title">🔄 ②追加モード切り替え</div>
+            <div class="mode-container">
+                <input type="radio" id="modeAppend" name="insertMode" value="append" checked onchange="toggleModeUI()">
+                <label for="modeAppend" class="mode-label">最後尾に積み上げ</label>
+                
+                <input type="radio" id="modeInsert" name="insertMode" value="insert" onchange="toggleModeUI()">
+                <label for="modeInsert" class="mode-label">指定時刻にはめ込み</label>
+            </div>
+
+            <div class="form-group" id="insertTimeContainer" style="display:none; background:#e8f4f8; padding:8px; border-radius:4px; border:1px solid #bee5eb;">
+                <label style="color:#1d643b;">⏰ はめ込み開始時刻を指定:</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="time" id="insertStartTime" value="14:00">
+                    <button class="btn btn-purple" style="padding:4px 8px; font-size:11px; white-space:nowrap;" onclick="setInsertTimeToNow()">現在時刻</button>
+                </div>
             </div>
 
             <div class="section-title">🍱 休憩時間のクイック挿入</div>
@@ -97,14 +122,22 @@
 
             <div class="config-box">
                 <div style="font-weight:bold; margin-bottom:8px; color:#2c3e50;">⚙️ パネルの名称・個別時間設定</div>
-                <div style="max-height: 250px; overflow-y: auto; padding-right:3px;" id="masterEditorForm">
-                    </div>
+                <div style="max-height: 200px; overflow-y: auto; padding-right:3px;" id="masterEditorForm"></div>
                 <button class="btn btn-success" style="width:100%; padding:4px; font-size:11px; margin-top:8px;" onclick="saveMasterEditor()">上記内容をパネルに反映</button>
             </div>
         </div>
 
         <div class="right-panel">
-            <div class="timeline-header">
+            <div class="timeline-header" style="background: #ebf5fb; padding: 10px; border-radius: 6px; border: 1px solid #d4e6f1;">
+                <div style="font-weight:bold; color:#2980b9; font-size:13px;">💾 ③【本日中】データの一時保存・再開</div>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn btn-purple" style="padding:6px 12px;" onclick="exportCurrentProgressToFile()">💾 作成中の日誌を保存</button>
+                    <button class="btn btn-purple" style="padding:6px 12px; background-color:#8e44ad;" onclick="document.getElementById('importProgressFile').click()">📂 途中の日誌を再開</button>
+                    <input type="file" id="importProgressFile" style="display:none" accept=".json" onchange="importCurrentProgressFromFile(event)">
+                </div>
+            </div>
+
+            <div class="timeline-header" style="margin-top:15px;">
                 <div class="section-title" style="margin:0; border:none;">📅 本日のタイムライン</div>
                 <div>
                     <button class="btn btn-danger" onclick="resetTimeline()">クリアして初期化</button>
@@ -124,7 +157,6 @@
     </div>
 
     <script>
-        // 初期の業務マスタデフォルトテンプレート
         const defaultJobs = [
             { id: 1, name: "持参薬鑑別", duration: 30, isTarget: true, defaultDetail: "定期持参薬・手術前休薬確認" },
             { id: 2, name: "服薬指導", duration: 45, isTarget: true, defaultDetail: "病棟服薬指導" },
@@ -139,34 +171,41 @@
         ];
 
         let baseConfig = {
-            "Aさん": {
-                firstHourJobId: 6, // 朝礼・病棟情報収集
-                firstHourDuration: 60,
-                jobs: JSON.parse(JSON.stringify(defaultJobs))
-            }
+            "Aさん": { firstHourJobId: 6, firstHourDuration: 60, jobs: JSON.parse(JSON.stringify(defaultJobs)) }
         };
 
         let currentUser = "Aさん";
         let timelineData = [];
 
         window.onload = function() {
-            if(localStorage.getItem("ward_diary_config_v2")) {
-                baseConfig = JSON.parse(localStorage.getItem("ward_diary_config_v2"));
+            if(localStorage.getItem("ward_diary_config_v3_master")) {
+                baseConfig = JSON.parse(localStorage.getItem("ward_diary_config_v3_master"));
             }
             updateUserSelect();
             loadUserConfig();
+            setInsertTimeToNow();
         };
+
+        function toggleModeUI() {
+            const isInsert = document.getElementById("modeInsert").checked;
+            document.getElementById("insertTimeContainer").style.display = isInsert ? "block" : "none";
+        }
+
+        function setInsertTimeToNow() {
+            let now = new Date();
+            let h = String(now.getHours()).padStart(2, '0');
+            let m = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById("insertStartTime").value = `${h}:${m}`;
+        }
 
         function updateUserSelect() {
             const select = document.getElementById("userSelect");
             select.innerHTML = "";
             for(let user in baseConfig) {
-                let opt = document.createElement("option");
-                opt.value = user; opt.innerText = user;
+                let opt = document.createElement("option"); opt.value = user; opt.innerText = user;
                 select.appendChild(opt);
             }
-            let optNew = document.createElement("option");
-            optNew.value = "新規"; optNew.innerText = "-- 新規ユーザー追加 --";
+            let optNew = document.createElement("option"); optNew.value = "新規"; optNew.innerText = "-- 新規ユーザー追加 --";
             select.appendChild(optNew);
         }
 
@@ -176,17 +215,10 @@
                 let name = prompt("新しいユーザー名を入力してください:");
                 if(name && !baseConfig[name]) {
                     baseConfig[name] = JSON.parse(JSON.stringify(baseConfig[currentUser] || baseConfig["Aさん"])); 
-                    updateUserSelect();
-                    select.value = name;
-                    currentUser = name;
-                } else {
-                    select.value = currentUser;
-                    return;
-                }
-            } else {
-                currentUser = select.value;
-            }
-            localStorage.setItem("ward_diary_config_v2", JSON.stringify(baseConfig));
+                    updateUserSelect(); select.value = name; currentUser = name;
+                } else { select.value = currentUser; return; }
+            } else { currentUser = select.value; }
+            localStorage.setItem("ward_diary_config_v3_master", JSON.stringify(baseConfig));
             renderPanels();
             renderMasterEditor();
             resetTimeline();
@@ -196,15 +228,12 @@
             const targetGrid = document.getElementById("targetPanelGrid");
             const nontargetGrid = document.getElementById("nontargetPanelGrid");
             targetGrid.innerHTML = ""; nontargetGrid.innerHTML = "";
-
             baseConfig[currentUser].jobs.forEach(job => {
                 let btn = document.createElement("button");
                 btn.className = "work-btn " + (job.isTarget ? "btn-target" : "btn-nontarget");
                 btn.innerText = `${job.name}\n(${job.duration}分)`;
                 btn.onclick = () => addJobToTimeline(job);
-                
-                if(job.isTarget) { targetGrid.appendChild(btn); } 
-                else { nontargetGrid.appendChild(btn); }
+                if(job.isTarget) { targetGrid.appendChild(btn); } else { nontargetGrid.appendChild(btn); }
             });
         }
 
@@ -212,13 +241,11 @@
             const form = document.getElementById("masterEditorForm");
             form.innerHTML = "";
             baseConfig[currentUser].jobs.forEach((job, index) => {
-                let div = document.createElement("div");
-                div.className = "editor-row";
+                let div = document.createElement("div"); div.className = "editor-row";
                 div.innerHTML = `
                     <span style="font-size:10px; width:15px; color:${job.isTarget?'#3498db':'#95a5a6'}">●</span>
-                    <input type="text" id="editName_${index}" value="${job.name}" style="flex:2;" placeholder="パネル名">
-                    <input type="text" id="editDur_${index}" value="${job.duration}" style="width:40px; text-align:center;" placeholder="分">
-                    <span style="font-size:10px;">分</span>
+                    <input type="text" id="editName_${index}" value="${job.name}" style="flex:2;">
+                    <input type="text" id="editDur_${index}" value="${job.duration}" style="width:35px; text-align:center;">分
                 `;
                 form.appendChild(div);
             });
@@ -226,14 +253,12 @@
 
         function saveMasterEditor() {
             baseConfig[currentUser].jobs.forEach((job, index) => {
-                let nameVal = document.getElementById(`editName_${index}`).value;
-                let durVal = parseInt(document.getElementById(`editDur_${index}`).value, 10) || 15;
-                job.name = nameVal;
-                job.duration = durVal;
+                job.name = document.getElementById(`editName_${index}`).value;
+                job.duration = parseInt(document.getElementById(`editDur_${index}`).value, 10) || 15;
             });
-            localStorage.setItem("ward_diary_config_v2", JSON.stringify(baseConfig));
+            localStorage.setItem("ward_diary_config_v3_master", JSON.stringify(baseConfig));
             renderPanels();
-            alert("設定を現在のユーザーのパネルへ反映しました。");
+            alert("基本マスタ設定を反映しました。");
         }
 
         function resetTimeline() {
@@ -241,66 +266,96 @@
             const conf = baseConfig[currentUser];
             let firstJob = conf.jobs.find(j => j.id === conf.firstHourJobId);
             if(firstJob) {
-                timelineData.push({
-                    name: firstJob.name,
-                    duration: conf.firstHourDuration,
-                    isTarget: firstJob.isTarget,
-                    detail: firstJob.defaultDetail
-                });
+                timelineData.push({ name: firstJob.name, duration: conf.firstHourDuration, isTarget: firstJob.isTarget, detail: firstJob.defaultDetail });
             }
             renderTimeline();
         }
 
+        // 業務の追加（積み上げ or はめ込み選択型）
         function addJobToTimeline(job) {
-            timelineData.push({
+            const isInsertMode = document.getElementById("modeInsert").checked;
+            
+            let newTarget = {
                 name: job.name,
                 duration: job.duration,
                 isTarget: job.isTarget,
                 detail: job.defaultDetail || ""
-            });
+            };
+
+            if (!isInsertMode) {
+                // 通常積み上げ
+                timelineData.push(newTarget);
+            } else {
+                // 特定時刻指定はめ込みロジック
+                let insertTimeStr = document.getElementById("insertStartTime").value;
+                let dayStartMins = timeStringToMins(document.getElementById("dayStartTime").value || "08:30");
+                let insertMins = timeStringToMins(insertTimeStr);
+
+                let tempTimeline = [];
+                let currentMins = dayStartMins;
+                let inserted = false;
+
+                for (let item of timelineData) {
+                    if (!inserted && insertMins <= currentMins) {
+                        tempTimeline.push(newTarget);
+                        inserted = true;
+                    }
+                    // もし既存タスクの途中に指定時間が来る場合、そのタスクの前に挟み込む(簡易版)
+                    if (!inserted && insertMins < (currentMins + item.duration)) {
+                        let beforeDur = insertMins - currentMins;
+                        let afterDur = item.duration - beforeDur;
+                        if(beforeDur > 0) {
+                            tempTimeline.push({ name: item.name, duration: beforeDur, isTarget: item.isTarget, detail: item.detail });
+                        }
+                        tempTimeline.push(newTarget);
+                        if(afterDur > 0) {
+                            tempTimeline.push({ name: item.name, duration: afterDur, isTarget: item.isTarget, detail: item.detail });
+                        }
+                        inserted = true;
+                        currentMins += item.duration;
+                        continue;
+                    }
+                    tempTimeline.push(item);
+                    currentMins += item.duration;
+                }
+
+                if (!inserted) {
+                    tempTimeline.push(newTarget);
+                }
+                timelineData = tempTimeline;
+            }
+
             renderTimeline();
-            document.getElementById("timelineList").scrollTop = document.getElementById("timelineList").scrollHeight;
         }
 
+        // 休憩時間の割り込み挿入
         function insertLunchTime(targetHour) {
             let startTimeStr = document.getElementById("dayStartTime").value || "08:30";
-            timelineData = timelineData.filter(item => item.name !== "休憩");
-
+            let cleanedTimeline = timelineData.filter(item => item.name !== "休憩");
             let tempTimeline = [];
             let currentMins = timeStringToMins(startTimeStr);
             let lunchStartMins = targetHour * 60;
             let lunchInserted = false;
 
-            for(let item of timelineData) {
+            for(let item of cleanedTimeline) {
                 if(!lunchInserted && currentMins >= lunchStartMins) {
                     tempTimeline.push({ name: "休憩", duration: 60, isTarget: false, detail: "昼休憩" });
                     lunchInserted = true;
                 }
-                
                 if(!lunchInserted && (currentMins + item.duration) > lunchStartMins) {
                     let beforeDuration = lunchStartMins - currentMins;
                     let afterDuration = item.duration - beforeDuration;
-                    
-                    if(beforeDuration > 0) {
-                        tempTimeline.push({ name: item.name, duration: beforeDuration, isTarget: item.isTarget, detail: item.detail });
-                    }
+                    if(beforeDuration > 0) tempTimeline.push({ name: item.name, duration: beforeDuration, isTarget: item.isTarget, detail: item.detail });
                     tempTimeline.push({ name: "休憩", duration: 60, isTarget: false, detail: "昼休憩" });
-                    if(afterDuration > 0) {
-                        tempTimeline.push({ name: item.name, duration: afterDuration, isTarget: item.isTarget, detail: item.detail });
-                    }
+                    if(afterDuration > 0) tempTimeline.push({ name: item.name, duration: afterDuration, isTarget: item.isTarget, detail: item.detail });
                     lunchInserted = true;
-                    currentMins += item.duration + 60;
+                    currentMins += item.duration;
                     continue;
                 }
-
                 tempTimeline.push(item);
                 currentMins += item.duration;
             }
-
-            if(!lunchInserted) {
-                tempTimeline.push({ name: "休憩", duration: 60, isTarget: false, detail: "昼休憩" });
-            }
-
+            if(!lunchInserted) tempTimeline.push({ name: "休憩", duration: 60, isTarget: false, detail: "昼休憩" });
             timelineData = tempTimeline;
             renderTimeline();
         }
@@ -320,29 +375,24 @@
         }
 
         function timeStringToMins(str) {
-            let [h, m] = str.split(":").map(Number);
-            return h * 60 + m;
+            let [h, m] = str.split(":").map(Number); return h * 60 + m;
         }
 
         function minsToTimeString(mins) {
-            let h = Math.floor(mins / 60) % 24;
-            let m = mins % 60;
+            let h = Math.floor(mins / 60) % 24; let m = mins % 60;
             return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
         }
 
         function renderTimeline() {
             const list = document.getElementById("timelineList");
             list.innerHTML = "";
-
             let currentMins = timeStringToMins(document.getElementById("dayStartTime").value || "08:30");
-            let totalMins = 0;
-            let targetMins = 0;
+            let totalMins = 0; let targetMins = 0;
 
             timelineData.forEach((item, index) => {
                 let startTimeStr = minsToTimeString(currentMins);
                 let endTimeStr = minsToTimeString(currentMins + item.duration);
                 currentMins += item.duration;
-
                 totalMins += item.duration;
                 if(item.isTarget) targetMins += item.duration;
 
@@ -360,7 +410,7 @@
                             <input type="range" class="time-slider" min="5" max="120" step="5" value="${item.duration}" oninput="handleSliderChange(${index}, this.value)">
                             <span class="time-badge">${item.duration}分</span>
                         </div>
-                        <button class="step-btn" style="color:red; font-weight:bold; background:none; border:none; cursor:pointer;" onclick="removeJob(${index})">×</button>
+                        <button style="color:red; font-weight:bold; background:none; border:none; cursor:pointer;" onclick="removeJob(${index})">×</button>
                     </div>
                 `;
                 list.appendChild(div);
@@ -373,29 +423,74 @@
         function generateExcelText() {
             let currentMins = timeStringToMins(document.getElementById("dayStartTime").value || "08:30");
             let lines = [];
-
-            timelineData.forEach(item => {
+                timelineData.forEach(item => {
                 let startTimeStr = minsToTimeString(currentMins);
                 let endTimeStr = minsToTimeString(currentMins + item.duration);
                 currentMins += item.duration;
-
-                let flag = item.isTarget ? "対象" : "対象外";
-                let line = `${currentUser}\t${startTimeStr}\t${endTimeStr}\t${item.name}\t${flag}\t${item.detail}`;
-                lines.push(line);
+                lines.push(`${currentUser}\t${startTimeStr}\t${endTimeStr}\t${item.name}\t${item.isTarget?"対象":"対象外"}\t${item.detail}`);
             });
-
             document.getElementById("excelTextarea").value = lines.join("\n");
         }
 
         function copyToClipboard() {
             generateExcelText();
             const textarea = document.getElementById("excelTextarea");
-            textarea.select();
-            document.execCommand("copy");
-            alert("Excel用コピーデータを生成しました！\nExcelのA列（左端）を選択して Ctrl + V で貼り付けてください。");
+            textarea.select(); document.execCommand("copy");
+            alert("Excel用データをクリップボードにコピーしました！\nExcelのA列（左端）を選択して Ctrl+V で貼り付けてください。");
         }
 
+        // 基本マスタ(雛形)のエクスポート・インポート
         function exportConfigToFile() {
             let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(baseConfig, null, 2));
+            let dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", `ward_diary_master.json`);
+            document.body.appendChild(dl); dl.click(); dl.remove();
+        }
+
+        function importConfigFromFile(event) {
+            const reader = new FileReader();
+            reader.onload = function(){
+                try {
+                    baseConfig = JSON.parse(reader.result);
+                    localStorage.setItem("ward_diary_config_v3_master", JSON.stringify(baseConfig));
+                    updateUserSelect(); loadUserConfig();
+                    alert("基本マスタを正常に読み込みました。");
+                } catch(e) { alert("マスターファイルの読み込みに失敗しました。"); }
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+
+        // 【新機能】作成中日誌データの一時保存・再開
+        function exportCurrentProgressToFile() {
+            let progressData = {
+                user: currentUser,
+                startTime: document.getElementById("dayStartTime").value,
+                timeline: timelineData
+            };
+            let today = new Date().toISOString().slice(0,10).replace(/-/g,"");
+            let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(progressData, null, 2));
             let dl = document.createElement('a');
-            
+            dl.setAttribute("href", dataStr);
+            dl.setAttribute("download", `日誌途中保存_${currentUser}_${today}.json`);
+            document.body.appendChild(dl); dl.click(); dl.remove();
+        }
+
+        function importCurrentProgressFromFile(event) {
+            const reader = new FileReader();
+            reader.onload = function(){
+                try {
+                    let progressData = JSON.parse(reader.result);
+                    if(progressData.user && progressData.timeline) {
+                        currentUser = progressData.user;
+                        document.getElementById("userSelect").value = currentUser;
+                        document.getElementById("dayStartTime").value = progressData.startTime || "08:30";
+                        timelineData = progressData.timeline;
+                        renderTimeline();
+                        alert(`【${currentUser}】の途中保存データを再開しました。`);
+                    } else { alert("有効な日誌データファイルではありません。"); }
+                } catch(e) { alert("データの読み込みに失敗しました。"); }
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+    </script>
+</body>
+</html>
