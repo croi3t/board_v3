@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>超高齢者PopPK研究 進捗管理・CRF</title>
+    
+    <HTA:APPLICATION 
+        ID="pkStudyApp" 
+        APPLICATIONNAME="PK_Study_CRF" 
+        WINDOWSTATE="normal"
+        SCROLL="yes"
+        SINGLEINSTANCE="yes"
+    >
+
+    <style>
+        body { font-family: 'Meiryo', sans-serif; font-size: 13px; background: #f4f7f8; margin: 15px; }
+        .container { width: 100%; margin: auto; }
+        .alert-section { background: #ffeb3b; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; border-left: 5px solid #f44336; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: middle; word-wrap: break-word; }
+        th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
+        
+        .status-btn { cursor: pointer; padding: 4px 8px; border-radius: 4px; border: none; color: white; font-weight: bold; width: 65px; font-size: 11px; }
+        .status-0 { background: #95a5a6; } /* 同意未 */
+        .status-1 { background: #3498db; } /* 同意済 */
+        .status-2 { background: #e67e22; } /* 採血済 */
+        .status-3 { background: #2ecc71; } /* 処理済 */
+        .status-4 { background: #2c3e50; } /* 提出済 */
+        .status-5 { background: #e74c3c; } /* 候補外 */
+        
+        .highlight { background: #fff9c4; font-weight: bold; }
+        .fetch-btn { cursor: pointer; padding: 4px 6px; background: #007bff; color: white; border: none; border-radius: 3px; font-size: 11px; margin-top: 2px;}
+        .fetch-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .export-btn { cursor: pointer; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; font-size: 12px; margin-left: 20px;}
+        
+        .tab-container { margin-bottom: 10px; border-bottom: 2px solid #2c3e50; padding-bottom: 2px; }
+        .tab-btn { cursor: pointer; padding: 8px 16px; border: 1px solid #2c3e50; border-bottom: none; background: #ecf0f1; border-radius: 5px 5px 0 0; font-weight: bold; color: #7f8c8d; display: inline-block; }
+        .tab-btn.active { background: #2c3e50; color: white; }
+        
+        .search-box { float: right; padding: 5px; border: 1px solid #ccc; border-radius: 3px; margin-top: 2px; font-size: 12px; width: 180px; }
+        
+        /* 病棟フィルターのレイアウト（全展開） */
+        .ward-filter-section {
+            background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; 
+            margin-bottom: 10px; clear: both; line-height: 1.8;
+        }
+        .ward-label {
+            display: inline-block; margin-right: 15px; font-size: 12px; white-space: nowrap; cursor: pointer;
+        }
+        .remarks-input { 
+            width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; 
+            border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="margin-top:0;">対象抗菌薬 PopPK解析 進捗管理ツール</h2>
+
+    <div id="todayAlert" class="alert-section">
+        <strong>【当日採血アラート】 本日（2点採血）の予定患者がいます</strong>
+        <ul id="alertList" style="margin: 5px 0 0 0;"></ul>
+    </div>
+
+    <div style="margin-bottom: 15px; background: white; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+        <label style="font-weight: bold; font-size: 12px;">1. 「注射.csv」を読み込む：</label>
+        <input type="file" id="csvFile" accept=".csv" style="font-size: 12px;">
+        <button class="export-btn" onclick="exportToCSV()">現在の管理一覧をCSV出力</button>
+        <button onclick="clearData()" style="float: right; color: red; font-size: 11px;">全データ初期化</button>
+    </div>
+
+    <div class="tab-container">
+        <div id="tab-screening" class="tab-btn active" onclick="switchTab('screening')">スクリーニング</div>
+        <div id="tab-target" class="tab-btn" onclick="switchTab('target')">対象症例</div>
+        <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
+        <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
+    </div>
+
+    <div class="ward-filter-section" id="wardFilterContainer">
+    </div>
+
+    <table id="patientTable">
+        <thead>
+            <tr>
+                <th style="width: 55px;">患者ID</th>
+                <th style="width: 80px;">氏名</th>
+                <th style="width: 90px;">病棟 / 診療科 / 医師</th>
+                <th style="width: 100px;">対象薬品</th>
+                <th style="width: 80px;">投与期間</th>
+                <th style="width: 125px;">採血予定日 (カルテ連携)</th>
+                <th style="width: auto;">備考・コメント</th>
+                <th style="width: 75px; text-align: center;">ステータス</th>
+                <th style="width: 55px; text-align: center;">操作</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    var fso;
+    var dataFilePath = "pk_study_crf_data.json";
+    try {
+        fso = new ActiveXObject("Scripting.FileSystemObject");
+        var htaPath = unescape(location.pathname).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\//g, '\\');
+        var folderPath = fso.GetParentFolderName(htaPath);
+        dataFilePath = folderPath + "\\pk_study_crf_data.json";
+    } catch(e) {}
+
+    function loadData() {
+        if (!fso) return {};
+        try {
+            if (fso.FileExists(dataFilePath)) {
+                var ts = fso.OpenTextFile(dataFilePath, 1, false, -2);
+                if (!ts.AtEndOfStream) {
+                    var text = ts.ReadAll();
+                    ts.Close();
+                    if (text) return JSON.parse(text);
+                }
+                ts.Close();
+            }
+        } catch(e) {}
+        return {};
+    }
+
+    function saveDataToFile() {
+        if (!fso) return;
+        try {
+            var ts = fso.OpenTextFile(dataFilePath, 2, true, -2);
+            ts.Write(JSON.stringify(patientData));
+            ts.Close();
+        } catch(e) {}
+    }
+
+    var patientData = loadData();
+    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "提出済", "候補外"];
+    var currentTab = "screening"; 
+    
+    // 一括取得用のキュー管理
+    var fetchQueue = [];
+    var isFetchingAll = false;
+
+    function escapeHtml(str) {
+        if (!str) return "";
+        return String(str).replace(/[&<>"']/g, function(match) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
+        });
+    }
+
+    function parseCSVLine(text) {
+        var ret = [];
+        var inQuote = false;
+        var val = "";
+        for (var i = 0; i < text.length; i++) {
+            var c = text.charAt(i);
+            if (inQuote) {
+                if (c === '"') {
+                    if (i + 1 < text.length && text.charAt(i + 1) === '"') {
+                        val += '"'; i++;
+                    } else {
+                        inQuote = false;
+                    }
+                } else {
+                    val += c;
+                }
+            } else {
+                if (c === '"') {
+                    inQuote = true;
+                } else if (c === ',') {
+                    ret.push(val); val = "";
+                } else {
+                    val += c;
+                }
+            }
+        }
+        ret.push(val);
+        return ret;
+    }
+
+    document.getElementById('csvFile').onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                processData(event.target.result);
+            } catch(err) {
+                alert("CSVの解析中にエラーが発生しました。\nファイルの形式が正しくない可能性があります。\nエラー詳細: " + err.message);
+            }
+            document.getElementById('csvFile').value = "";
+        };
+        reader.readAsText(file, 'Shift-JIS'); 
+    };
+
+    function processData(csvText) {
+        var lines = csvText.split(/\r\n|\n|\r/);
+        var addedCount = 0;
+
+        for (var i = 1; i < lines.length; i++) {
+            var line = lines[i];
+            if (!line || line.replace(/^\s+|\s+$/g, '') === "") continue;
+
+            var cols = parseCSVLine(line);
+            
+            if (cols.length < 6) continue;
+
+            var drug = cols[1] ? cols[1].replace(/^\s+|\s+$/g, '') : "";
+            var date = cols[4] ? cols[4].replace(/^\s+|\s+$/g, '') : "";
+            var id = cols[5] ? cols[5].replace(/^\s+|\s+$/g, '') : "";
+            var name = cols[6] ? cols[6].replace(/^\s+|\s+$/g, '') : "";
+            
+            var department = cols.length > 7 && cols[7] ? cols[7].replace(/^\s+|\s+$/g, '') : "";
+            var doctor = cols.length > 8 && cols[8] ? cols[8].replace(/^\s+|\s+$/g, '') : "";
+            var ward = cols.length > 9 && cols[9] ? cols[9].replace(/^\s+|\s+$/g, '') : "";
+
+            if (!id) continue;
+            addedCount++;
+
+            var key = id; 
+
+            if (!patientData[key]) {
+                patientData[key] = {
+                    id: id, name: name, drug: drug,
+                    department: department, doctor: doctor, ward: ward,
+                    start: date, end: date,
+                    status: 0,
+                    sampleDate: "",
+                    bloodDetail: "",
+                    remarks: "",
+                    tab: "screening"
+                };
+            } else {
+                if (patientData[key].drug.indexOf(drug) === -1) {
+                    patientData[key].drug += " / " + drug;
+                }
+                patientData[key].department = department || patientData[key].department;
+                patientData[key].doctor = doctor || patientData[key].doctor;
+                patientData[key].ward = ward || patientData[key].ward;
+
+                var newDate = new Date(date);
+                if (!isNaN(newDate.getTime())) {
+                    if (newDate < new Date(patientData[key].start)) patientData[key].start = date;
+                    if (newDate > new Date(patientData[key].end)) patientData[key].end = date;
+                }
+            }
+        }
+        
+        saveAndRender();
+        alert("CSVの取り込みが完了しました。\n有効データ行数: " + addedCount);
+    }
+
+    function switchTab(tabName) {
+        currentTab = tabName;
+        document.getElementById("tab-screening").className = (tabName === "screening") ? "tab-btn active" : "tab-btn";
+        document.getElementById("tab-target").className = (tabName === "target") ? "tab-btn active" : "tab-btn";
+        renderTable();
+    }
+
+    function moveTab(key, targetTab) {
+        patientData[key].tab = targetTab;
+        saveAndRender();
+    }
+
+    function toggleStatus(key) {
+        patientData[key].status = (patientData[key].status + 1) % statusLabels.length;
+        saveAndRender();
+    }
+
+    function updateSampleDate(key, dateVal) {
+        patientData[key].sampleDate = dateVal;
+        patientData[key].bloodDetail = "手動入力";
+        saveAndRender();
+    }
+
+    function updateRemarks(key, textVal) {
+        patientData[key].remarks = textVal;
+        saveDataToFile(); 
+    }
+
+    function saveAndRender() {
+        saveDataToFile();
+        updateWardCheckboxes();
+        renderTable();
+    }
+
+    function clearData() {
+        if(confirm("すべての管理データを消去します。よろしいですか？（※復元できません）")) {
+            patientData = {};
+            if (fso && fso.FileExists(dataFilePath)) {
+                try { fso.DeleteFile(dataFilePath); } catch(e) {}
+            }
+            saveAndRender();
+        }
+    }
+
+    function updateWardCheckboxes() {
+        var container = document.getElementById("wardFilterContainer");
+        
+        var existingChecks = document.getElementsByClassName('ward-cb');
+        var checkedWards = {};
+        for(var i=0; i<existingChecks.length; i++) {
+            if(existingChecks[i].checked) {
+                checkedWards[existingChecks[i].value] = true;
+            }
+        }
+
+        var wards = {};
+        for (var key in patientData) {
+            if (patientData.hasOwnProperty(key) && patientData[key].ward) {
+                wards[patientData[key].ward] = true;
+            }
+        }
+        
+        // 指定された順番の配列（半角・全角の揺れを考慮）
+        var predefinedWards = [
+            "3A", "３A", "NICU", "3C", "３C", "4A", "４A", "4B", "４B", "4C", "４C", 
+            "5A", "５A", "5B", "５B", "5C", "５C", "6A", "６A", "6B", "６B", "6C", "６C"
+        ];
+        var wardOrder = [];
+        
+        // 事前定義された病棟が存在すれば順番に追加
+        for (var i = 0; i < predefinedWards.length; i++) {
+            var w = predefinedWards[i];
+            if (wards[w]) {
+                wardOrder.push(w);
+                delete wards[w];
+            }
+        }
+        
+        // リスト外の病棟があった場合は末尾に追加
+        for (var w in wards) {
+            wardOrder.push(w);
+        }
+        
+        var html = '<span style="font-size:12px; font-weight:bold; margin-right:15px; color:#555;">病棟絞り込み:</span>';
+        var hasWard = false;
+        
+        for (var i = 0; i < wardOrder.length; i++) {
+            hasWard = true;
+            var w = wardOrder[i];
+            var isChecked = checkedWards[w] ? "checked" : "";
+            html += '<label class="ward-label"><input type="checkbox" class="ward-cb" value="' + escapeHtml(w) + '" onchange="renderTable()" ' + isChecked + '> ' + escapeHtml(w) + '</label>';
+        }
+        
+        if (!hasWard) html += '<span style="font-size:11px; color:#999;">（データなし）</span>';
+        container.innerHTML = html;
+    }
+
+    function exportToCSV() {
+        if (!fso) {
+            alert("ファイル出力機能が利用できない環境です。");
+            return;
+        }
+
+        var csvContent = "患者ID,氏名,病棟,診療科,担当医師,対象薬品,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
+        
+        for (var key in patientData) {
+            if (!patientData.hasOwnProperty(key)) continue;
+            var p = patientData[key];
+            
+            var rowArray = [
+                p.id, p.name, p.ward, p.department, p.doctor,
+                p.drug, p.start, p.end, p.sampleDate,
+                statusLabels[p.status], 
+                p.tab === "target" ? "対象症例" : "スクリーニング",
+                p.remarks
+            ];
+            
+            var escapedRow = [];
+            for (var i = 0; i < rowArray.length; i++) {
+                var str = String(rowArray[i] || "");
+                escapedRow.push('"' + str.replace(/"/g, '""') + '"');
+            }
+            csvContent += escapedRow.join(",") + "\n";
+        }
+        
+        try {
+            var d = new Date();
+            var y = d.getFullYear();
+            var m = d.getMonth() + 1;
+            var day = d.getDate();
+            var dateStr = y + (m < 10 ? '0' + m : m) + (day < 10 ? '0' + day : day);
+            
+            var htaPath = unescape(location.pathname).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\//g, '\\');
+            var folderPath = fso.GetParentFolderName(htaPath);
+            var expPath = folderPath + "\\管理一覧出力_" + dateStr + ".csv";
+            
+            var stream = new ActiveXObject("ADODB.Stream");
+            stream.Type = 2;
+            stream.Charset = "Shift_JIS";
+            stream.Open();
+            stream.WriteText(csvContent);
+            stream.SaveToFile(expPath, 2);
+            stream.Close();
+            
+            alert("「" + expPath + "」にCSVを出力しました。");
+        } catch (e) {
+            alert("CSV出力に失敗しました: " + e.message);
+        }
+    }
+
+    function renderTable() {
+        var tbody = document.getElementById('tableBody');
+        var alertList = document.getElementById('alertList');
+        var alertSection = document.getElementById('todayAlert');
+        var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        
+        var checkboxes = document.getElementsByClassName('ward-cb');
+        var selectedWards = [];
+        for(var i=0; i<checkboxes.length; i++) {
+            if(checkboxes[i].checked) {
+                selectedWards.push(checkboxes[i].value);
+            }
+        }
+        
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = d.getMonth() + 1;
+        var day = d.getDate();
+        var todayStr = y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+        
+        tbody.innerHTML = "";
+        alertList.innerHTML = "";
+        var alertCount = 0;
+
+        for (var key in patientData) {
+            if (!patientData.hasOwnProperty(key)) continue;
+            var p = patientData[key];
+            
+            var pTab = p.tab || "screening";
+            if (pTab !== currentTab) continue;
+            
+            var searchText = (p.id + p.name).toUpperCase();
+            if (searchInput !== "" && searchText.indexOf(searchInput) === -1) continue;
+
+            if (selectedWards.length > 0) {
+                var wardMatch = false;
+                for(var j=0; j<selectedWards.length; j++) {
+                    if (p.ward === selectedWards[j]) wardMatch = true;
+                }
+                if (!wardMatch) continue;
+            }
+
+            var isToday = (p.sampleDate === todayStr);
+
+            if (isToday && currentTab === "target") {
+                alertCount++;
+                var li = document.createElement("li");
+                li.innerHTML = "<strong>" + escapeHtml(p.id) + " " + escapeHtml(p.name) + "様</strong> (" + escapeHtml(p.drug) + ")";
+                alertList.appendChild(li);
+            }
+
+            var row = document.createElement('tr');
+            row.id = 'tr-patient-' + p.id;
+            if (isToday) row.className = 'highlight';
+
+            var infoStr = escapeHtml(p.ward) + "<br><span style='font-size:10px;color:#555;'>" + escapeHtml(p.department) + " / " + escapeHtml(p.doctor) + "</span>";
+
+            var html = "";
+            html += "<td>" + escapeHtml(p.id) + "</td>";
+            html += "<td>" + escapeHtml(p.name) + "</td>";
+            html += "<td>" + infoStr + "</td>";
+            html += "<td style='font-size: 11px;'>" + escapeHtml(p.drug) + "</td>";
+            html += "<td style='font-size: 11px;'>" + escapeHtml(p.start) + "<br>～" + escapeHtml(p.end) + "</td>";
+            
+            html += "<td class='blood-date-cell' title='" + escapeHtml(p.bloodDetail) + "'>";
+            html += "  <input type='date' value='" + escapeHtml(p.sampleDate) + "' onchange=\"updateSampleDate('" + key + "', this.value)\" style='width: 105px;'>";
+            html += "  <br><button class='fetch-btn' id='btn-" + p.id + "' onclick=\"fetchSingleBloodDate('" + key + "')\">カルテ確認</button>";
+            html += "  <div style='font-size:10px; color:#666; margin-top:2px;' class='blood-date-text'>" + escapeHtml(p.bloodDetail) + "</div>";
+            html += "</td>";
+
+            var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
+            // textarea化して改行対応し、幅を最大限活用
+            html += "<td><textarea class='remarks-input' onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ...'>" + safeRemarks + "</textarea></td>";
+            
+            html += "<td style='text-align: center;'>";
+            html += "  <button class='status-btn status-" + p.status + "' onclick=\"toggleStatus('" + key + "')\">" + statusLabels[p.status] + "</button>";
+            html += "</td>";
+            
+            html += "<td style='text-align: center;'>";
+            if (currentTab === "screening") {
+                html += "  <button onclick=\"moveTab('" + key + "', 'target')\" style='font-size:10px; background:#2ecc71; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer;'>追加</button>";
+            } else {
+                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer;'>戻す</button>";
+            }
+            html += "</td>";
+            
+            row.innerHTML = html;
+            tbody.appendChild(row);
+        }
+
+        alertSection.style.display = alertCount > 0 ? "block" : "none";
+    }
+
+    // ★追加: 現在表示されているリスト（フィルター適用後）の患者をまとめて取得
+    function fetchAllBloodDates() {
+        if(isFetchingAll) return;
+        fetchQueue = [];
+        
+        var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        var checkboxes = document.getElementsByClassName('ward-cb');
+        var selectedWards = [];
+        for(var i=0; i<checkboxes.length; i++) {
+            if(checkboxes[i].checked) {
+                selectedWards.push(checkboxes[i].value);
+            }
+        }
+        
+        for (var key in patientData) {
+            if (!patientData.hasOwnProperty(key)) continue;
+            var p = patientData[key];
+            if ((p.tab || "screening") !== currentTab) continue;
+            
+            var searchText = (p.id + p.name).toUpperCase();
+            if (searchInput !== "" && searchText.indexOf(searchInput) === -1) continue;
+
+            if (selectedWards.length > 0) {
+                var wardMatch = false;
+                for(var j=0; j<selectedWards.length; j++) {
+                    if (p.ward === selectedWards[j]) wardMatch = true;
+                }
+                if (!wardMatch) continue;
+            }
+            fetchQueue.push(key);
+        }
+        
+        if (fetchQueue.length === 0) {
+            alert("取得対象の患者がいません。");
+            return;
+        }
+        
+        if (confirm("現在表示されている " + fetchQueue.length + " 名の採血予定日を一括取得しますか？\n※順次カルテシステムにアクセスするため時間がかかる場合があります。")) {
+            isFetchingAll = true;
+            processFetchQueue();
+        }
+    }
+
+    function processFetchQueue() {
+        if(fetchQueue.length === 0) {
+            isFetchingAll = false;
+            alert("一括取得が完了しました。");
+            return;
+        }
+        var nextKey = fetchQueue.shift();
+        // 取得後、再帰的に次を処理する
+        fetchSingleBloodDate(nextKey, processFetchQueue); 
+    }
+
+    // 第2引数(callback)を追加し、完了時に呼び出すように改修
+    function fetchSingleBloodDate(key, callback) {
+        var p = patientData[key];
+        if (!p || !p.id) {
+            if (callback) callback();
+            return;
+        }
+        
+        var btn = document.getElementById('btn-' + p.id);
+        if(btn) { btn.innerText = "取得中..."; btn.disabled = true; }
+
+        var userId = "16622";
+        var url = "http://10.5.171.42:8082/karte/karte.php?kanja_id=" + p.id + 
+                  "&user_id=" + userId + 
+                  "&order_search_flg=1&order_search_code=3&order_search_name=#top" +
+                  "&_nocache=" + new Date().getTime();
+
+        var iframeId = "blood-fetch-iframe-" + p.id;
+        var existing = document.getElementById(iframeId);
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+        var iframe = document.createElement("iframe");
+        iframe.id = iframeId;
+        iframe.style.display = "none";
+        iframe.setAttribute("application", "yes"); 
+        document.body.appendChild(iframe);
+
+        var isDone = false;
+        
+        var cleanup = function() {
+            if (isDone) return;
+            isDone = true;
+            setTimeout(function() {
+                var ifr = document.getElementById(iframeId);
+                if (ifr && ifr.parentNode) ifr.parentNode.removeChild(ifr);
+                if (callback) callback(); // 次の患者の処理へ進む
+            }, 500);
+            saveAndRender(); 
+        };
+
+        // タイムアウト時間を3分から30秒に短縮（一括取得での停止を防ぐため）
+        var fallbackTimer = setTimeout(function() {
+            if (!isDone) {
+                p.bloodDetail = "読み込みタイムアウト(30秒超過)";
+                cleanup();
+            }
+        }, 30000); 
+
+        iframe.onload = function() {
+            setTimeout(function() {
+                if (isDone) return;
+                try {
+                    var doc = iframe.contentWindow.document;
+                    var allText = "";
+                    
+                    function collectText(currentDoc) {
+                        if (!currentDoc) return;
+                        try {
+                            if (currentDoc.body && currentDoc.body.innerText) {
+                                allText += " " + currentDoc.body.innerText;
+                            }
+                        } catch(e) {}
+                        var frames = currentDoc.getElementsByTagName("frame");
+                        var iframes = currentDoc.getElementsByTagName("iframe");
+                        for(var j=0; j<frames.length; j++) {
+                            try { collectText(frames[j].contentWindow.document); } catch(e){}
+                        }
+                        for(var k=0; k<iframes.length; k++) {
+                            try { collectText(iframes[k].contentWindow.document); } catch(e){}
+                        }
+                    }
+                    
+                    collectText(doc);
+
+                    var regex = /【([^】]*?(?:生化学|血液|外注|一般)[^】]*?)】[^【]{0,150}?(\d{4})\/(\d{2})\/(\d{2})/g;
+                    var match;
+                    var today = new Date();
+                    today.setHours(0,0,0,0);
+                    var futureEntries = [];
+                    
+                    while ((match = regex.exec(allText)) !== null) {
+                        var typeRaw = match[1].replace(/^[0-9:\s]+/, '').replace(/\[.*?\]\s*/g, '').replace(/^\s+|\s+$/g, '');
+                        var typeClean = typeRaw.substring(0, 15);
+                        var y = parseInt(match[2], 10);
+                        var m = parseInt(match[3], 10);
+                        var d = parseInt(match[4], 10);
+                        var dt = new Date(y, m - 1, d);
+                        
+                        var diffDays = (dt.getTime() - today.getTime()) / (1000 * 3600 * 24);
+                        if (diffDays >= 1 && diffDays <= 30) {
+                            var mStr = m < 10 ? '0' + m : m;
+                            var dStr = d < 10 ? '0' + d : d;
+                            futureEntries.push({
+                                dateObj: dt,
+                                displayDate: y + '-' + mStr + '-' + dStr,
+                                detail: match[0].substring(0, 45) + " (" + typeClean + ")"
+                            });
+                        }
+                    }
+                    
+                    if (futureEntries.length > 0) {
+                        futureEntries.sort(function(a, b) { return a.dateObj.getTime() - b.dateObj.getTime(); });
+                        var target = futureEntries[0];
+                        p.sampleDate = target.displayDate;
+                        p.bloodDetail = "自動取得: " + target.detail;
+                    } else {
+                        p.bloodDetail = "明日以降30日以内の検査予定が見つかりませんでした";
+                    }
+                } catch(e) {
+                    p.bloodDetail = "フレーム解析エラー: " + (e.message || e);
+                }
+                
+                clearTimeout(fallbackTimer);
+                cleanup();
+            }, 1500); 
+        };
+        
+        try {
+            iframe.src = url;
+        } catch(e) {
+            p.bloodDetail = "URLアクセスエラー";
+            clearTimeout(fallbackTimer);
+            cleanup();
+        }
+    }
+
+    updateWardCheckboxes();
+    renderTable();
+</script>
+</body>
+</html>
