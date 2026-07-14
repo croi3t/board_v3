@@ -21,13 +21,19 @@
         th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: middle; word-wrap: break-word; }
         th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
         
-        .status-btn { cursor: pointer; padding: 4px 8px; border-radius: 4px; border: none; color: white; font-weight: bold; width: 65px; font-size: 11px; }
+        /* Sort indicators */
+        .sort-icon { font-size: 10px; color: #7f8c8d; margin-left: 3px; }
+        
+        /* Status Select UI */
+        .status-select { padding: 4px; border-radius: 4px; border: none; font-weight: bold; width: 100%; font-size: 11px; color: white; cursor: pointer; text-align: center; }
+        .status-select option { background: white; color: black; font-weight: normal; }
         .status-0 { background: #95a5a6; } /* 同意未 */
         .status-1 { background: #3498db; } /* 同意済 */
         .status-2 { background: #e67e22; } /* 採血済 */
         .status-3 { background: #2ecc71; } /* 処理済 */
         .status-4 { background: #2c3e50; } /* 提出済 */
         .status-5 { background: #e74c3c; } /* 候補外 */
+        .status-6 { background: #bdc3c7; color: #333; } /* 未判定 */
         
         .highlight { background: #fff9c4; font-weight: bold; }
         .fetch-btn { cursor: pointer; padding: 4px 6px; background: #007bff; color: white; border: none; border-radius: 3px; font-size: 11px; margin-top: 2px;}
@@ -40,7 +46,6 @@
         
         .search-box { float: right; padding: 5px; border: 1px solid #ccc; border-radius: 3px; margin-top: 2px; font-size: 12px; width: 180px; }
         
-        /* 病棟フィルターのレイアウト（全展開） */
         .ward-filter-section {
             background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; 
             margin-bottom: 10px; clear: both; line-height: 1.8;
@@ -65,8 +70,8 @@
     </div>
 
     <div style="margin-bottom: 15px; background: white; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
-        <label style="font-weight: bold; font-size: 12px;">1. 「注射.csv」を読み込む：</label>
-        <input type="file" id="csvFile" accept=".csv" style="font-size: 12px;">
+        <label style="font-weight: bold; font-size: 12px;">1. 処方統計データ（Excel または CSV）を読み込む：</label>
+        <input type="file" id="dataFile" accept=".csv, .xls, .xlsx" style="font-size: 12px;">
         <button class="export-btn" onclick="exportToCSV()">現在の管理一覧をCSV出力</button>
         <button onclick="clearData()" style="float: right; color: red; font-size: 11px;">全データ初期化</button>
     </div>
@@ -84,14 +89,23 @@
     <table id="patientTable">
         <thead>
             <tr>
-                <th style="width: 55px;">患者ID</th>
-                <th style="width: 80px;">氏名</th>
-                <th style="width: 90px;">病棟 / 診療科 / 医師</th>
-                <th style="width: 100px;">対象薬品</th>
-                <th style="width: 80px;">投与期間</th>
-                <th style="width: 125px;">採血予定日 (カルテ連携)</th>
+                <th style="width: 60px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
+                <th style="width: 80px; cursor: pointer;" onclick="sortTable('name')">氏名 <span id="sort-icon-name" class="sort-icon">↕</span></th>
+                <th style="width: 70px; cursor: pointer;" onclick="sortTable('age')">年齢<br>/区分 <span id="sort-icon-age" class="sort-icon">↕</span></th>
+                <th style="width: 90px; cursor: pointer;" onclick="sortTable('ward')">病棟/診療科 <span id="sort-icon-ward" class="sort-icon">↕</span></th>
+                <th style="width: 100px;">対象薬品<br>
+                    <select id="filterDrug" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
+                        <option value="">すべて</option>
+                    </select>
+                </th>
+                <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
+                <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
                 <th style="width: auto;">備考・コメント</th>
-                <th style="width: 75px; text-align: center;">ステータス</th>
+                <th style="width: 85px;">ステータス<br>
+                    <select id="filterStatus" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
+                        <option value="">すべて</option>
+                    </select>
+                </th>
                 <th style="width: 55px; text-align: center;">操作</th>
             </tr>
         </thead>
@@ -135,12 +149,14 @@
     }
 
     var patientData = loadData();
-    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "提出済", "候補外"];
+    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "提出済", "候補外", "未判定"];
     var currentTab = "screening"; 
     
-    // 一括取得用のキュー管理
     var fetchQueue = [];
     var isFetchingAll = false;
+    
+    var currentSortCol = "";
+    var currentSortAsc = true;
 
     function escapeHtml(str) {
         if (!str) return "";
@@ -179,57 +195,141 @@
         return ret;
     }
 
-    document.getElementById('csvFile').onchange = function(e) {
+    function formatDateString(strOrDate) {
+        if (!strOrDate) return "";
+        var d = new Date(strOrDate);
+        if (isNaN(d.getTime())) return String(strOrDate); 
+        var y = d.getFullYear();
+        var m = d.getMonth() + 1;
+        var day = d.getDate();
+        return y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+    }
+
+    function calculateAgeAtStart(birthDateStr, startDateStr) {
+        if (!birthDateStr || !startDateStr) return null;
+        var bStr = birthDateStr.replace(/[\/\年\月]/g, "/").replace(/日/g, "");
+        var sStr = startDateStr.replace(/[\/\年\月]/g, "/").replace(/日/g, "");
+        var b = new Date(bStr);
+        var s = new Date(sStr);
+        if(isNaN(b.getTime()) || isNaN(s.getTime())) return null;
+        var age = s.getFullYear() - b.getFullYear();
+        var m = s.getMonth() - b.getMonth();
+        if (m < 0 || (m === 0 && s.getDate() < b.getDate())) {
+            age--;
+        }
+        return age;
+    }
+
+    function getAgeGroup(age) {
+        if(age === null || age === undefined || age === "") return "";
+        if(age <= 17) return "対象外";
+        if(age <= 64) return "非高齢者";
+        if(age <= 84) return "高齢者";
+        return "超高齢者";
+    }
+
+    document.getElementById('dataFile').onchange = function(e) {
+        var fileInput = document.getElementById('dataFile');
+        var filePath = fileInput.value; 
         var file = e.target.files[0];
         if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function(event) {
+
+        var fileName = file.name.toLowerCase();
+        
+        if (fileName.indexOf(".xls") !== -1) {
+            // Excel読み込み処理
             try {
-                processData(event.target.result);
+                var excel = new ActiveXObject("Excel.Application");
+                excel.Visible = false;
+                excel.DisplayAlerts = false;
+                var book = excel.Workbooks.Open(filePath);
+                var sheet = book.Worksheets(1);
+                var usedRange = sheet.UsedRange;
+                var rowsCount = usedRange.Rows.Count;
+                var colsCount = usedRange.Columns.Count;
+                
+                var val = usedRange.Value;
+                var dataRows = [];
+                
+                if (rowsCount === 1 && colsCount === 1) {
+                    dataRows.push([val != null ? String(val) : ""]);
+                } else {
+                    var vbarray = new VBArray(val).toArray();
+                    var index = 0;
+                    for(var r=0; r<rowsCount; r++) {
+                        var rowData = [];
+                        for(var c=0; c<colsCount; c++) {
+                            var cellVal = vbarray[index++];
+                            rowData.push(cellVal != null ? String(cellVal) : "");
+                        }
+                        dataRows.push(rowData);
+                    }
+                }
+                
+                book.Close(false);
+                excel.Quit();
+                excel = null;
+                
+                processDataRows(dataRows, 1);
             } catch(err) {
-                alert("CSVの解析中にエラーが発生しました。\nファイルの形式が正しくない可能性があります。\nエラー詳細: " + err.message);
+                alert("Excelファイルの読み込みに失敗しました。\nExcelがインストールされているか、ファイルが使用中でないか確認してください。\n詳細: " + err.message);
             }
-            document.getElementById('csvFile').value = "";
-        };
-        reader.readAsText(file, 'Shift-JIS'); 
+            fileInput.value = "";
+        } else {
+            // CSV読み込み処理
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    var text = event.target.result;
+                    var lines = text.split(/\r\n|\n|\r/);
+                    var dataRows = [];
+                    for (var i = 0; i < lines.length; i++) {
+                        if (!lines[i] || lines[i].replace(/^\s+|\s+$/g, '') === "") continue;
+                        dataRows.push(parseCSVLine(lines[i]));
+                    }
+                    processDataRows(dataRows, 1);
+                } catch(err) {
+                    alert("CSVの解析中にエラーが発生しました。\nエラー詳細: " + err.message);
+                }
+                fileInput.value = "";
+            };
+            reader.readAsText(file, 'Shift-JIS'); 
+        }
     };
 
-    function processData(csvText) {
-        var lines = csvText.split(/\r\n|\n|\r/);
+    function processDataRows(dataRows, startIndex) {
         var addedCount = 0;
-
-        for (var i = 1; i < lines.length; i++) {
-            var line = lines[i];
-            if (!line || line.replace(/^\s+|\s+$/g, '') === "") continue;
-
-            var cols = parseCSVLine(line);
-            
+        for (var i = startIndex; i < dataRows.length; i++) {
+            var cols = dataRows[i];
             if (cols.length < 6) continue;
 
-            var drug = cols[1] ? cols[1].replace(/^\s+|\s+$/g, '') : "";
-            var date = cols[4] ? cols[4].replace(/^\s+|\s+$/g, '') : "";
-            var id = cols[5] ? cols[5].replace(/^\s+|\s+$/g, '') : "";
-            var name = cols[6] ? cols[6].replace(/^\s+|\s+$/g, '') : "";
+            var drug = cols[1] ? String(cols[1]).replace(/^\s+|\s+$/g, '') : "";
+            var rawDate = cols[4] ? cols[4] : "";
+            var date = formatDateString(rawDate);
+            var id = cols[5] ? String(cols[5]).replace(/^\s+|\s+$/g, '') : "";
+            var name = cols[6] ? String(cols[6]).replace(/^\s+|\s+$/g, '') : "";
             
-            var department = cols.length > 7 && cols[7] ? cols[7].replace(/^\s+|\s+$/g, '') : "";
-            var doctor = cols.length > 8 && cols[8] ? cols[8].replace(/^\s+|\s+$/g, '') : "";
-            var ward = cols.length > 9 && cols[9] ? cols[9].replace(/^\s+|\s+$/g, '') : "";
+            var department = cols.length > 7 && cols[7] ? String(cols[7]).replace(/^\s+|\s+$/g, '') : "";
+            var doctor = cols.length > 8 && cols[8] ? String(cols[8]).replace(/^\s+|\s+$/g, '') : "";
+            var ward = cols.length > 9 && cols[9] ? String(cols[9]).replace(/^\s+|\s+$/g, '') : "";
 
             if (!id) continue;
             addedCount++;
 
             var key = id; 
-
             if (!patientData[key]) {
                 patientData[key] = {
                     id: id, name: name, drug: drug,
                     department: department, doctor: doctor, ward: ward,
                     start: date, end: date,
-                    status: 0,
+                    status: 6, // 新規は「未判定」をデフォルトとする
                     sampleDate: "",
                     bloodDetail: "",
                     remarks: "",
-                    tab: "screening"
+                    tab: "screening",
+                    birthDate: "",
+                    age: null,
+                    ageGroup: ""
                 };
             } else {
                 if (patientData[key].drug.indexOf(drug) === -1) {
@@ -244,11 +344,20 @@
                     if (newDate < new Date(patientData[key].start)) patientData[key].start = date;
                     if (newDate > new Date(patientData[key].end)) patientData[key].end = date;
                 }
+                
+                // 開始日が更新された場合、年齢の再計算を試みる
+                if (patientData[key].birthDate) {
+                    patientData[key].age = calculateAgeAtStart(patientData[key].birthDate, patientData[key].start);
+                    patientData[key].ageGroup = getAgeGroup(patientData[key].age);
+                }
             }
         }
         
-        saveAndRender();
-        alert("CSVの取り込みが完了しました。\n有効データ行数: " + addedCount);
+        saveDataToFile();
+        updateHeaderFilters(true);
+        updateWardCheckboxes();
+        renderTable();
+        alert("データの取り込みが完了しました。\n有効データ行数: " + addedCount);
     }
 
     function switchTab(tabName) {
@@ -263,8 +372,8 @@
         saveAndRender();
     }
 
-    function toggleStatus(key) {
-        patientData[key].status = (patientData[key].status + 1) % statusLabels.length;
+    function updateStatus(key, val) {
+        patientData[key].status = parseInt(val, 10);
         saveAndRender();
     }
 
@@ -295,6 +404,45 @@
         }
     }
 
+    function sortTable(col) {
+        if (currentSortCol === col) currentSortAsc = !currentSortAsc;
+        else { currentSortCol = col; currentSortAsc = true; }
+        renderTable();
+    }
+
+    function updateHeaderFilters(forceRebuild) {
+        var selDrug = document.getElementById("filterDrug");
+        var selStatus = document.getElementById("filterStatus");
+        
+        if (!forceRebuild && selDrug.options.length > 1) return; // 既に構築済みならスキップ
+
+        var currentDrug = selDrug.value;
+        var currentStatus = selStatus.value;
+        
+        var drugs = {};
+        for (var key in patientData) {
+            if(patientData.hasOwnProperty(key)) {
+                var dParts = patientData[key].drug.split(" / ");
+                for(var i=0; i<dParts.length; i++) drugs[dParts[i]] = true;
+            }
+        }
+        
+        var drugHtml = '<option value="">すべて</option>';
+        var sortedDrugs = Object.keys(drugs).sort();
+        for(var i=0; i<sortedDrugs.length; i++) {
+            var d = sortedDrugs[i];
+            drugHtml += '<option value="' + escapeHtml(d) + '"' + (d === currentDrug ? ' selected' : '') + '>' + escapeHtml(d) + '</option>';
+        }
+        selDrug.innerHTML = drugHtml;
+
+        var statusHtml = '<option value="">すべて</option>';
+        for(var i=0; i<statusLabels.length; i++) {
+            var lbl = statusLabels[i];
+            statusHtml += '<option value="' + i + '"' + (i.toString() === currentStatus ? ' selected' : '') + '>' + lbl + '</option>';
+        }
+        selStatus.innerHTML = statusHtml;
+    }
+
     function updateWardCheckboxes() {
         var container = document.getElementById("wardFilterContainer");
         
@@ -313,14 +461,12 @@
             }
         }
         
-        // 指定された順番の配列（半角・全角の揺れを考慮）
         var predefinedWards = [
             "3A", "３A", "NICU", "3C", "３C", "4A", "４A", "4B", "４B", "4C", "４C", 
-            "5A", "５A", "5B", "５B", "5C", "５C", "6A", "６A", "6B", "６B", "6C", "６C"
+            "5A", "５A", "5B", "５B", "5C", "５C", "6A", "６A", "6B", "６B", "6C", "６C", "外来"
         ];
         var wardOrder = [];
         
-        // 事前定義された病棟が存在すれば順番に追加
         for (var i = 0; i < predefinedWards.length; i++) {
             var w = predefinedWards[i];
             if (wards[w]) {
@@ -329,7 +475,6 @@
             }
         }
         
-        // リスト外の病棟があった場合は末尾に追加
         for (var w in wards) {
             wardOrder.push(w);
         }
@@ -354,16 +499,16 @@
             return;
         }
 
-        var csvContent = "患者ID,氏名,病棟,診療科,担当医師,対象薬品,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
+        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
         
         for (var key in patientData) {
             if (!patientData.hasOwnProperty(key)) continue;
             var p = patientData[key];
             
             var rowArray = [
-                p.id, p.name, p.ward, p.department, p.doctor,
+                p.id, p.name, p.age, p.ageGroup, p.ward, p.department, p.doctor,
                 p.drug, p.start, p.end, p.sampleDate,
-                statusLabels[p.status], 
+                statusLabels[p.status] || "未判定", 
                 p.tab === "target" ? "対象症例" : "スクリーニング",
                 p.remarks
             ];
@@ -402,10 +547,15 @@
     }
 
     function renderTable() {
+        updateHeaderFilters();
+
         var tbody = document.getElementById('tableBody');
         var alertList = document.getElementById('alertList');
         var alertSection = document.getElementById('todayAlert');
         var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        
+        var selDrug = document.getElementById("filterDrug").value;
+        var selStatus = document.getElementById("filterStatus").value;
         
         var checkboxes = document.getElementsByClassName('ward-cb');
         var selectedWards = [];
@@ -425,6 +575,8 @@
         alertList.innerHTML = "";
         var alertCount = 0;
 
+        var keys = [];
+
         for (var key in patientData) {
             if (!patientData.hasOwnProperty(key)) continue;
             var p = patientData[key];
@@ -443,6 +595,53 @@
                 if (!wardMatch) continue;
             }
 
+            if (selDrug !== "" && p.drug.indexOf(selDrug) === -1) continue;
+            if (selStatus !== "" && p.status.toString() !== selStatus) continue;
+
+            keys.push(key);
+        }
+
+        // 並び替え処理
+        if (currentSortCol !== "") {
+            keys.sort(function(a, b) {
+                var vA = patientData[a][currentSortCol];
+                var vB = patientData[b][currentSortCol];
+                
+                if (vA === null || vA === undefined) vA = "";
+                if (vB === null || vB === undefined) vB = "";
+                
+                if (currentSortCol === 'age') {
+                    vA = parseInt(vA, 10); if(isNaN(vA)) vA = -1;
+                    vB = parseInt(vB, 10); if(isNaN(vB)) vB = -1;
+                }
+
+                if(vA < vB) return currentSortAsc ? -1 : 1;
+                if(vA > vB) return currentSortAsc ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // ソートアイコンの更新
+        var sortCols = ["id", "name", "age", "ward", "start", "sampleDate"];
+        for (var i=0; i<sortCols.length; i++) {
+            var sc = sortCols[i];
+            var iconId = "sort-icon-" + sc;
+            var el = document.getElementById(iconId);
+            if(el) {
+                if (currentSortCol === sc) {
+                    el.innerHTML = currentSortAsc ? "▲" : "▼";
+                    el.style.color = "#f1c40f";
+                } else {
+                    el.innerHTML = "↕";
+                    el.style.color = "#7f8c8d";
+                }
+            }
+        }
+
+        for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
+            var p = patientData[key];
+
             var isToday = (p.sampleDate === todayStr);
 
             if (isToday && currentTab === "target") {
@@ -457,26 +656,32 @@
             if (isToday) row.className = 'highlight';
 
             var infoStr = escapeHtml(p.ward) + "<br><span style='font-size:10px;color:#555;'>" + escapeHtml(p.department) + " / " + escapeHtml(p.doctor) + "</span>";
+            var ageDisplay = (p.age !== null && p.age !== "") ? escapeHtml(p.age) + "歳<br><span style='font-size:10px;'>" + escapeHtml(p.ageGroup) + "</span>" : "<span style='color:#ccc; font-size:10px;'>未取得</span>";
 
             var html = "";
             html += "<td>" + escapeHtml(p.id) + "</td>";
             html += "<td>" + escapeHtml(p.name) + "</td>";
+            html += "<td>" + ageDisplay + "</td>";
             html += "<td>" + infoStr + "</td>";
             html += "<td style='font-size: 11px;'>" + escapeHtml(p.drug) + "</td>";
             html += "<td style='font-size: 11px;'>" + escapeHtml(p.start) + "<br>～" + escapeHtml(p.end) + "</td>";
             
             html += "<td class='blood-date-cell' title='" + escapeHtml(p.bloodDetail) + "'>";
             html += "  <input type='date' value='" + escapeHtml(p.sampleDate) + "' onchange=\"updateSampleDate('" + key + "', this.value)\" style='width: 105px;'>";
-            html += "  <br><button class='fetch-btn' id='btn-" + p.id + "' onclick=\"fetchSingleBloodDate('" + key + "')\">カルテ確認</button>";
+            html += "  <br><button class='fetch-btn' id='btn-" + p.id + "' onclick=\"fetchSingleBloodDate('" + key + "')\">一括確認<br>(年齢+採血)</button>";
             html += "  <div style='font-size:10px; color:#666; margin-top:2px;' class='blood-date-text'>" + escapeHtml(p.bloodDetail) + "</div>";
             html += "</td>";
 
             var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
-            // textarea化して改行対応し、幅を最大限活用
             html += "<td><textarea class='remarks-input' onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ...'>" + safeRemarks + "</textarea></td>";
             
             html += "<td style='text-align: center;'>";
-            html += "  <button class='status-btn status-" + p.status + "' onclick=\"toggleStatus('" + key + "')\">" + statusLabels[p.status] + "</button>";
+            html += "  <select class='status-select status-" + p.status + "' onchange=\"updateStatus('" + key + "', this.value)\">";
+            for (var st=0; st<statusLabels.length; st++) {
+                var selected = (p.status === st) ? "selected" : "";
+                html += "    <option value='" + st + "' " + selected + ">" + statusLabels[st] + "</option>";
+            }
+            html += "  </select>";
             html += "</td>";
             
             html += "<td style='text-align: center;'>";
@@ -494,18 +699,17 @@
         alertSection.style.display = alertCount > 0 ? "block" : "none";
     }
 
-    // ★追加: 現在表示されているリスト（フィルター適用後）の患者をまとめて取得
     function fetchAllBloodDates() {
         if(isFetchingAll) return;
         fetchQueue = [];
         
         var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        var selDrug = document.getElementById("filterDrug").value;
+        var selStatus = document.getElementById("filterStatus").value;
         var checkboxes = document.getElementsByClassName('ward-cb');
         var selectedWards = [];
         for(var i=0; i<checkboxes.length; i++) {
-            if(checkboxes[i].checked) {
-                selectedWards.push(checkboxes[i].value);
-            }
+            if(checkboxes[i].checked) selectedWards.push(checkboxes[i].value);
         }
         
         for (var key in patientData) {
@@ -523,6 +727,10 @@
                 }
                 if (!wardMatch) continue;
             }
+
+            if (selDrug !== "" && p.drug.indexOf(selDrug) === -1) continue;
+            if (selStatus !== "" && p.status.toString() !== selStatus) continue;
+
             fetchQueue.push(key);
         }
         
@@ -531,7 +739,7 @@
             return;
         }
         
-        if (confirm("現在表示されている " + fetchQueue.length + " 名の採血予定日を一括取得しますか？\n※順次カルテシステムにアクセスするため時間がかかる場合があります。")) {
+        if (confirm("現在表示されている " + fetchQueue.length + " 名の生年月日と採血予定日を一括取得しますか？\n※順次カルテシステムにアクセスするため時間がかかります。")) {
             isFetchingAll = true;
             processFetchQueue();
         }
@@ -544,11 +752,9 @@
             return;
         }
         var nextKey = fetchQueue.shift();
-        // 取得後、再帰的に次を処理する
         fetchSingleBloodDate(nextKey, processFetchQueue); 
     }
 
-    // 第2引数(callback)を追加し、完了時に呼び出すように改修
     function fetchSingleBloodDate(key, callback) {
         var p = patientData[key];
         if (!p || !p.id) {
@@ -560,12 +766,15 @@
         if(btn) { btn.innerText = "取得中..."; btn.disabled = true; }
 
         var userId = "16622";
-        var url = "http://10.5.171.42:8082/karte/karte.php?kanja_id=" + p.id + 
-                  "&user_id=" + userId + 
-                  "&order_search_flg=1&order_search_code=3&order_search_name=#top" +
-                  "&_nocache=" + new Date().getTime();
+        
+        var url1 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?kanja_id=" + p.id + 
+                   "&ichiran_code=31&user_id=" + userId + "&section_code=0000022&page_num=0&login_flg=";
+                   
+        var url2 = "http://10.5.171.42:8082/karte/karte.php?kanja_id=" + p.id + 
+                   "&user_id=" + userId + "&order_search_flg=1&order_search_code=3&order_search_name=#top" +
+                   "&_nocache=" + new Date().getTime();
 
-        var iframeId = "blood-fetch-iframe-" + p.id;
+        var iframeId = "fetch-iframe-" + p.id;
         var existing = document.getElementById(iframeId);
         if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
 
@@ -575,6 +784,7 @@
         iframe.setAttribute("application", "yes"); 
         document.body.appendChild(iframe);
 
+        var step = 1;
         var isDone = false;
         
         var cleanup = function() {
@@ -583,15 +793,14 @@
             setTimeout(function() {
                 var ifr = document.getElementById(iframeId);
                 if (ifr && ifr.parentNode) ifr.parentNode.removeChild(ifr);
-                if (callback) callback(); // 次の患者の処理へ進む
+                if (callback) callback();
             }, 500);
             saveAndRender(); 
         };
 
-        // タイムアウト時間を3分から30秒に短縮（一括取得での停止を防ぐため）
         var fallbackTimer = setTimeout(function() {
             if (!isDone) {
-                p.bloodDetail = "読み込みタイムアウト(30秒超過)";
+                p.bloodDetail = step === 1 ? "年齢取得タイムアウト(30秒)" : "採血日取得タイムアウト(30秒)";
                 cleanup();
             }
         }, 30000); 
@@ -605,68 +814,77 @@
                     
                     function collectText(currentDoc) {
                         if (!currentDoc) return;
-                        try {
-                            if (currentDoc.body && currentDoc.body.innerText) {
-                                allText += " " + currentDoc.body.innerText;
-                            }
-                        } catch(e) {}
+                        try { if (currentDoc.body && currentDoc.body.innerText) allText += " " + currentDoc.body.innerText; } catch(e) {}
                         var frames = currentDoc.getElementsByTagName("frame");
                         var iframes = currentDoc.getElementsByTagName("iframe");
-                        for(var j=0; j<frames.length; j++) {
-                            try { collectText(frames[j].contentWindow.document); } catch(e){}
-                        }
-                        for(var k=0; k<iframes.length; k++) {
-                            try { collectText(iframes[k].contentWindow.document); } catch(e){}
-                        }
+                        for(var j=0; j<frames.length; j++) { try { collectText(frames[j].contentWindow.document); } catch(e){} }
+                        for(var k=0; k<iframes.length; k++) { try { collectText(iframes[k].contentWindow.document); } catch(e){} }
                     }
-                    
                     collectText(doc);
 
-                    var regex = /【([^】]*?(?:生化学|血液|外注|一般)[^】]*?)】[^【]{0,150}?(\d{4})\/(\d{2})\/(\d{2})/g;
-                    var match;
-                    var today = new Date();
-                    today.setHours(0,0,0,0);
-                    var futureEntries = [];
-                    
-                    while ((match = regex.exec(allText)) !== null) {
-                        var typeRaw = match[1].replace(/^[0-9:\s]+/, '').replace(/\[.*?\]\s*/g, '').replace(/^\s+|\s+$/g, '');
-                        var typeClean = typeRaw.substring(0, 15);
-                        var y = parseInt(match[2], 10);
-                        var m = parseInt(match[3], 10);
-                        var d = parseInt(match[4], 10);
-                        var dt = new Date(y, m - 1, d);
-                        
-                        var diffDays = (dt.getTime() - today.getTime()) / (1000 * 3600 * 24);
-                        if (diffDays >= 1 && diffDays <= 30) {
-                            var mStr = m < 10 ? '0' + m : m;
-                            var dStr = d < 10 ? '0' + d : d;
-                            futureEntries.push({
-                                dateObj: dt,
-                                displayDate: y + '-' + mStr + '-' + dStr,
-                                detail: match[0].substring(0, 45) + " (" + typeClean + ")"
-                            });
+                    if (step === 1) {
+                        var bdRegex = /(?:生年月日.*?|)((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
+                        var match = allText.match(bdRegex);
+                        if (match) {
+                            var y = parseInt(match[1], 10);
+                            var m = parseInt(match[2], 10);
+                            var d = parseInt(match[3], 10);
+                            p.birthDate = y + "/" + (m<10?'0'+m:m) + "/" + (d<10?'0'+d:d);
+                            p.age = calculateAgeAtStart(p.birthDate, p.start);
+                            p.ageGroup = getAgeGroup(p.age);
                         }
-                    }
-                    
-                    if (futureEntries.length > 0) {
-                        futureEntries.sort(function(a, b) { return a.dateObj.getTime() - b.dateObj.getTime(); });
-                        var target = futureEntries[0];
-                        p.sampleDate = target.displayDate;
-                        p.bloodDetail = "自動取得: " + target.detail;
-                    } else {
-                        p.bloodDetail = "明日以降30日以内の検査予定が見つかりませんでした";
+                        
+                        step = 2;
+                        iframe.src = url2; 
+                    } else if (step === 2) {
+                        var regex = /【([^】]*?(?:生化学|血液|外注|一般)[^】]*?)】[^【]{0,150}?(\d{4})\/(\d{2})\/(\d{2})/g;
+                        var match;
+                        var today = new Date();
+                        today.setHours(0,0,0,0);
+                        var futureEntries = [];
+                        
+                        while ((match = regex.exec(allText)) !== null) {
+                            var typeRaw = match[1].replace(/^[0-9:\s]+/, '').replace(/\[.*?\]\s*/g, '').replace(/^\s+|\s+$/g, '');
+                            var typeClean = typeRaw.substring(0, 15);
+                            var y = parseInt(match[2], 10);
+                            var m = parseInt(match[3], 10);
+                            var d = parseInt(match[4], 10);
+                            var dt = new Date(y, m - 1, d);
+                            
+                            var diffDays = (dt.getTime() - today.getTime()) / (1000 * 3600 * 24);
+                            if (diffDays >= 1 && diffDays <= 30) {
+                                var mStr = m < 10 ? '0' + m : m;
+                                var dStr = d < 10 ? '0' + d : d;
+                                futureEntries.push({
+                                    dateObj: dt,
+                                    displayDate: y + '-' + mStr + '-' + dStr,
+                                    detail: match[0].substring(0, 45) + " (" + typeClean + ")"
+                                });
+                            }
+                        }
+                        
+                        if (futureEntries.length > 0) {
+                            futureEntries.sort(function(a, b) { return a.dateObj.getTime() - b.dateObj.getTime(); });
+                            var target = futureEntries[0];
+                            p.sampleDate = target.displayDate;
+                            p.bloodDetail = "自動取得: " + target.detail;
+                        } else {
+                            p.bloodDetail = "明日以降30日以内の検査予定が見つかりませんでした";
+                        }
+                        
+                        clearTimeout(fallbackTimer);
+                        cleanup();
                     }
                 } catch(e) {
-                    p.bloodDetail = "フレーム解析エラー: " + (e.message || e);
+                    p.bloodDetail = (step === 1 ? "年齢取得エラー: " : "フレーム解析エラー: ") + (e.message || e);
+                    clearTimeout(fallbackTimer);
+                    cleanup();
                 }
-                
-                clearTimeout(fallbackTimer);
-                cleanup();
             }, 1500); 
         };
         
         try {
-            iframe.src = url;
+            iframe.src = url1;
         } catch(e) {
             p.bloodDetail = "URLアクセスエラー";
             clearTimeout(fallbackTimer);
@@ -674,6 +892,7 @@
         }
     }
 
+    updateHeaderFilters(true);
     updateWardCheckboxes();
     renderTable();
 </script>
