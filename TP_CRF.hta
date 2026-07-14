@@ -24,15 +24,15 @@
         .sort-icon { font-size: 10px; color: #7f8c8d; margin-left: 3px; }
         
         /* Status Panel UI */
-        .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; width: 100px; margin: auto; }
-        .status-badge { font-size: 10px; padding: 3px 1px; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
+        .status-grid { width: 90px; margin: auto; text-align: left; }
+        .status-badge { display: inline-block; width: 26px; margin: 1px; font-size: 10px; padding: 3px 0; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
         .status-badge:hover { border-color: #888; color: #333; }
         .status-badge.active.st-0 { background: #bdc3c7; color: #333; border-color: #bdc3c7; font-weight:bold; } /* 未判 */
-        .status-badge.active.st-1 { background: #f39c12; color: white; border-color: #f39c12; font-weight:bold; } /* 同未 */
+        .status-badge.active.st-1 { background: #f1c40f; color: white; border-color: #f1c40f; font-weight:bold; } /* 同未 */
         .status-badge.active.st-2 { background: #3498db; color: white; border-color: #3498db; font-weight:bold; } /* 同済 */
-        .status-badge.active.st-3 { background: #e67e22; color: white; border-color: #e67e22; font-weight:bold; } /* 採血 */
-        .status-badge.active.st-4 { background: #2ecc71; color: white; border-color: #2ecc71; font-weight:bold; } /* 処理 */
-        .status-badge.active.st-5 { background: #2c3e50; color: white; border-color: #2c3e50; font-weight:bold; } /* 提出 */
+        .status-badge.active.st-3 { background: #e74c3c; color: white; border-color: #e74c3c; font-weight:bold; } /* 採血 */
+        .status-badge.active.st-4 { background: #9b59b6; color: white; border-color: #9b59b6; font-weight:bold; } /* 処理 */
+        .status-badge.active.st-5 { background: #2ecc71; color: white; border-color: #2ecc71; font-weight:bold; } /* 提出 */
         
         .highlight { background: #fff9c4 !important; }
         
@@ -55,13 +55,21 @@
         .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; }
 
         /* Summary Dashboard */
-        .summary-dashboard { background: white; border: 1px solid #ccc; padding: 20px; border-radius: 5px; }
-        .summary-table { width: 95%; margin-bottom: 30px; border-collapse: collapse; }
-        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .summary-dashboard { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        .summary-table { width: 95%; margin-bottom: 15px; border-collapse: collapse; }
+        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 12px; }
         .summary-table th { background: #34495e; color: white; }
         .summary-table td:first-child { background: #ecf0f1; font-weight: bold; }
         .summary-total-row { background: #ecf0f1; font-weight: bold; }
         .summary-total-col { background: #f1c40f !important; color: #333; font-weight: bold; }
+
+        /* Multi-select filter */
+        .ms-container { position: relative; display: inline-block; width: 100%; text-align: left; }
+        .ms-btn { width: 100%; font-size: 10px; padding: 2px; text-align: left; background: white; border: 1px solid #ccc; cursor: pointer; border-radius: 2px; margin-top: 2px; }
+        .ms-content { display: none; position: absolute; background-color: white; min-width: 140px; box-shadow: 0px 4px 8px rgba(0,0,0,0.2); z-index: 100; max-height: 250px; overflow-y: auto; border: 1px solid #ccc; left: 0; padding: 5px; }
+        .ms-content label { display: block; padding: 2px 0; color: black; font-size: 11px; font-weight: normal; cursor: pointer; white-space: nowrap; }
+        .ms-content label:hover { background-color: #f1f1f1; }
+        .ms-close { display: block; width: 100%; font-size:10px; margin-top:5px; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -102,27 +110,29 @@
                     <th style="width: 55px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
                     <th style="width: 75px; cursor: pointer;" onclick="sortTable('name')">氏名 <span id="sort-icon-name" class="sort-icon">↕</span></th>
                     <th style="width: 80px; cursor: pointer;" onclick="sortTable('age')">年齢/区分 <span id="sort-icon-age" class="sort-icon">↕</span><br>
-                        <select id="filterAgeGroup" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
-                            <option value="">すべて</option>
-                            <option value="非高齢者">非高齢者</option>
-                            <option value="高齢者">高齢者</option>
-                            <option value="超高齢者">超高齢者</option>
-                            <option value="対象外">対象外</option>
-                        </select>
+                        <div class="ms-container" id="ms-age">
+                            <button class="ms-btn" onclick="toggleMs('ms-age', event)">▼ 絞り込み</button>
+                            <div class="ms-content" id="ms-age-content" onclick="event.stopPropagation()"></div>
+                        </div>
                     </th>
                     <th style="width: 90px; cursor: pointer;" onclick="sortTable('ward')">病棟/診療科 <span id="sort-icon-ward" class="sort-icon">↕</span></th>
                     <th style="width: 100px;">対象薬品<br>
-                        <select id="filterDrug" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
-                            <option value="">すべて</option>
-                        </select>
+                        <div class="ms-container" id="ms-drug">
+                            <button class="ms-btn" onclick="toggleMs('ms-drug', event)">▼ 絞り込み</button>
+                            <div class="ms-content" id="ms-drug-content" onclick="event.stopPropagation()"></div>
+                        </div>
                     </th>
                     <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
                     <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
                     <th style="width: auto;">備考・コメント</th>
-                    <th style="width: 110px;">ステータス<br>
-                        <select id="filterStatus" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
-                            <option value="">すべて</option>
-                        </select>
+                    <th style="width: 110px; padding-bottom: 2px;">ステータス<br>
+                        <div class="ms-container" id="ms-status">
+                            <button class="ms-btn" onclick="toggleMs('ms-status', event)">▼ 絞り込み</button>
+                            <div class="ms-content" id="ms-status-content" onclick="event.stopPropagation()"></div>
+                        </div>
+                        <div style="font-size:9px; font-weight:normal; line-height:1.2; margin-top:2px;">
+                          [注] 未判:未判定, 同未:同意未, 同済:同意済, 採血:採血済, 処理:処理済, 提出:提出済
+                        </div>
                     </th>
                     <th style="width: 60px; text-align: center;">操作</th>
                 </tr>
@@ -156,17 +166,14 @@
                     if (text) {
                         var parsed = JSON.parse(text);
                         var migrated = {};
-                        var didMigrate = false;
                         
                         for (var k in parsed) {
                             var p = parsed[k];
                             
-                            // ステータスのマイグレーション (旧6:未判定 -> 新0:未判定, 旧5:候補外 -> タブ移動等)
-                            if (p.status === 6) { p.status = 0; didMigrate = true; }
-                            else if (p.status === 5) { p.status = 0; p.tab = "exclude"; didMigrate = true; }
-                            else if (p.status >= 0 && p.status <= 4) { p.status = p.status + 1; didMigrate = true; }
+                            if (p.status === 6) { p.status = 0; }
+                            else if (p.status === 5) { p.status = 0; p.tab = "exclude"; }
+                            else if (p.status >= 0 && p.status <= 4) { p.status = p.status + 1; }
                             
-                            // ID_DRUGキーへのマイグレーション（レコード分割）
                             if (p.drug && p.drug.indexOf(" / ") !== -1) {
                                 var drugs = p.drug.split(" / ");
                                 for(var i=0; i<drugs.length; i++) {
@@ -175,12 +182,10 @@
                                     pCopy.drug = drugs[i];
                                     migrated[newKey] = pCopy;
                                 }
-                                didMigrate = true;
                             } else {
                                 if (k.indexOf("_") === -1) {
                                     var newKey = p.id + "_" + p.drug;
                                     migrated[newKey] = p;
-                                    didMigrate = true;
                                 } else {
                                     migrated[k] = p;
                                 }
@@ -212,14 +217,21 @@
     
     var fetchQueue = [];
     var isFetchingAll = false;
-    
     var currentSortCol = "";
     var currentSortAsc = true;
+    
+    var msFilters = { age: {}, drug: {}, status: {} };
 
     function escapeHtml(str) {
         if (!str) return "";
         return String(str).replace(/[&<>"']/g, function(match) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
+        });
+    }
+    
+    function toHalfWidth(str) {
+        return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
         });
     }
 
@@ -368,10 +380,10 @@
             var department = cols.length > 7 && cols[7] ? String(cols[7]).replace(/^\s+|\s+$/g, '') : "";
             var doctor = cols.length > 8 && cols[8] ? String(cols[8]).replace(/^\s+|\s+$/g, '') : "";
             var ward = cols.length > 9 && cols[9] ? String(cols[9]).replace(/^\s+|\s+$/g, '') : "";
+            ward = toHalfWidth(ward).toUpperCase();
 
             if (!id) continue;
             
-            // 複数の薬剤が1セルに入っている場合（例: セフトリアキソン / ユナスピン）は分割する
             var drugs = drugStr.split(/\s*[\/／]\s*/);
             
             for(var dIdx=0; dIdx<drugs.length; dIdx++) {
@@ -385,7 +397,7 @@
                         id: id, name: name, drug: drug,
                         department: department, doctor: doctor, ward: ward,
                         start: date, end: date,
-                        status: 0, // 新規は「未判定」(0)
+                        status: 0,
                         sampleDate: "", bloodDetail: "", remarks: "",
                         tab: "screening", birthDate: "", age: null, ageGroup: ""
                     };
@@ -480,36 +492,77 @@
         renderTable();
     }
 
-    function updateHeaderFilters(forceRebuild) {
-        var selDrug = document.getElementById("filterDrug");
-        var selStatus = document.getElementById("filterStatus");
+    function toggleMs(id, e) {
+        if(e) e.stopPropagation();
+        var content = null;
+        if (id) content = document.getElementById(id + "-content");
+        var isShowing = content && content.style.display === "block";
         
-        if (!forceRebuild && selDrug.options.length > 1) return;
-
-        var currentDrug = selDrug.value;
-        var currentStatus = selStatus.value;
-        
-        var drugs = {};
-        for (var key in patientData) {
-            if(patientData.hasOwnProperty(key)) {
-                drugs[patientData[key].drug] = true;
-            }
+        var allContents = document.getElementsByClassName("ms-content");
+        for (var i = 0; i < allContents.length; i++) {
+            allContents[i].style.display = "none";
         }
         
-        var drugHtml = '<option value="">すべて</option>';
-        var sortedDrugs = Object.keys(drugs).sort();
+        if (!isShowing && content) {
+            content.style.display = "block";
+        }
+    }
+    
+    document.onclick = function(e) {
+        if (!e.target.matches('.ms-btn')) {
+            toggleMs('');
+        }
+    };
+
+    function updateMsFilter(filterType, val, isChecked) {
+        if (isChecked) msFilters[filterType][val] = true;
+        else delete msFilters[filterType][val];
+        renderTable();
+    }
+
+    function clearMsFilter(filterType) {
+        msFilters[filterType] = {};
+        updateHeaderFilters(true);
+        renderTable();
+    }
+
+    function updateHeaderFilters(forceRebuild) {
+        var drugContent = document.getElementById("ms-drug-content");
+        if (!forceRebuild && drugContent.innerHTML !== "") return;
+
+        // Age
+        var ages = ["非高齢者", "高齢者", "超高齢者", "対象外"];
+        var html = '<div style="margin-bottom:5px;"><button onclick="clearMsFilter(\'age\')" style="font-size:9px; width:100%;">全クリア</button></div>';
+        for(var i=0; i<ages.length; i++) {
+            var chk = msFilters.age[ages[i]] ? "checked" : "";
+            html += '<label><input type="checkbox" value="' + ages[i] + '" ' + chk + ' onchange="updateMsFilter(\'age\', this.value, this.checked)"> ' + ages[i] + '</label>';
+        }
+        html += '<button class="ms-close" onclick="toggleMs(\'\')">閉じる</button>';
+        document.getElementById("ms-age-content").innerHTML = html;
+
+        // Drug
+        var drugsMap = {};
+        for (var key in patientData) {
+            if(patientData.hasOwnProperty(key)) drugsMap[patientData[key].drug] = true;
+        }
+        var sortedDrugs = Object.keys(drugsMap).sort();
+        html = '<div style="margin-bottom:5px;"><button onclick="clearMsFilter(\'drug\')" style="font-size:9px; width:100%;">全クリア</button></div>';
         for(var i=0; i<sortedDrugs.length; i++) {
             var d = sortedDrugs[i];
-            drugHtml += '<option value="' + escapeHtml(d) + '"' + (d === currentDrug ? ' selected' : '') + '>' + escapeHtml(d) + '</option>';
+            var chk = msFilters.drug[d] ? "checked" : "";
+            html += '<label><input type="checkbox" value="' + escapeHtml(d) + '" ' + chk + ' onchange="updateMsFilter(\'drug\', this.value, this.checked)"> ' + escapeHtml(d) + '</label>';
         }
-        selDrug.innerHTML = drugHtml;
+        html += '<button class="ms-close" onclick="toggleMs(\'\')">閉じる</button>';
+        drugContent.innerHTML = html;
 
-        var statusHtml = '<option value="">すべて</option>';
+        // Status
+        html = '<div style="margin-bottom:5px;"><button onclick="clearMsFilter(\'status\')" style="font-size:9px; width:100%;">全クリア</button></div>';
         for(var i=0; i<statusLabels.length; i++) {
-            var lbl = statusLabels[i];
-            statusHtml += '<option value="' + i + '"' + (i.toString() === currentStatus ? ' selected' : '') + '>' + lbl + '</option>';
+            var chk = msFilters.status[i.toString()] ? "checked" : "";
+            html += '<label><input type="checkbox" value="' + i + '" ' + chk + ' onchange="updateMsFilter(\'status\', this.value, this.checked)"> ' + statusLabels[i] + '</label>';
         }
-        selStatus.innerHTML = statusHtml;
+        html += '<button class="ms-close" onclick="toggleMs(\'\')">閉じる</button>';
+        document.getElementById("ms-status-content").innerHTML = html;
     }
 
     function updateWardCheckboxes() {
@@ -522,37 +575,36 @@
             if(existingChecks[i].checked) checkedWards[existingChecks[i].value] = true;
         }
 
-        var wards = {};
+        var predefinedOrder = ["3A", "NICU", "3C", "4A", "4B", "4C", "5A", "5B", "5C", "6A", "6B", "6C", "外来"];
+        var otherWards = {};
+        
         for (var key in patientData) {
             if (patientData.hasOwnProperty(key) && patientData[key].ward) {
-                wards[patientData[key].ward] = true;
+                var w = patientData[key].ward;
+                var found = false;
+                for(var j=0; j<predefinedOrder.length; j++) {
+                    if (predefinedOrder[j] === w) { found = true; break; }
+                }
+                if (!found) {
+                    otherWards[w] = true;
+                }
             }
         }
         
-        var predefinedWards = [
-            "3A", "３A", "NICU", "3C", "３C", "4A", "４A", "4B", "４B", "4C", "４C", 
-            "5A", "５A", "5B", "５B", "5C", "５C", "6A", "６A", "6B", "６B", "6C", "６C", "外来"
-        ];
-        var wardOrder = [];
-        
-        for (var i = 0; i < predefinedWards.length; i++) {
-            var w = predefinedWards[i];
-            if (wards[w]) {
-                wardOrder.push(w);
-                delete wards[w];
-            }
+        var otherWardsArr = [];
+        for (var k in otherWards) {
+            if(otherWards.hasOwnProperty(k)) otherWardsArr.push(k);
         }
+        otherWardsArr.sort();
         
-        for (var w in wards) {
-            wardOrder.push(w);
-        }
+        var finalOrder = predefinedOrder.concat(otherWardsArr);
         
         var html = '<span style="font-size:12px; font-weight:bold; margin-right:15px; color:#555;">病棟絞り込み:</span>';
         var hasWard = false;
         
-        for (var i = 0; i < wardOrder.length; i++) {
+        for (var i = 0; i < finalOrder.length; i++) {
             hasWard = true;
-            var w = wardOrder[i];
+            var w = finalOrder[i];
             var isChecked = checkedWards[w] ? "checked" : "";
             html += '<label class="ward-label"><input type="checkbox" class="ward-cb" value="' + escapeHtml(w) + '" onchange="renderTable()" ' + isChecked + '> ' + escapeHtml(w) + '</label>';
         }
@@ -646,11 +698,11 @@
             }
         }
 
-        var html = "<h3 style='margin-top:0; border-bottom:2px solid #2980b9; padding-bottom:5px;'>各抗菌薬の症例集計（※対象症例タブのみ）</h3>";
+        var html = "<h3 style='margin-top:0; border-bottom:2px solid #2980b9; padding-bottom:3px; margin-bottom:10px;'>各抗菌薬の症例集計（※対象症例タブのみ）</h3>";
         
         for(var i=0; i<targetDrugs.length; i++) {
             var drugName = targetDrugs[i];
-            html += "<h4 style='color:#2c3e50;'>" + drugName + "</h4>";
+            html += "<h4 style='color:#2c3e50; margin: 0 0 5px 0; font-size:13px;'>" + drugName + "</h4>";
             html += "<table class='summary-table'><thead><tr><th>年齢区分</th>";
             for(var s=0; s<statusLabels.length; s++) {
                 html += "<th>" + statusLabels[s] + "</th>";
@@ -678,11 +730,16 @@
             for(var s=0; s<statusLabels.length; s++) {
                 html += "<td>" + colTotals[s] + "</td>";
             }
-            html += "<td class='summary-total-col' style='font-size:14px;'>" + totalCases + "</td></tr>";
+            html += "<td class='summary-total-col'>" + totalCases + "</td></tr>";
             html += "</tbody></table>";
         }
 
         summaryDiv.innerHTML = html;
+    }
+
+    function hasKeys(obj) {
+        for (var k in obj) { if(obj.hasOwnProperty(k)) return true; }
+        return false;
     }
 
     function renderTable() {
@@ -692,10 +749,6 @@
         var alertList = document.getElementById('alertList');
         var alertSection = document.getElementById('todayAlert');
         var searchInput = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toUpperCase() : "";
-        
-        var selAgeGroup = document.getElementById("filterAgeGroup").value;
-        var selDrug = document.getElementById("filterDrug").value;
-        var selStatus = document.getElementById("filterStatus").value;
         
         var checkboxes = document.getElementsByClassName('ward-cb');
         var selectedWards = [];
@@ -743,9 +796,9 @@
                 if (!wardMatch) continue;
             }
 
-            if (selAgeGroup !== "" && p.ageGroup !== selAgeGroup) continue;
-            if (selDrug !== "" && p.drug !== selDrug) continue;
-            if (selStatus !== "" && p.status.toString() !== selStatus) continue;
+            if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
+            if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
+            if (hasKeys(msFilters.status) && !msFilters.status[p.status.toString()]) continue;
 
             keys.push(key);
         }
@@ -833,7 +886,6 @@
             var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
             html += "<td><textarea class='remarks-input' onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ...'>" + safeRemarks + "</textarea></td>";
             
-            // ステータス・パネルUI
             html += "<td style='text-align: center;'>";
             html += "  <div class='status-grid'>";
             for (var st=0; st<statusAbbr.length; st++) {
@@ -867,9 +919,6 @@
         fetchQueue = [];
         
         var searchInput = document.getElementById("searchInput").value.toUpperCase();
-        var selAgeGroup = document.getElementById("filterAgeGroup").value;
-        var selDrug = document.getElementById("filterDrug").value;
-        var selStatus = document.getElementById("filterStatus").value;
         var checkboxes = document.getElementsByClassName('ward-cb');
         var selectedWards = [];
         for(var i=0; i<checkboxes.length; i++) {
@@ -892,9 +941,9 @@
                 if (!wardMatch) continue;
             }
 
-            if (selAgeGroup !== "" && p.ageGroup !== selAgeGroup) continue;
-            if (selDrug !== "" && p.drug !== selDrug) continue;
-            if (selStatus !== "" && p.status.toString() !== selStatus) continue;
+            if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
+            if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
+            if (hasKeys(msFilters.status) && !msFilters.status[p.status.toString()]) continue;
 
             fetchQueue.push(key);
         }
