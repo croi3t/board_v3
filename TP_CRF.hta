@@ -155,6 +155,13 @@
         dataFilePath = folderPath + "\\pk_study_crf_data.json";
     } catch(e) {}
 
+    function toHalfWidth(str) {
+        if (!str) return "";
+        return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+        });
+    }
+
     function loadData() {
         if (!fso) return {};
         try {
@@ -173,6 +180,11 @@
                             if (p.status === 6) { p.status = 0; }
                             else if (p.status === 5) { p.status = 0; p.tab = "exclude"; }
                             else if (p.status >= 0 && p.status <= 4) { p.status = p.status + 1; }
+                            
+                            // Normalize existing ward data
+                            if (p.ward) {
+                                p.ward = toHalfWidth(String(p.ward)).toUpperCase().replace(/^\s+|\s+$/g, '');
+                            }
                             
                             if (p.drug && p.drug.indexOf(" / ") !== -1) {
                                 var drugs = p.drug.split(" / ");
@@ -226,12 +238,6 @@
         if (!str) return "";
         return String(str).replace(/[&<>"']/g, function(match) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
-        });
-    }
-    
-    function toHalfWidth(str) {
-        return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
-            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
         });
     }
 
@@ -509,9 +515,12 @@
     }
     
     document.onclick = function(e) {
-        if (!e.target.matches('.ms-btn')) {
-            toggleMs('');
+        var evt = e || window.event;
+        var t = evt.target || evt.srcElement;
+        if (t && typeof t.className === "string" && t.className.indexOf('ms-btn') !== -1) {
+            return;
         }
+        toggleMs('');
     };
 
     function updateMsFilter(filterType, val, isChecked) {
