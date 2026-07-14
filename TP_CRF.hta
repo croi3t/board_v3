@@ -24,8 +24,8 @@
         .sort-icon { font-size: 10px; color: #7f8c8d; margin-left: 3px; }
         
         /* Status Panel UI */
-        .status-grid { width: 90px; margin: auto; text-align: left; }
-        .status-badge { display: inline-block; width: 26px; margin: 1px; font-size: 10px; padding: 3px 0; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
+        .status-grid { width: 115px; margin: auto; text-align: left; }
+        .status-badge { display: inline-block; width: 34px; margin: 1px; font-size: 11px; padding: 4px 0; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
         .status-badge:hover { border-color: #888; color: #333; }
         .status-badge.active.st-0 { background: #bdc3c7; color: #333; border-color: #bdc3c7; font-weight:bold; } /* 未判 */
         .status-badge.active.st-1 { background: #f1c40f; color: white; border-color: #f1c40f; font-weight:bold; } /* 同未 */
@@ -40,7 +40,7 @@
         .multi-drug-row { border-left: 4px solid #e74c3c !important; }
         .multi-drug-badge { background: #e74c3c; color: white; font-size: 9px; padding: 2px 4px; border-radius: 3px; display: inline-block; margin-top: 4px; font-weight:bold; }
 
-        .fetch-btn { cursor: pointer; padding: 4px 6px; background: #007bff; color: white; border: none; border-radius: 3px; font-size: 11px; margin-top: 2px;}
+        .fetch-btn { cursor: pointer; padding: 4px; background: #007bff; color: white; border: none; border-radius: 3px; font-size: 11px; margin-top: 2px; white-space: nowrap; width: 100%; box-sizing: border-box; }
         .fetch-btn:disabled { background: #ccc; cursor: not-allowed; }
         .export-btn { cursor: pointer; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; font-size: 12px; margin-left: 20px;}
         
@@ -125,13 +125,10 @@
                     <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
                     <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
                     <th style="width: auto;">備考・コメント</th>
-                    <th style="width: 110px; padding-bottom: 2px;">ステータス<br>
+                    <th style="width: 125px; padding-bottom: 2px;">ステータス<br>
                         <div class="ms-container" id="ms-status">
                             <button class="ms-btn" onclick="toggleMs('ms-status', event)">▼ 絞り込み</button>
                             <div class="ms-content" id="ms-status-content" onclick="event.stopPropagation()"></div>
-                        </div>
-                        <div style="font-size:9px; font-weight:normal; line-height:1.2; margin-top:2px;">
-                          [注] 未判:未判定, 同未:同意未, 同済:同意済, 採血:採血済, 処理:処理済, 提出:提出済
                         </div>
                     </th>
                     <th style="width: 60px; text-align: center;">操作</th>
@@ -467,7 +464,7 @@
 
     function updateSampleDate(key, dateVal) {
         patientData[key].sampleDate = dateVal;
-        patientData[key].bloodDetail = "手動入力";
+        patientData[key].bloodDetail = "手動";
         saveAndRender();
     }
 
@@ -619,6 +616,8 @@
         }
         
         if (!hasWard) html += '<span style="font-size:11px; color:#999;">（データなし）</span>';
+        
+        html += '<span style="font-size:11px; color:#777; margin-left:20px; float:right;">[注] 未判:未判定, 同未:同意未, 同済:同意済, 採血:採血済, 処理:処理済, 提出:提出済</span>';
         container.innerHTML = html;
     }
 
@@ -888,7 +887,7 @@
             
             html += "<td class='blood-date-cell' title='" + escapeHtml(p.bloodDetail) + "'>";
             html += "  <input type='date' value='" + escapeHtml(p.sampleDate) + "' onchange=\"updateSampleDate('" + key + "', this.value)\" style='width: 105px;'>";
-            html += "  <br><button class='fetch-btn' id='btn-" + key + "' onclick=\"fetchSingleBloodDate('" + key + "')\">一括確認<br>(年齢+採血)</button>";
+            html += "  <br><button class='fetch-btn' id='btn-" + key + "' onclick=\"fetchSingleBloodDate('" + key + "')\">一括確認(年齢+採血)</button>";
             html += "  <div style='font-size:10px; color:#666; margin-top:2px;' class='blood-date-text'>" + escapeHtml(p.bloodDetail) + "</div>";
             html += "</td>";
 
@@ -1023,7 +1022,7 @@
 
         var fallbackTimer = setTimeout(function() {
             if (!isDone) {
-                p.bloodDetail = step === 1 ? "年齢取得タイムアウト(30秒)" : "採血日取得タイムアウト(30秒)";
+                p.bloodDetail = step === 1 ? "年齢取得T/O" : "採血取得T/O";
                 cleanup();
             }
         }, 30000); 
@@ -1081,7 +1080,7 @@
                                 futureEntries.push({
                                     dateObj: dt,
                                     displayDate: y + '-' + mStr + '-' + dStr,
-                                    detail: match[0].substring(0, 45) + " (" + typeClean + ")"
+                                    detail: typeClean
                                 });
                             }
                         }
@@ -1090,16 +1089,17 @@
                             futureEntries.sort(function(a, b) { return a.dateObj.getTime() - b.dateObj.getTime(); });
                             var target = futureEntries[0];
                             p.sampleDate = target.displayDate;
-                            p.bloodDetail = "自動取得: " + target.detail;
+                            p.bloodDetail = "予定有 (" + target.detail + ")";
                         } else {
-                            p.bloodDetail = "明日以降30日以内の検査予定が見つかりませんでした";
+                            p.bloodDetail = "30日以内の予定なし";
                         }
                         
                         clearTimeout(fallbackTimer);
                         cleanup();
                     }
                 } catch(e) {
-                    p.bloodDetail = (step === 1 ? "年齢取得エラー: " : "フレーム解析エラー: ") + (e.message || e);
+                    var err = String(e.message || e);
+                    p.bloodDetail = (step === 1 ? "年齢Err:" : "解析Err:") + err.substring(0, 10);
                     clearTimeout(fallbackTimer);
                     cleanup();
                 }
@@ -1109,7 +1109,7 @@
         try {
             iframe.src = url1;
         } catch(e) {
-            p.bloodDetail = "URLアクセスエラー";
+            p.bloodDetail = "URLエラー";
             clearTimeout(fallbackTimer);
             cleanup();
         }
