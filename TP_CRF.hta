@@ -21,21 +21,25 @@
         th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: middle; word-wrap: break-word; }
         th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
         
-        /* Sort indicators */
         .sort-icon { font-size: 10px; color: #7f8c8d; margin-left: 3px; }
         
-        /* Status Select UI */
-        .status-select { padding: 4px; border-radius: 4px; border: none; font-weight: bold; width: 100%; font-size: 11px; color: white; cursor: pointer; text-align: center; }
-        .status-select option { background: white; color: black; font-weight: normal; }
-        .status-0 { background: #95a5a6; } /* 同意未 */
-        .status-1 { background: #3498db; } /* 同意済 */
-        .status-2 { background: #e67e22; } /* 採血済 */
-        .status-3 { background: #2ecc71; } /* 処理済 */
-        .status-4 { background: #2c3e50; } /* 提出済 */
-        .status-5 { background: #e74c3c; } /* 候補外 */
-        .status-6 { background: #bdc3c7; color: #333; } /* 未判定 */
+        /* Status Panel UI */
+        .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; width: 100px; margin: auto; }
+        .status-badge { font-size: 10px; padding: 3px 1px; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
+        .status-badge:hover { border-color: #888; color: #333; }
+        .status-badge.active.st-0 { background: #bdc3c7; color: #333; border-color: #bdc3c7; font-weight:bold; } /* 未判 */
+        .status-badge.active.st-1 { background: #f39c12; color: white; border-color: #f39c12; font-weight:bold; } /* 同未 */
+        .status-badge.active.st-2 { background: #3498db; color: white; border-color: #3498db; font-weight:bold; } /* 同済 */
+        .status-badge.active.st-3 { background: #e67e22; color: white; border-color: #e67e22; font-weight:bold; } /* 採血 */
+        .status-badge.active.st-4 { background: #2ecc71; color: white; border-color: #2ecc71; font-weight:bold; } /* 処理 */
+        .status-badge.active.st-5 { background: #2c3e50; color: white; border-color: #2c3e50; font-weight:bold; } /* 提出 */
         
-        .highlight { background: #fff9c4; font-weight: bold; }
+        .highlight { background: #fff9c4 !important; }
+        
+        /* Multiple Drugs highlight */
+        .multi-drug-row { border-left: 4px solid #e74c3c !important; }
+        .multi-drug-badge { background: #e74c3c; color: white; font-size: 9px; padding: 2px 4px; border-radius: 3px; display: inline-block; margin-top: 4px; font-weight:bold; }
+
         .fetch-btn { cursor: pointer; padding: 4px 6px; background: #007bff; color: white; border: none; border-radius: 3px; font-size: 11px; margin-top: 2px;}
         .fetch-btn:disabled { background: #ccc; cursor: not-allowed; }
         .export-btn { cursor: pointer; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; font-size: 12px; margin-left: 20px;}
@@ -46,17 +50,18 @@
         
         .search-box { float: right; padding: 5px; border: 1px solid #ccc; border-radius: 3px; margin-top: 2px; font-size: 12px; width: 180px; }
         
-        .ward-filter-section {
-            background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; 
-            margin-bottom: 10px; clear: both; line-height: 1.8;
-        }
-        .ward-label {
-            display: inline-block; margin-right: 15px; font-size: 12px; white-space: nowrap; cursor: pointer;
-        }
-        .remarks-input { 
-            width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; 
-            border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit;
-        }
+        .ward-filter-section { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; margin-bottom: 10px; clear: both; line-height: 1.8; }
+        .ward-label { display: inline-block; margin-right: 15px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+        .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; }
+
+        /* Summary Dashboard */
+        .summary-dashboard { background: white; border: 1px solid #ccc; padding: 20px; border-radius: 5px; }
+        .summary-table { width: 95%; margin-bottom: 30px; border-collapse: collapse; }
+        .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .summary-table th { background: #34495e; color: white; }
+        .summary-table td:first-child { background: #ecf0f1; font-weight: bold; }
+        .summary-total-row { background: #ecf0f1; font-weight: bold; }
+        .summary-total-col { background: #f1c40f !important; color: #333; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -79,38 +84,55 @@
     <div class="tab-container">
         <div id="tab-screening" class="tab-btn active" onclick="switchTab('screening')">スクリーニング</div>
         <div id="tab-target" class="tab-btn" onclick="switchTab('target')">対象症例</div>
-        <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
-        <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
+        <div id="tab-exclude" class="tab-btn" onclick="switchTab('exclude')">候補外</div>
+        <div id="tab-summary" class="tab-btn" onclick="switchTab('summary')" style="background:#e8f4f8; border-color:#3498db; color:#2980b9;">集計・進捗</div>
+        
+        <span id="header-tools">
+            <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
+            <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
+        </span>
     </div>
 
-    <div class="ward-filter-section" id="wardFilterContainer">
-    </div>
+    <div id="wardFilterContainer" class="ward-filter-section"></div>
 
-    <table id="patientTable">
-        <thead>
-            <tr>
-                <th style="width: 60px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
-                <th style="width: 80px; cursor: pointer;" onclick="sortTable('name')">氏名 <span id="sort-icon-name" class="sort-icon">↕</span></th>
-                <th style="width: 70px; cursor: pointer;" onclick="sortTable('age')">年齢<br>/区分 <span id="sort-icon-age" class="sort-icon">↕</span></th>
-                <th style="width: 90px; cursor: pointer;" onclick="sortTable('ward')">病棟/診療科 <span id="sort-icon-ward" class="sort-icon">↕</span></th>
-                <th style="width: 100px;">対象薬品<br>
-                    <select id="filterDrug" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
-                        <option value="">すべて</option>
-                    </select>
-                </th>
-                <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
-                <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
-                <th style="width: auto;">備考・コメント</th>
-                <th style="width: 85px;">ステータス<br>
-                    <select id="filterStatus" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
-                        <option value="">すべて</option>
-                    </select>
-                </th>
-                <th style="width: 55px; text-align: center;">操作</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
+    <div id="table-view">
+        <table id="patientTable">
+            <thead>
+                <tr>
+                    <th style="width: 55px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
+                    <th style="width: 75px; cursor: pointer;" onclick="sortTable('name')">氏名 <span id="sort-icon-name" class="sort-icon">↕</span></th>
+                    <th style="width: 80px; cursor: pointer;" onclick="sortTable('age')">年齢/区分 <span id="sort-icon-age" class="sort-icon">↕</span><br>
+                        <select id="filterAgeGroup" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
+                            <option value="">すべて</option>
+                            <option value="非高齢者">非高齢者</option>
+                            <option value="高齢者">高齢者</option>
+                            <option value="超高齢者">超高齢者</option>
+                            <option value="対象外">対象外</option>
+                        </select>
+                    </th>
+                    <th style="width: 90px; cursor: pointer;" onclick="sortTable('ward')">病棟/診療科 <span id="sort-icon-ward" class="sort-icon">↕</span></th>
+                    <th style="width: 100px;">対象薬品<br>
+                        <select id="filterDrug" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
+                            <option value="">すべて</option>
+                        </select>
+                    </th>
+                    <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
+                    <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
+                    <th style="width: auto;">備考・コメント</th>
+                    <th style="width: 110px;">ステータス<br>
+                        <select id="filterStatus" onchange="renderTable()" style="width: 100%; font-size:10px; font-weight:normal; margin-top:2px; color:black;">
+                            <option value="">すべて</option>
+                        </select>
+                    </th>
+                    <th style="width: 60px; text-align: center;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    
+    <div id="summary-view" class="summary-dashboard" style="display:none;">
+    </div>
 </div>
 
 <script>
@@ -131,7 +153,42 @@
                 if (!ts.AtEndOfStream) {
                     var text = ts.ReadAll();
                     ts.Close();
-                    if (text) return JSON.parse(text);
+                    if (text) {
+                        var parsed = JSON.parse(text);
+                        var migrated = {};
+                        var didMigrate = false;
+                        
+                        for (var k in parsed) {
+                            var p = parsed[k];
+                            
+                            // ステータスのマイグレーション (旧6:未判定 -> 新0:未判定, 旧5:候補外 -> タブ移動等)
+                            if (p.status === 6) { p.status = 0; didMigrate = true; }
+                            else if (p.status === 5) { p.status = 0; p.tab = "exclude"; didMigrate = true; }
+                            else if (p.status >= 0 && p.status <= 4) { p.status = p.status + 1; didMigrate = true; }
+                            
+                            // ID_DRUGキーへのマイグレーション（レコード分割）
+                            if (p.drug && p.drug.indexOf(" / ") !== -1) {
+                                var drugs = p.drug.split(" / ");
+                                for(var i=0; i<drugs.length; i++) {
+                                    var newKey = p.id + "_" + drugs[i];
+                                    var pCopy = JSON.parse(JSON.stringify(p));
+                                    pCopy.drug = drugs[i];
+                                    migrated[newKey] = pCopy;
+                                }
+                                didMigrate = true;
+                            } else {
+                                if (k.indexOf("_") === -1) {
+                                    var newKey = p.id + "_" + p.drug;
+                                    migrated[newKey] = p;
+                                    didMigrate = true;
+                                } else {
+                                    migrated[k] = p;
+                                }
+                            }
+                        }
+                        
+                        return migrated;
+                    }
                 }
                 ts.Close();
             }
@@ -149,7 +206,8 @@
     }
 
     var patientData = loadData();
-    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "提出済", "候補外", "未判定"];
+    var statusLabels = ["未判定", "同意未", "同意済", "採血済", "処理済", "提出済"];
+    var statusAbbr = ["未判", "同未", "同済", "採血", "処理", "提出"];
     var currentTab = "screening"; 
     
     var fetchQueue = [];
@@ -237,7 +295,6 @@
         var fileName = file.name.toLowerCase();
         
         if (fileName.indexOf(".xls") !== -1) {
-            // Excel読み込み処理
             try {
                 var excel = new ActiveXObject("Excel.Application");
                 excel.Visible = false;
@@ -276,7 +333,6 @@
             }
             fileInput.value = "";
         } else {
-            // CSV読み込み処理
             var reader = new FileReader();
             reader.onload = function(event) {
                 try {
@@ -303,7 +359,7 @@
             var cols = dataRows[i];
             if (cols.length < 6) continue;
 
-            var drug = cols[1] ? String(cols[1]).replace(/^\s+|\s+$/g, '') : "";
+            var drugStr = cols[1] ? String(cols[1]).replace(/^\s+|\s+$/g, '') : "";
             var rawDate = cols[4] ? cols[4] : "";
             var date = formatDateString(rawDate);
             var id = cols[5] ? String(cols[5]).replace(/^\s+|\s+$/g, '') : "";
@@ -314,41 +370,40 @@
             var ward = cols.length > 9 && cols[9] ? String(cols[9]).replace(/^\s+|\s+$/g, '') : "";
 
             if (!id) continue;
-            addedCount++;
+            
+            // 複数の薬剤が1セルに入っている場合（例: セフトリアキソン / ユナスピン）は分割する
+            var drugs = drugStr.split(/\s*[\/／]\s*/);
+            
+            for(var dIdx=0; dIdx<drugs.length; dIdx++) {
+                var drug = drugs[dIdx];
+                if (!drug) continue;
+                addedCount++;
 
-            var key = id; 
-            if (!patientData[key]) {
-                patientData[key] = {
-                    id: id, name: name, drug: drug,
-                    department: department, doctor: doctor, ward: ward,
-                    start: date, end: date,
-                    status: 6, // 新規は「未判定」をデフォルトとする
-                    sampleDate: "",
-                    bloodDetail: "",
-                    remarks: "",
-                    tab: "screening",
-                    birthDate: "",
-                    age: null,
-                    ageGroup: ""
-                };
-            } else {
-                if (patientData[key].drug.indexOf(drug) === -1) {
-                    patientData[key].drug += " / " + drug;
-                }
-                patientData[key].department = department || patientData[key].department;
-                patientData[key].doctor = doctor || patientData[key].doctor;
-                patientData[key].ward = ward || patientData[key].ward;
+                var key = id + "_" + drug; 
+                if (!patientData[key]) {
+                    patientData[key] = {
+                        id: id, name: name, drug: drug,
+                        department: department, doctor: doctor, ward: ward,
+                        start: date, end: date,
+                        status: 0, // 新規は「未判定」(0)
+                        sampleDate: "", bloodDetail: "", remarks: "",
+                        tab: "screening", birthDate: "", age: null, ageGroup: ""
+                    };
+                } else {
+                    patientData[key].department = department || patientData[key].department;
+                    patientData[key].doctor = doctor || patientData[key].doctor;
+                    patientData[key].ward = ward || patientData[key].ward;
 
-                var newDate = new Date(date);
-                if (!isNaN(newDate.getTime())) {
-                    if (newDate < new Date(patientData[key].start)) patientData[key].start = date;
-                    if (newDate > new Date(patientData[key].end)) patientData[key].end = date;
-                }
-                
-                // 開始日が更新された場合、年齢の再計算を試みる
-                if (patientData[key].birthDate) {
-                    patientData[key].age = calculateAgeAtStart(patientData[key].birthDate, patientData[key].start);
-                    patientData[key].ageGroup = getAgeGroup(patientData[key].age);
+                    var newDate = new Date(date);
+                    if (!isNaN(newDate.getTime())) {
+                        if (newDate < new Date(patientData[key].start)) patientData[key].start = date;
+                        if (newDate > new Date(patientData[key].end)) patientData[key].end = date;
+                    }
+                    
+                    if (patientData[key].birthDate) {
+                        patientData[key].age = calculateAgeAtStart(patientData[key].birthDate, patientData[key].start);
+                        patientData[key].ageGroup = getAgeGroup(patientData[key].age);
+                    }
                 }
             }
         }
@@ -364,7 +419,22 @@
         currentTab = tabName;
         document.getElementById("tab-screening").className = (tabName === "screening") ? "tab-btn active" : "tab-btn";
         document.getElementById("tab-target").className = (tabName === "target") ? "tab-btn active" : "tab-btn";
-        renderTable();
+        document.getElementById("tab-exclude").className = (tabName === "exclude") ? "tab-btn active" : "tab-btn";
+        document.getElementById("tab-summary").className = (tabName === "summary") ? "tab-btn active" : "tab-btn";
+
+        if (tabName === "summary") {
+            document.getElementById("table-view").style.display = "none";
+            document.getElementById("wardFilterContainer").style.display = "none";
+            document.getElementById("header-tools").style.display = "none";
+            document.getElementById("summary-view").style.display = "block";
+            renderSummary();
+        } else {
+            document.getElementById("summary-view").style.display = "none";
+            document.getElementById("table-view").style.display = "block";
+            document.getElementById("wardFilterContainer").style.display = "block";
+            document.getElementById("header-tools").style.display = "inline";
+            renderTable();
+        }
     }
 
     function moveTab(key, targetTab) {
@@ -414,7 +484,7 @@
         var selDrug = document.getElementById("filterDrug");
         var selStatus = document.getElementById("filterStatus");
         
-        if (!forceRebuild && selDrug.options.length > 1) return; // 既に構築済みならスキップ
+        if (!forceRebuild && selDrug.options.length > 1) return;
 
         var currentDrug = selDrug.value;
         var currentStatus = selStatus.value;
@@ -422,8 +492,7 @@
         var drugs = {};
         for (var key in patientData) {
             if(patientData.hasOwnProperty(key)) {
-                var dParts = patientData[key].drug.split(" / ");
-                for(var i=0; i<dParts.length; i++) drugs[dParts[i]] = true;
+                drugs[patientData[key].drug] = true;
             }
         }
         
@@ -445,13 +514,12 @@
 
     function updateWardCheckboxes() {
         var container = document.getElementById("wardFilterContainer");
+        if(!container) return;
         
         var existingChecks = document.getElementsByClassName('ward-cb');
         var checkedWards = {};
         for(var i=0; i<existingChecks.length; i++) {
-            if(existingChecks[i].checked) {
-                checkedWards[existingChecks[i].value] = true;
-            }
+            if(existingChecks[i].checked) checkedWards[existingChecks[i].value] = true;
         }
 
         var wards = {};
@@ -508,8 +576,8 @@
             var rowArray = [
                 p.id, p.name, p.age, p.ageGroup, p.ward, p.department, p.doctor,
                 p.drug, p.start, p.end, p.sampleDate,
-                statusLabels[p.status] || "未判定", 
-                p.tab === "target" ? "対象症例" : "スクリーニング",
+                statusLabels[p.status], 
+                p.tab === "target" ? "対象症例" : (p.tab === "exclude" ? "候補外" : "スクリーニング"),
                 p.remarks
             ];
             
@@ -546,14 +614,86 @@
         }
     }
 
+    function renderSummary() {
+        var summaryDiv = document.getElementById("summary-view");
+        var targetDrugs = ["セフトリアキソン", "ユナスピン", "タゾピペ"];
+        var ageGroups = ["非高齢者", "高齢者", "超高齢者", "対象外", "未取得"];
+        
+        var stats = {};
+        for (var i=0; i<targetDrugs.length; i++) {
+            stats[targetDrugs[i]] = {};
+            for(var j=0; j<ageGroups.length; j++) {
+                stats[targetDrugs[i]][ageGroups[j]] = [0,0,0,0,0,0];
+            }
+        }
+
+        for(var k in patientData) {
+            var p = patientData[k];
+            if (p.tab !== "target") continue; 
+            
+            var matchedDrug = null;
+            for(var i=0; i<targetDrugs.length; i++) {
+                if (p.drug.indexOf(targetDrugs[i]) !== -1) {
+                    matchedDrug = targetDrugs[i];
+                    break;
+                }
+            }
+            if (!matchedDrug) continue; 
+            
+            var ag = p.ageGroup || "未取得";
+            if (stats[matchedDrug][ag]) {
+                stats[matchedDrug][ag][p.status]++;
+            }
+        }
+
+        var html = "<h3 style='margin-top:0; border-bottom:2px solid #2980b9; padding-bottom:5px;'>各抗菌薬の症例集計（※対象症例タブのみ）</h3>";
+        
+        for(var i=0; i<targetDrugs.length; i++) {
+            var drugName = targetDrugs[i];
+            html += "<h4 style='color:#2c3e50;'>" + drugName + "</h4>";
+            html += "<table class='summary-table'><thead><tr><th>年齢区分</th>";
+            for(var s=0; s<statusLabels.length; s++) {
+                html += "<th>" + statusLabels[s] + "</th>";
+            }
+            html += "<th style='background:#f39c12;'>合計</th></tr></thead><tbody>";
+            
+            var colTotals = [0,0,0,0,0,0];
+            var totalCases = 0;
+
+            for(var a=0; a<ageGroups.length; a++) {
+                var ag = ageGroups[a];
+                html += "<tr><td>" + ag + "</td>";
+                var rowTotal = 0;
+                for(var s=0; s<statusLabels.length; s++) {
+                    var cnt = stats[drugName][ag][s];
+                    html += "<td>" + cnt + "</td>";
+                    rowTotal += cnt;
+                    colTotals[s] += cnt;
+                }
+                html += "<td class='summary-total-col'>" + rowTotal + "</td></tr>";
+                totalCases += rowTotal;
+            }
+
+            html += "<tr class='summary-total-row'><td>総合計</td>";
+            for(var s=0; s<statusLabels.length; s++) {
+                html += "<td>" + colTotals[s] + "</td>";
+            }
+            html += "<td class='summary-total-col' style='font-size:14px;'>" + totalCases + "</td></tr>";
+            html += "</tbody></table>";
+        }
+
+        summaryDiv.innerHTML = html;
+    }
+
     function renderTable() {
         updateHeaderFilters();
 
         var tbody = document.getElementById('tableBody');
         var alertList = document.getElementById('alertList');
         var alertSection = document.getElementById('todayAlert');
-        var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        var searchInput = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toUpperCase() : "";
         
+        var selAgeGroup = document.getElementById("filterAgeGroup").value;
         var selDrug = document.getElementById("filterDrug").value;
         var selStatus = document.getElementById("filterStatus").value;
         
@@ -575,6 +715,14 @@
         alertList.innerHTML = "";
         var alertCount = 0;
 
+        var idCounts = {};
+        for(var k in patientData) {
+            if(patientData.hasOwnProperty(k)) {
+                var pid = patientData[k].id;
+                idCounts[pid] = (idCounts[pid] || 0) + 1;
+            }
+        }
+
         var keys = [];
 
         for (var key in patientData) {
@@ -595,13 +743,13 @@
                 if (!wardMatch) continue;
             }
 
-            if (selDrug !== "" && p.drug.indexOf(selDrug) === -1) continue;
+            if (selAgeGroup !== "" && p.ageGroup !== selAgeGroup) continue;
+            if (selDrug !== "" && p.drug !== selDrug) continue;
             if (selStatus !== "" && p.status.toString() !== selStatus) continue;
 
             keys.push(key);
         }
 
-        // 並び替え処理
         if (currentSortCol !== "") {
             keys.sort(function(a, b) {
                 var vA = patientData[a][currentSortCol];
@@ -621,7 +769,6 @@
             });
         }
 
-        // ソートアイコンの更新
         var sortCols = ["id", "name", "age", "ward", "start", "sampleDate"];
         for (var i=0; i<sortCols.length; i++) {
             var sc = sortCols[i];
@@ -651,44 +798,60 @@
                 alertList.appendChild(li);
             }
 
+            var hasMultiple = (idCounts[p.id] > 1);
+
             var row = document.createElement('tr');
-            row.id = 'tr-patient-' + p.id;
-            if (isToday) row.className = 'highlight';
+            row.id = 'tr-patient-' + key;
+            
+            var rowClasses = [];
+            if (isToday) rowClasses.push("highlight");
+            if (hasMultiple) rowClasses.push("multi-drug-row");
+            row.className = rowClasses.join(" ");
 
             var infoStr = escapeHtml(p.ward) + "<br><span style='font-size:10px;color:#555;'>" + escapeHtml(p.department) + " / " + escapeHtml(p.doctor) + "</span>";
             var ageDisplay = (p.age !== null && p.age !== "") ? escapeHtml(p.age) + "歳<br><span style='font-size:10px;'>" + escapeHtml(p.ageGroup) + "</span>" : "<span style='color:#ccc; font-size:10px;'>未取得</span>";
+
+            var drugDisplay = escapeHtml(p.drug);
+            if (hasMultiple) {
+                drugDisplay += "<br><span class='multi-drug-badge'>複数期間(薬剤)あり</span>";
+            }
 
             var html = "";
             html += "<td>" + escapeHtml(p.id) + "</td>";
             html += "<td>" + escapeHtml(p.name) + "</td>";
             html += "<td>" + ageDisplay + "</td>";
             html += "<td>" + infoStr + "</td>";
-            html += "<td style='font-size: 11px;'>" + escapeHtml(p.drug) + "</td>";
+            html += "<td style='font-size: 11px;'>" + drugDisplay + "</td>";
             html += "<td style='font-size: 11px;'>" + escapeHtml(p.start) + "<br>～" + escapeHtml(p.end) + "</td>";
             
             html += "<td class='blood-date-cell' title='" + escapeHtml(p.bloodDetail) + "'>";
             html += "  <input type='date' value='" + escapeHtml(p.sampleDate) + "' onchange=\"updateSampleDate('" + key + "', this.value)\" style='width: 105px;'>";
-            html += "  <br><button class='fetch-btn' id='btn-" + p.id + "' onclick=\"fetchSingleBloodDate('" + key + "')\">一括確認<br>(年齢+採血)</button>";
+            html += "  <br><button class='fetch-btn' id='btn-" + key + "' onclick=\"fetchSingleBloodDate('" + key + "')\">一括確認<br>(年齢+採血)</button>";
             html += "  <div style='font-size:10px; color:#666; margin-top:2px;' class='blood-date-text'>" + escapeHtml(p.bloodDetail) + "</div>";
             html += "</td>";
 
             var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
             html += "<td><textarea class='remarks-input' onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ...'>" + safeRemarks + "</textarea></td>";
             
+            // ステータス・パネルUI
             html += "<td style='text-align: center;'>";
-            html += "  <select class='status-select status-" + p.status + "' onchange=\"updateStatus('" + key + "', this.value)\">";
-            for (var st=0; st<statusLabels.length; st++) {
-                var selected = (p.status === st) ? "selected" : "";
-                html += "    <option value='" + st + "' " + selected + ">" + statusLabels[st] + "</option>";
+            html += "  <div class='status-grid'>";
+            for (var st=0; st<statusAbbr.length; st++) {
+                var isActive = (p.status === st) ? "active st-" + st : "";
+                html += "    <div class='status-badge " + isActive + "' onclick=\"updateStatus('" + key + "', " + st + ")\">" + statusAbbr[st] + "</div>";
             }
-            html += "  </select>";
+            html += "  </div>";
             html += "</td>";
             
             html += "<td style='text-align: center;'>";
             if (currentTab === "screening") {
-                html += "  <button onclick=\"moveTab('" + key + "', 'target')\" style='font-size:10px; background:#2ecc71; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer;'>追加</button>";
-            } else {
-                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer;'>戻す</button>";
+                html += "  <button onclick=\"moveTab('" + key + "', 'target')\" style='font-size:10px; background:#2ecc71; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%; margin-bottom:4px;'>対象へ</button>";
+                html += "  <br><button onclick=\"moveTab('" + key + "', 'exclude')\" style='font-size:10px; background:#e74c3c; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%;'>候補外へ</button>";
+            } else if (currentTab === "target") {
+                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%; margin-bottom:4px;'>戻す</button>";
+                html += "  <br><button onclick=\"moveTab('" + key + "', 'exclude')\" style='font-size:10px; background:#e74c3c; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%;'>候補外へ</button>";
+            } else if (currentTab === "exclude") {
+                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%;'>スクへ戻す</button>";
             }
             html += "</td>";
             
@@ -704,6 +867,7 @@
         fetchQueue = [];
         
         var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        var selAgeGroup = document.getElementById("filterAgeGroup").value;
         var selDrug = document.getElementById("filterDrug").value;
         var selStatus = document.getElementById("filterStatus").value;
         var checkboxes = document.getElementsByClassName('ward-cb');
@@ -728,7 +892,8 @@
                 if (!wardMatch) continue;
             }
 
-            if (selDrug !== "" && p.drug.indexOf(selDrug) === -1) continue;
+            if (selAgeGroup !== "" && p.ageGroup !== selAgeGroup) continue;
+            if (selDrug !== "" && p.drug !== selDrug) continue;
             if (selStatus !== "" && p.status.toString() !== selStatus) continue;
 
             fetchQueue.push(key);
@@ -739,7 +904,7 @@
             return;
         }
         
-        if (confirm("現在表示されている " + fetchQueue.length + " 名の生年月日と採血予定日を一括取得しますか？\n※順次カルテシステムにアクセスするため時間がかかります。")) {
+        if (confirm("現在表示されている " + fetchQueue.length + " 件の生年月日と採血予定日を一括取得しますか？\n※順次カルテシステムにアクセスするため時間がかかります。")) {
             isFetchingAll = true;
             processFetchQueue();
         }
@@ -762,7 +927,7 @@
             return;
         }
         
-        var btn = document.getElementById('btn-' + p.id);
+        var btn = document.getElementById('btn-' + key);
         if(btn) { btn.innerText = "取得中..."; btn.disabled = true; }
 
         var userId = "16622";
@@ -774,7 +939,7 @@
                    "&user_id=" + userId + "&order_search_flg=1&order_search_code=3&order_search_name=#top" +
                    "&_nocache=" + new Date().getTime();
 
-        var iframeId = "fetch-iframe-" + p.id;
+        var iframeId = "fetch-iframe-" + key;
         var existing = document.getElementById(iframeId);
         if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
 
