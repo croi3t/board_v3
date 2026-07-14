@@ -24,15 +24,15 @@
         .sort-icon { font-size: 10px; color: #7f8c8d; margin-left: 3px; }
         
         /* Status Panel UI */
-        .status-grid { width: 115px; margin: auto; text-align: left; }
-        .status-badge { display: inline-block; width: 34px; margin: 1px; font-size: 11px; padding: 4px 0; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
+        .status-grid { width: 95px; margin: auto; text-align: left; }
+        .status-badge { display: inline-block; width: 28px; margin: 1px; font-size: 11px; padding: 2px 0; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
         .status-badge:hover { border-color: #888; color: #333; }
-        .status-badge.active.st-0 { background: #bdc3c7; color: #333; border-color: #bdc3c7; font-weight:bold; } /* 未判 */
-        .status-badge.active.st-1 { background: #f1c40f; color: white; border-color: #f1c40f; font-weight:bold; } /* 同未 */
-        .status-badge.active.st-2 { background: #3498db; color: white; border-color: #3498db; font-weight:bold; } /* 同済 */
-        .status-badge.active.st-3 { background: #e74c3c; color: white; border-color: #e74c3c; font-weight:bold; } /* 採血 */
-        .status-badge.active.st-4 { background: #9b59b6; color: white; border-color: #9b59b6; font-weight:bold; } /* 処理 */
-        .status-badge.active.st-5 { background: #2ecc71; color: white; border-color: #2ecc71; font-weight:bold; } /* 提出 */
+        .status-badge.active.st-0 { background: #f1c40f; color: white; border-color: #f1c40f; font-weight:bold; } /* 同未 */
+        .status-badge.active.st-1 { background: #3498db; color: white; border-color: #3498db; font-weight:bold; } /* 同済 */
+        .status-badge.active.st-2 { background: #e74c3c; color: white; border-color: #e74c3c; font-weight:bold; } /* 採血 */
+        .status-badge.active.st-3 { background: #9b59b6; color: white; border-color: #9b59b6; font-weight:bold; } /* 処理 */
+        .status-badge.active.st-4 { background: #2ecc71; color: white; border-color: #2ecc71; font-weight:bold; } /* 提出 */
+        .status-badge.active.st-5 { background: #1abc9c; color: white; border-color: #1abc9c; font-weight:bold; } /* 冷凍 */
         
         .highlight { background: #fff9c4 !important; }
         
@@ -107,7 +107,7 @@
         <table id="patientTable">
             <thead>
                 <tr>
-                    <th style="width: 55px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
+                    <th style="width: 65px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
                     <th style="width: 75px; cursor: pointer;" onclick="sortTable('name')">氏名 <span id="sort-icon-name" class="sort-icon">↕</span></th>
                     <th style="width: 80px; cursor: pointer;" onclick="sortTable('age')">年齢/区分 <span id="sort-icon-age" class="sort-icon">↕</span><br>
                         <div class="ms-container" id="ms-age">
@@ -125,7 +125,7 @@
                     <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
                     <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
                     <th style="width: auto;">備考・コメント</th>
-                    <th style="width: 125px; padding-bottom: 2px;">ステータス<br>
+                    <th style="width: 105px; padding-bottom: 2px;">ステータス<br>
                         <div class="ms-container" id="ms-status">
                             <button class="ms-btn" onclick="toggleMs('ms-status', event)">▼ 絞り込み</button>
                             <div class="ms-content" id="ms-status-content" onclick="event.stopPropagation()"></div>
@@ -174,9 +174,26 @@
                         for (var k in parsed) {
                             var p = parsed[k];
                             
-                            if (p.status === 6) { p.status = 0; }
-                            else if (p.status === 5) { p.status = 0; p.tab = "exclude"; }
-                            else if (p.status >= 0 && p.status <= 4) { p.status = p.status + 1; }
+                            // Migrate status from number to explicit string
+                            if (typeof p.status === "number") {
+                                if (p.tab === undefined) {
+                                    // very old data
+                                    if (p.status === 6) p.status = "";
+                                    else if (p.status === 5) { p.status = ""; p.tab = "exclude"; }
+                                    else {
+                                        var origLabels = ["同意未", "同意済", "採血済", "処理済", "提出済"];
+                                        p.status = origLabels[p.status] || "";
+                                    }
+                                } else {
+                                    // old data with tabs
+                                    if (p.status === 0) p.status = "";
+                                    else {
+                                        var currLabels = ["", "同意未", "同意済", "採血済", "処理済", "提出済"];
+                                        p.status = currLabels[p.status] || "";
+                                    }
+                                }
+                            }
+                            if (!p.status) p.status = "";
                             
                             // Normalize existing ward data
                             if (p.ward) {
@@ -220,8 +237,8 @@
     }
 
     var patientData = loadData();
-    var statusLabels = ["未判定", "同意未", "同意済", "採血済", "処理済", "提出済"];
-    var statusAbbr = ["未判", "同未", "同済", "採血", "処理", "提出"];
+    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "提出済", "冷凍"];
+    var statusAbbr = ["同未", "同済", "採血", "処理", "提出", "冷凍"];
     var currentTab = "screening"; 
     
     var fetchQueue = [];
@@ -400,7 +417,7 @@
                         id: id, name: name, drug: drug,
                         department: department, doctor: doctor, ward: ward,
                         start: date, end: date,
-                        status: 0,
+                        status: "", // 未選択
                         sampleDate: "", bloodDetail: "", remarks: "",
                         tab: "screening", birthDate: "", age: null, ageGroup: ""
                     };
@@ -457,8 +474,12 @@
         saveAndRender();
     }
 
-    function updateStatus(key, val) {
-        patientData[key].status = parseInt(val, 10);
+    function updateStatus(key, valStr) {
+        if (patientData[key].status === valStr) {
+            patientData[key].status = ""; // Toggle off to unselected
+        } else {
+            patientData[key].status = valStr;
+        }
         saveAndRender();
     }
 
@@ -563,9 +584,13 @@
 
         // Status
         html = '<div style="margin-bottom:5px;"><button onclick="clearMsFilter(\'status\')" style="font-size:9px; width:100%;">全クリア</button></div>';
+        
+        var chkUnsel = msFilters.status[""] ? "checked" : "";
+        html += '<label><input type="checkbox" value="" ' + chkUnsel + ' onchange="updateMsFilter(\'status\', this.value, this.checked)"> 未選択</label>';
+        
         for(var i=0; i<statusLabels.length; i++) {
-            var chk = msFilters.status[i.toString()] ? "checked" : "";
-            html += '<label><input type="checkbox" value="' + i + '" ' + chk + ' onchange="updateMsFilter(\'status\', this.value, this.checked)"> ' + statusLabels[i] + '</label>';
+            var chk = msFilters.status[statusLabels[i]] ? "checked" : "";
+            html += '<label><input type="checkbox" value="' + statusLabels[i] + '" ' + chk + ' onchange="updateMsFilter(\'status\', this.value, this.checked)"> ' + statusLabels[i] + '</label>';
         }
         html += '<button class="ms-close" onclick="toggleMs(\'\')">閉じる</button>';
         document.getElementById("ms-status-content").innerHTML = html;
@@ -617,7 +642,7 @@
         
         if (!hasWard) html += '<span style="font-size:11px; color:#999;">（データなし）</span>';
         
-        html += '<span style="font-size:11px; color:#777; margin-left:20px; float:right;">[注] 未判:未判定, 同未:同意未, 同済:同意済, 採血:採血済, 処理:処理済, 提出:提出済</span>';
+        html += '<span style="font-size:11px; color:#777; margin-left:20px; float:right;">[注] 同未:同意未, 同済:同意済, 採血:採血済, 処理:処理済, 提出:提出済, 冷凍:冷凍</span>';
         container.innerHTML = html;
     }
 
@@ -636,7 +661,7 @@
             var rowArray = [
                 p.id, p.name, p.age, p.ageGroup, p.ward, p.department, p.doctor,
                 p.drug, p.start, p.end, p.sampleDate,
-                statusLabels[p.status], 
+                p.status === "" ? "未選択" : p.status, 
                 p.tab === "target" ? "対象症例" : (p.tab === "exclude" ? "候補外" : "スクリーニング"),
                 p.remarks
             ];
@@ -683,7 +708,7 @@
         for (var i=0; i<targetDrugs.length; i++) {
             stats[targetDrugs[i]] = {};
             for(var j=0; j<ageGroups.length; j++) {
-                stats[targetDrugs[i]][ageGroups[j]] = [0,0,0,0,0,0];
+                stats[targetDrugs[i]][ageGroups[j]] = [0,0,0,0,0,0,0];
             }
         }
 
@@ -702,7 +727,9 @@
             
             var ag = p.ageGroup || "未取得";
             if (stats[matchedDrug][ag]) {
-                stats[matchedDrug][ag][p.status]++;
+                var sIdx = statusLabels.indexOf(p.status);
+                if (sIdx === -1) sIdx = statusLabels.length; // Unselected
+                stats[matchedDrug][ag][sIdx]++;
             }
         }
 
@@ -715,16 +742,17 @@
             for(var s=0; s<statusLabels.length; s++) {
                 html += "<th>" + statusLabels[s] + "</th>";
             }
+            html += "<th>未選択</th>";
             html += "<th style='background:#f39c12;'>合計</th></tr></thead><tbody>";
             
-            var colTotals = [0,0,0,0,0,0];
+            var colTotals = [0,0,0,0,0,0,0];
             var totalCases = 0;
 
             for(var a=0; a<ageGroups.length; a++) {
                 var ag = ageGroups[a];
                 html += "<tr><td>" + ag + "</td>";
                 var rowTotal = 0;
-                for(var s=0; s<statusLabels.length; s++) {
+                for(var s=0; s<=statusLabels.length; s++) {
                     var cnt = stats[drugName][ag][s];
                     html += "<td>" + cnt + "</td>";
                     rowTotal += cnt;
@@ -735,7 +763,7 @@
             }
 
             html += "<tr class='summary-total-row'><td>総合計</td>";
-            for(var s=0; s<statusLabels.length; s++) {
+            for(var s=0; s<=statusLabels.length; s++) {
                 html += "<td>" + colTotals[s] + "</td>";
             }
             html += "<td class='summary-total-col'>" + totalCases + "</td></tr>";
@@ -806,7 +834,7 @@
 
             if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
             if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
-            if (hasKeys(msFilters.status) && !msFilters.status[p.status.toString()]) continue;
+            if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
 
             keys.push(key);
         }
@@ -896,22 +924,22 @@
             
             html += "<td style='text-align: center;'>";
             html += "  <div class='status-grid'>";
-            for (var st=0; st<statusAbbr.length; st++) {
-                var isActive = (p.status === st) ? "active st-" + st : "";
-                html += "    <div class='status-badge " + isActive + "' onclick=\"updateStatus('" + key + "', " + st + ")\">" + statusAbbr[st] + "</div>";
+            for (var st=0; st<statusLabels.length; st++) {
+                var isActive = (p.status === statusLabels[st]) ? "active st-" + st : "";
+                html += "    <div class='status-badge " + isActive + "' onclick=\"updateStatus('" + key + "', '" + statusLabels[st] + "')\">" + statusAbbr[st] + "</div>";
             }
             html += "  </div>";
             html += "</td>";
             
             html += "<td style='text-align: center;'>";
             if (currentTab === "screening") {
-                html += "  <button onclick=\"moveTab('" + key + "', 'target')\" style='font-size:10px; background:#2ecc71; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%; margin-bottom:4px;'>対象へ</button>";
-                html += "  <br><button onclick=\"moveTab('" + key + "', 'exclude')\" style='font-size:10px; background:#e74c3c; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%;'>候補外へ</button>";
+                html += "  <button onclick=\"moveTab('" + key + "', 'target')\" style='font-size:10px; background:#2ecc71; color:white; border:none; padding:7px 4px; border-radius:3px; cursor:pointer; width:100%; margin-bottom:5px;'>対象へ</button>";
+                html += "  <br><button onclick=\"moveTab('" + key + "', 'exclude')\" style='font-size:10px; background:#e74c3c; color:white; border:none; padding:7px 4px; border-radius:3px; cursor:pointer; width:100%;'>候補外へ</button>";
             } else if (currentTab === "target") {
-                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%; margin-bottom:4px;'>戻す</button>";
-                html += "  <br><button onclick=\"moveTab('" + key + "', 'exclude')\" style='font-size:10px; background:#e74c3c; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%;'>候補外へ</button>";
+                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:7px 4px; border-radius:3px; cursor:pointer; width:100%; margin-bottom:5px;'>戻す</button>";
+                html += "  <br><button onclick=\"moveTab('" + key + "', 'exclude')\" style='font-size:10px; background:#e74c3c; color:white; border:none; padding:7px 4px; border-radius:3px; cursor:pointer; width:100%;'>候補外へ</button>";
             } else if (currentTab === "exclude") {
-                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:4px; border-radius:3px; cursor:pointer; width:100%;'>スクへ戻す</button>";
+                html += "  <button onclick=\"moveTab('" + key + "', 'screening')\" style='font-size:10px; background:#95a5a6; color:white; border:none; padding:7px 4px; border-radius:3px; cursor:pointer; width:100%;'>スクへ戻す</button>";
             }
             html += "</td>";
             
@@ -951,7 +979,7 @@
 
             if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
             if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
-            if (hasKeys(msFilters.status) && !msFilters.status[p.status.toString()]) continue;
+            if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
 
             fetchQueue.push(key);
         }
@@ -1045,8 +1073,12 @@
                     collectText(doc);
 
                     if (step === 1) {
+                        var paddedId = ("0000000" + p.id).slice(-7);
+                        var idx = allText.indexOf(paddedId);
+                        var searchText = idx !== -1 ? allText.substring(idx) : allText;
+                        
                         var bdRegex = /(?:生年月日.*?|)((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
-                        var match = allText.match(bdRegex);
+                        var match = searchText.match(bdRegex);
                         if (match) {
                             var y = parseInt(match[1], 10);
                             var m = parseInt(match[2], 10);
