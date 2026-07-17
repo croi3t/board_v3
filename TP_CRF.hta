@@ -218,6 +218,19 @@
                             }
                         }
                         
+                        try {
+                            var d = new Date();
+                            var y = d.getFullYear();
+                            var m = d.getMonth() + 1;
+                            var day = d.getDate();
+                            var weekOfMonth = Math.ceil(day / 7);
+                            var mStr = m < 10 ? '0' + m : m;
+                            var backupFileName = folderPath + "\\backup_pk_study_" + y + mStr + "_W" + weekOfMonth + ".json";
+                            if (!fso.FileExists(backupFileName)) {
+                                fso.CopyFile(dataFilePath, backupFileName, false);
+                            }
+                        } catch(err) {}
+
                         return migrated;
                     }
                 }
@@ -411,9 +424,45 @@
                 if (!drug) continue;
                 addedCount++;
 
-                var key = id + "_" + drug; 
-                if (!patientData[key]) {
-                    patientData[key] = {
+                var baseKey = id + "_" + drug; 
+                var episodes = [];
+                for (var k in patientData) {
+                    if (patientData.hasOwnProperty(k) && (k === baseKey || k.indexOf(baseKey + "_") === 0)) {
+                        episodes.push(k);
+                    }
+                }
+                
+                var matchedKey = null;
+                var incomingDate = new Date(date).getTime();
+                
+                if (!isNaN(incomingDate)) {
+                    for (var e = 0; e < episodes.length; e++) {
+                        var epKey = episodes[e];
+                        var epStart = new Date(patientData[epKey].start).getTime();
+                        var epEnd = new Date(patientData[epKey].end).getTime();
+                        
+                        var diffStart = (epStart - incomingDate) / (1000 * 3600 * 24);
+                        var diffEnd = (incomingDate - epEnd) / (1000 * 3600 * 24);
+                        
+                        if (diffStart <= 3 && diffEnd <= 3) {
+                            matchedKey = epKey;
+                            break;
+                        }
+                    }
+                }
+                
+                if (isNaN(incomingDate) && episodes.length > 0) {
+                    matchedKey = episodes[0];
+                }
+
+                if (!matchedKey) {
+                    var newKey = baseKey;
+                    if (episodes.length > 0) {
+                        var counter = episodes.length + 1;
+                        while(patientData[baseKey + "_" + counter]) { counter++; }
+                        newKey = baseKey + "_" + counter;
+                    }
+                    patientData[newKey] = {
                         id: id, name: name, drug: drug,
                         department: department, doctor: doctor, ward: ward,
                         start: date, end: date,
@@ -422,6 +471,7 @@
                         tab: "screening", birthDate: "", age: null, ageGroup: ""
                     };
                 } else {
+                    var key = matchedKey;
                     patientData[key].department = department || patientData[key].department;
                     patientData[key].doctor = doctor || patientData[key].doctor;
                     patientData[key].ward = ward || patientData[key].ward;
