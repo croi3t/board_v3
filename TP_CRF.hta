@@ -115,7 +115,12 @@
                             <div class="ms-content" id="ms-age-content" onclick="event.stopPropagation()"></div>
                         </div>
                     </th>
-                    <th style="width: 90px; cursor: pointer;" onclick="sortTable('ward')">病棟/診療科 <span id="sort-icon-ward" class="sort-icon">↕</span></th>
+                    <th style="width: 100px; cursor: pointer;" onclick="sortTable('ward')">病棟/診療科 <span id="sort-icon-ward" class="sort-icon">↕</span><br>
+                        <div class="ms-container" id="ms-dept">
+                            <button class="ms-btn" onclick="toggleMs('ms-dept', event)">▼ 診療科 絞込</button>
+                            <div class="ms-content" id="ms-dept-content" onclick="event.stopPropagation()"></div>
+                        </div>
+                    </th>
                     <th style="width: 100px;">対象薬品<br>
                         <div class="ms-container" id="ms-drug">
                             <button class="ms-btn" onclick="toggleMs('ms-drug', event)">▼ 絞り込み</button>
@@ -259,7 +264,7 @@
     var currentSortCol = "";
     var currentSortAsc = true;
     
-    var msFilters = { age: {}, drug: {}, status: {} };
+    var msFilters = { age: {}, drug: {}, status: {}, dept: {} };
 
     function escapeHtml(str) {
         if (!str) return "";
@@ -617,6 +622,25 @@
         html += '<button class="ms-close" onclick="toggleMs(\'\')">閉じる</button>';
         document.getElementById("ms-age-content").innerHTML = html;
 
+        // Dept
+        var deptContent = document.getElementById("ms-dept-content");
+        var deptMap = {};
+        for (var key in patientData) {
+            if(patientData.hasOwnProperty(key)) {
+                var dep = patientData[key].department || "(未登録)";
+                deptMap[dep] = true;
+            }
+        }
+        var sortedDepts = Object.keys(deptMap).sort();
+        var htmlDept = '<div style="margin-bottom:5px;"><button onclick="clearMsFilter(\'dept\')" style="font-size:9px; width:100%;">全クリア</button></div>';
+        for(var i=0; i<sortedDepts.length; i++) {
+            var d = sortedDepts[i];
+            var chk = msFilters.dept[d] ? "checked" : "";
+            htmlDept += '<label><input type="checkbox" value="' + escapeHtml(d) + '" ' + chk + ' onchange="updateMsFilter(\'dept\', this.value, this.checked)"> ' + escapeHtml(d) + '</label>';
+        }
+        htmlDept += '<button class="ms-close" onclick="toggleMs(\'\')">閉じる</button>';
+        deptContent.innerHTML = htmlDept;
+
         // Drug
         var drugsMap = {};
         for (var key in patientData) {
@@ -885,6 +909,8 @@
             if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
             if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
             if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
+            var safeDept = p.department || "(未登録)";
+            if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
 
             keys.push(key);
         }
@@ -1030,6 +1056,8 @@
             if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
             if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
             if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
+            var safeDept = p.department || "(未登録)";
+            if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
 
             fetchQueue.push(key);
         }
