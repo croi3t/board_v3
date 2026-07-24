@@ -230,7 +230,11 @@
                             var day = d.getDate();
                             var weekOfMonth = Math.ceil(day / 7);
                             var mStr = m < 10 ? '0' + m : m;
-                            var backupFileName = folderPath + "\\backup_pk_study_" + y + mStr + "_W" + weekOfMonth + ".json";
+                            var backupDir = folderPath + "\\バックアップ";
+                            if (!fso.FolderExists(backupDir)) {
+                                fso.CreateFolder(backupDir);
+                            }
+                            var backupFileName = backupDir + "\\backup_pk_study_" + y + mStr + "_W" + weekOfMonth + ".json";
                             if (!fso.FileExists(backupFileName)) {
                                 fso.CopyFile(dataFilePath, backupFileName, false);
                             }
