@@ -985,6 +985,26 @@
                 drugDisplay += "<br><span class='multi-drug-badge'>複数期間(薬剤)あり</span>";
             }
 
+            var isFutureSampleInPeriod = false;
+            if (p.sampleDate && p.start && p.end) {
+                var sDate = new Date(p.sampleDate);
+                var startDate = new Date(p.start);
+                var endDate = new Date(p.end);
+                
+                sDate.setHours(0,0,0,0);
+                startDate.setHours(0,0,0,0);
+                endDate.setHours(0,0,0,0);
+                
+                var todayDate = new Date();
+                todayDate.setHours(0,0,0,0);
+                
+                if (sDate > todayDate && sDate >= startDate && sDate <= endDate) {
+                    isFutureSampleInPeriod = true;
+                }
+            }
+            var bloodCellStyle = isFutureSampleInPeriod ? "background-color: #ffeaa7; border: 2px solid #fdcb6e;" : "";
+            var futureBadge = isFutureSampleInPeriod ? "<span style='display:inline-block; font-size:10px; font-weight:bold; color:#d35400; background:#fad390; padding:2px 4px; border-radius:3px; margin-bottom:2px;'>🌟投与中予定あり</span><br>" : "";
+
             var html = "";
             html += "<td>" + escapeHtml(p.id) + "</td>";
             html += "<td>" + escapeHtml(p.name) + "</td>";
@@ -993,7 +1013,8 @@
             html += "<td style='font-size: 11px;'>" + drugDisplay + "</td>";
             html += "<td style='font-size: 11px;'>" + escapeHtml(p.start) + "<br>～" + escapeHtml(p.end) + "</td>";
             
-            html += "<td class='blood-date-cell' title='" + escapeHtml(p.bloodDetail) + "'>";
+            html += "<td class='blood-date-cell' style='" + bloodCellStyle + "' title='" + escapeHtml(p.bloodDetail) + "'>";
+            html += futureBadge;
             html += "  <input type='date' value='" + escapeHtml(p.sampleDate) + "' onchange=\"updateSampleDate('" + key + "', this.value)\" style='width: 105px;'>";
             html += "  <br><button class='fetch-btn' id='btn-" + key + "' onclick=\"fetchSingleBloodDate('" + key + "')\">一括確認(年齢+採血)</button>";
             html += "  <div style='font-size:10px; color:#666; margin-top:2px;' class='blood-date-text'>" + escapeHtml(p.bloodDetail) + "</div>";
