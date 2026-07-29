@@ -409,6 +409,26 @@
 
     function processDataRows(dataRows, startIndex) {
         var addedCount = 0;
+
+        var sessionCounts = {};
+        for (var i = startIndex; i < dataRows.length; i++) {
+            var cols = dataRows[i];
+            if (cols.length < 6) continue;
+            var s_id = cols[5] ? String(cols[5]).replace(/^\s+|\s+$/g, '') : "";
+            var s_rawDate = cols[4] ? cols[4] : "";
+            var s_date = formatDateString(s_rawDate);
+            var s_drugStr = cols[1] ? String(cols[1]).replace(/^\s+|\s+$/g, '') : "";
+            if (!s_id || !s_drugStr) continue;
+            
+            var s_drugs = s_drugStr.split(/\s*[\/／]\s*/);
+            for(var dIdx=0; dIdx<s_drugs.length; dIdx++) {
+                var s_drug = s_drugs[dIdx];
+                if (!s_drug) continue;
+                var sKey = s_id + "_" + s_drug + "_" + s_date;
+                sessionCounts[sKey] = (sessionCounts[sKey] || 0) + 1;
+            }
+        }
+
         for (var i = startIndex; i < dataRows.length; i++) {
             var cols = dataRows[i];
             if (cols.length < 6) continue;
@@ -477,7 +497,8 @@
                         start: date, end: date,
                         status: "", // 未選択
                         sampleDate: "", bloodDetail: "", remarks: "",
-                        tab: "screening", birthDate: "", age: null, ageGroup: ""
+                        tab: "screening", birthDate: "", age: null, ageGroup: "",
+                        freq: sessionCounts[id + "_" + drug + "_" + date] || 1
                     };
                 } else {
                     var key = matchedKey;
@@ -495,6 +516,9 @@
                         patientData[key].age = calculateAgeAtStart(patientData[key].birthDate, patientData[key].start);
                         patientData[key].ageGroup = getAgeGroup(patientData[key].age);
                     }
+                    
+                    var currentSKey = id + "_" + drug + "_" + date;
+                    patientData[key].freq = Math.max(patientData[key].freq || 0, sessionCounts[currentSKey] || 1);
                 }
             }
         }
@@ -730,7 +754,7 @@
             return;
         }
 
-        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
+        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与回数,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
         
         for (var key in patientData) {
             if (!patientData.hasOwnProperty(key)) continue;
@@ -738,7 +762,7 @@
             
             var rowArray = [
                 p.id, p.name, p.age, p.ageGroup, p.ward, p.department, p.doctor,
-                p.drug, p.start, p.end, p.sampleDate,
+                p.drug, p.freq ? p.freq + "回/日" : "", p.start, p.end, p.sampleDate,
                 p.status === "" ? "未選択" : p.status, 
                 p.tab === "target" ? "対象症例" : (p.tab === "exclude" ? "候補外" : "スクリーニング"),
                 p.remarks
@@ -981,6 +1005,9 @@
             var ageDisplay = (p.age !== null && p.age !== "") ? escapeHtml(p.age) + "歳<br><span style='font-size:10px;'>" + escapeHtml(p.ageGroup) + "</span>" : "<span style='color:#ccc; font-size:10px;'>未取得</span>";
 
             var drugDisplay = escapeHtml(p.drug);
+            if (p.freq && p.freq > 0) {
+                drugDisplay += " <span style='font-size:10px; color:#34495e; background:#ecf0f1; padding:2px 4px; border-radius:3px; white-space:nowrap;'>(" + p.freq + "回/日)</span>";
+            }
             if (hasMultiple) {
                 drugDisplay += "<br><span class='multi-drug-badge'>複数期間(薬剤)あり</span>";
             }
