@@ -164,6 +164,25 @@
         });
     }
 
+    function autoExcludeOldPatients(dataObj) {
+        var todayTime = new Date().getTime();
+        for (var k in dataObj) {
+            if (dataObj.hasOwnProperty(k)) {
+                var p = dataObj[k];
+                if ((p.tab || "screening") === "screening") {
+                    var eDate = new Date(p.end).getTime();
+                    if (!isNaN(eDate)) {
+                        var daysDiff = (todayTime - eDate) / (1000 * 3600 * 24);
+                        if (daysDiff > 30) {
+                            p.tab = "exclude";
+                            p.remarks = p.remarks ? p.remarks + "\n[自動] 投与終了から1ヶ月以上経過" : "[自動] 投与終了から1ヶ月以上経過";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     function loadData() {
         if (!fso) return {};
         try {
@@ -222,6 +241,8 @@
                                 }
                             }
                         }
+                        
+                        autoExcludeOldPatients(migrated);
                         
                         try {
                             var d = new Date();
@@ -523,6 +544,7 @@
             }
         }
         
+        autoExcludeOldPatients(patientData);
         saveDataToFile();
         updateHeaderFilters(true);
         updateWardCheckboxes();
@@ -907,10 +929,14 @@
         var alertCount = 0;
 
         var idCounts = {};
+        var idInTarget = {};
         for(var k in patientData) {
             if(patientData.hasOwnProperty(k)) {
                 var pid = patientData[k].id;
                 idCounts[pid] = (idCounts[pid] || 0) + 1;
+                if (patientData[k].tab === "target") {
+                    idInTarget[pid] = true;
+                }
             }
         }
 
@@ -992,6 +1018,7 @@
             }
 
             var hasMultiple = (idCounts[p.id] > 1);
+            var isAlreadyTarget = idInTarget[p.id];
 
             var row = document.createElement('tr');
             row.id = 'tr-patient-' + key;
@@ -1008,7 +1035,9 @@
             if (p.freq && p.freq > 0) {
                 drugDisplay += " <span style='font-size:10px; color:#34495e; background:#ecf0f1; padding:2px 4px; border-radius:3px; white-space:nowrap;'>(" + p.freq + "回/日)</span>";
             }
-            if (hasMultiple) {
+            if (isAlreadyTarget && currentTab !== "target") {
+                drugDisplay += "<br><span style='display:inline-block; font-size:10px; font-weight:bold; color:white; background:#c0392b; padding:2px 4px; border-radius:3px; margin-top:2px;'>🚨対象症例に登録済</span>";
+            } else if (hasMultiple) {
                 drugDisplay += "<br><span class='multi-drug-badge'>複数期間(薬剤)あり</span>";
             }
 
