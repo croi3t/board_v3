@@ -1371,7 +1371,7 @@
     }
     function renderCRF() {
         var html = '<div style="margin-bottom:10px;">';
-        html += '<h3 style="margin-top:0;">提出済患者用 CRFデータシート</h3>';
+        html += '<h3 style="margin-top:0;">提出済・冷凍患者用 CRFデータシート</h3>';
         html += '<button onclick="addCrfColumn()" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">＋ 列を追加</button> ';
         html += '<button onclick="exportCRFToCSV()" class="export-btn" style="background:#27ae60;">CRFをCSV出力</button>';
         html += '</div>';
@@ -1393,7 +1393,7 @@
         for (var key in patientData) {
             if (!patientData.hasOwnProperty(key)) continue;
             var p = patientData[key];
-            if (p.tab === "target" && p.status === "提出済") {
+            if (p.tab === "target" && (p.status === "提出済" || p.status === "冷凍")) {
                 html += '<tr>';
                 html += '<td>' + escapeHtml(p.id) + '</td>';
                 html += '<td>' + escapeHtml(p.name) + '</td>';
@@ -1457,7 +1457,7 @@
         for (var k in patientData) {
             if (patientData.hasOwnProperty(k)) {
                 var p = patientData[k];
-                if (p.tab === "target" && p.status === "提出済") {
+                if (p.tab === "target" && (p.status === "提出済" || p.status === "冷凍")) {
                     var row = [
                         '"' + String(p.id).replace(/"/g, '""') + '"',
                         '"' + String(p.name).replace(/"/g, '""') + '"',
