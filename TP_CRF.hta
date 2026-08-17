@@ -52,7 +52,7 @@
         
         .ward-filter-section { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; margin-bottom: 10px; clear: both; line-height: 1.8; }
         .ward-label { display: inline-block; margin-right: 15px; font-size: 12px; white-space: nowrap; cursor: pointer; }
-        .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; }
+        .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; overflow-y: scroll; }
 
         /* Summary Dashboard */
         .summary-dashboard { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
@@ -94,6 +94,7 @@
         <div id="tab-target" class="tab-btn" onclick="switchTab('target')">対象症例</div>
         <div id="tab-exclude" class="tab-btn" onclick="switchTab('exclude')">候補外</div>
         <div id="tab-summary" class="tab-btn" onclick="switchTab('summary')" style="background:#e8f4f8; border-color:#3498db; color:#2980b9;">集計・進捗</div>
+        <div id="tab-crf" class="tab-btn" onclick="switchTab('crf')" style="background:#e8f8ec; border-color:#27ae60; color:#27ae60;">CRF編集</div>
         
         <span id="header-tools">
             <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
@@ -144,6 +145,9 @@
     </div>
     
     <div id="summary-view" class="summary-dashboard" style="display:none;">
+    </div>
+    
+    <div id="crf-view" class="summary-dashboard" style="display:none; overflow-x:auto;">
     </div>
 </div>
 
@@ -280,8 +284,35 @@
     }
 
     var patientData = loadData();
-    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "提出済", "冷凍"];
-    var statusAbbr = ["同未", "同済", "採血", "処理", "提出", "冷凍"];
+    var statusLabels = ["同意未", "同意済", "採血済", "処理済", "冷凍", "提出済"];
+    var statusAbbr = ["同未", "同済", "採血", "処理", "冷凍", "提出"];
+
+    var colsFilePath = folderPath + "\\pk_study_crf_columns.json";
+    var crfColumns = [];
+    
+    function loadColumns() {
+        if (!fso) return;
+        try {
+            if (fso.FileExists(colsFilePath)) {
+                var ts = fso.OpenTextFile(colsFilePath, 1, false, -2);
+                if (!ts.AtEndOfStream) {
+                    crfColumns = JSON.parse(ts.ReadAll());
+                }
+                ts.Close();
+            }
+        } catch(e) {}
+    }
+    
+    function saveColumns() {
+        if (!fso) return;
+        try {
+            var ts = fso.OpenTextFile(colsFilePath, 2, true, -2);
+            ts.Write(JSON.stringify(crfColumns));
+            ts.Close();
+        } catch(e) {}
+    }
+    
+    loadColumns();
     var currentTab = "screening"; 
     
     var fetchQueue = [];
@@ -558,18 +589,31 @@
         document.getElementById("tab-target").className = (tabName === "target") ? "tab-btn active" : "tab-btn";
         document.getElementById("tab-exclude").className = (tabName === "exclude") ? "tab-btn active" : "tab-btn";
         document.getElementById("tab-summary").className = (tabName === "summary") ? "tab-btn active" : "tab-btn";
+        document.getElementById("tab-crf").className = (tabName === "crf") ? "tab-btn active" : "tab-btn";
 
+        var wardContainer = document.getElementById("wardFilterContainer");
+        var headerTools = document.getElementById("header-tools");
+        
         if (tabName === "summary") {
             document.getElementById("table-view").style.display = "none";
-            document.getElementById("wardFilterContainer").style.display = "none";
-            document.getElementById("header-tools").style.display = "none";
+            document.getElementById("crf-view").style.display = "none";
             document.getElementById("summary-view").style.display = "block";
+            if(wardContainer) wardContainer.style.display = "none";
+            if(headerTools) headerTools.style.display = "none";
             renderSummary();
+        } else if (tabName === "crf") {
+            document.getElementById("table-view").style.display = "none";
+            document.getElementById("summary-view").style.display = "none";
+            document.getElementById("crf-view").style.display = "block";
+            if(wardContainer) wardContainer.style.display = "none";
+            if(headerTools) headerTools.style.display = "none";
+            renderCRF();
         } else {
             document.getElementById("summary-view").style.display = "none";
+            document.getElementById("crf-view").style.display = "none";
             document.getElementById("table-view").style.display = "block";
-            document.getElementById("wardFilterContainer").style.display = "block";
-            document.getElementById("header-tools").style.display = "inline";
+            if(wardContainer) wardContainer.style.display = "block";
+            if(headerTools) headerTools.style.display = "inline";
             renderTable();
         }
     }
@@ -603,6 +647,17 @@
         saveDataToFile();
         updateWardCheckboxes();
         renderTable();
+    }
+
+    function expandTextarea(el) {
+        if (el.getAttribute("data-expanded") === "true") {
+            el.style.height = '45px';
+            el.setAttribute("data-expanded", "false");
+        } else {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight + 5) + 'px';
+            el.setAttribute("data-expanded", "true");
+        }
     }
 
     function clearData() {
@@ -1077,7 +1132,7 @@
             html += "</td>";
 
             var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
-            html += "<td><textarea class='remarks-input' onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ...'>" + safeRemarks + "</textarea></td>";
+            html += "<td><textarea class='remarks-input' title='" + safeRemarks + "' ondblclick=\"expandTextarea(this)\" oninput=\"this.title=this.value\" onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ... ダブルクリックで拡大'>" + safeRemarks + "</textarea></td>";
             
             html += "<td style='text-align: center;'>";
             html += "  <div class='status-grid'>";
@@ -1139,6 +1194,15 @@
             if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
             var safeDept = p.department || "(未登録)";
             if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
+
+            var endDate = new Date(p.end);
+            endDate.setHours(0,0,0,0);
+            var todayDate = new Date();
+            todayDate.setHours(0,0,0,0);
+            
+            if (!isNaN(endDate.getTime()) && endDate < todayDate) {
+                continue;
+            }
 
             fetchQueue.push(key);
         }
@@ -1265,7 +1329,7 @@
                             var dt = new Date(y, m - 1, d);
                             
                             var diffDays = (dt.getTime() - today.getTime()) / (1000 * 3600 * 24);
-                            if (diffDays >= 1 && diffDays <= 30) {
+                            if (diffDays >= 0 && diffDays <= 30) {
                                 var mStr = m < 10 ? '0' + m : m;
                                 var dStr = d < 10 ? '0' + d : d;
                                 futureEntries.push({
@@ -1305,7 +1369,133 @@
             cleanup();
         }
     }
+    function renderCRF() {
+        var html = '<div style="margin-bottom:10px;">';
+        html += '<h3 style="margin-top:0;">提出済患者用 CRFデータシート</h3>';
+        html += '<button onclick="addCrfColumn()" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">＋ 列を追加</button> ';
+        html += '<button onclick="exportCRFToCSV()" class="export-btn" style="background:#27ae60;">CRFをCSV出力</button>';
+        html += '</div>';
 
+        html += '<table id="crfTable" style="table-layout: auto; min-width: 100%;">';
+        html += '<thead><tr>';
+        html += '<th style="min-width: 70px;">患者ID</th>';
+        html += '<th style="min-width: 80px;">氏名</th>';
+        html += '<th style="min-width: 120px;">対象薬品</th>';
+        
+        for (var i = 0; i < crfColumns.length; i++) {
+            html += '<th style="min-width: 150px;">' + escapeHtml(crfColumns[i]) + '<br>';
+            html += '<button onclick="removeCrfColumn(\'' + escapeHtml(crfColumns[i]).replace(/'/g, "\\'") + '\')" style="font-size:10px; background:#e74c3c; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-top:3px;">削除</button>';
+            html += '</th>';
+        }
+        
+        html += '</tr></thead><tbody>';
+        
+        for (var key in patientData) {
+            if (!patientData.hasOwnProperty(key)) continue;
+            var p = patientData[key];
+            if (p.tab === "target" && p.status === "提出済") {
+                html += '<tr>';
+                html += '<td>' + escapeHtml(p.id) + '</td>';
+                html += '<td>' + escapeHtml(p.name) + '</td>';
+                html += '<td>' + escapeHtml(p.drug) + '</td>';
+                
+                var cData = p.crfData || {};
+                for (var i = 0; i < crfColumns.length; i++) {
+                    var colName = crfColumns[i];
+                    var val = cData[colName] || "";
+                    html += '<td><textarea class="remarks-input" style="min-height:45px; resize:vertical; font-size:11px;" title="' + escapeHtml(val) + '" ondblclick="expandTextarea(this)" oninput="this.title=this.value" onchange="updateCrfData(\'' + key + '\', \'' + escapeHtml(colName).replace(/'/g, "\\'") + '\', this.value)" placeholder="ダブルクリックで拡大">' + escapeHtml(val) + '</textarea></td>';
+                }
+                html += '</tr>';
+            }
+        }
+        
+        html += '</tbody></table>';
+        document.getElementById('crf-view').innerHTML = html;
+    }
+
+    function addCrfColumn() {
+        var colName = prompt("新しい列名を入力してください:");
+        if (!colName) return;
+        colName = colName.replace(/^\s+|\s+$/g, '');
+        if (colName === "") return;
+        if (crfColumns.indexOf(colName) !== -1) {
+            alert("その列名はすでに存在します。");
+            return;
+        }
+        crfColumns.push(colName);
+        saveColumns();
+        renderCRF();
+    }
+
+    function removeCrfColumn(colName) {
+        if (!confirm("列「" + colName + "」を削除しますか？\n(※入力されているデータは見えなくなります)")) return;
+        var idx = crfColumns.indexOf(colName);
+        if (idx !== -1) {
+            crfColumns.splice(idx, 1);
+            saveColumns();
+            renderCRF();
+        }
+    }
+
+    function updateCrfData(key, colName, val) {
+        if (!patientData[key].crfData) {
+            patientData[key].crfData = {};
+        }
+        patientData[key].crfData[colName] = val;
+        saveDataToFile();
+    }
+
+    function exportCRFToCSV() {
+        if (!fso) {
+            alert("ファイルシステムにアクセスできません。");
+            return;
+        }
+        
+        var header = ["患者ID", "氏名", "対象薬品"].concat(crfColumns);
+        var csvContent = header.join(",") + "\n";
+        
+        for (var k in patientData) {
+            if (patientData.hasOwnProperty(k)) {
+                var p = patientData[k];
+                if (p.tab === "target" && p.status === "提出済") {
+                    var row = [
+                        '"' + String(p.id).replace(/"/g, '""') + '"',
+                        '"' + String(p.name).replace(/"/g, '""') + '"',
+                        '"' + String(p.drug).replace(/"/g, '""') + '"'
+                    ];
+                    var cData = p.crfData || {};
+                    for (var i = 0; i < crfColumns.length; i++) {
+                        var val = cData[crfColumns[i]] || "";
+                        var valClean = String(val).replace(/"/g, '""');
+                        row.push('"' + valClean + '"');
+                    }
+                    csvContent += row.join(",") + "\n";
+                }
+            }
+        }
+        
+        try {
+            var stream = new ActiveXObject("ADODB.Stream");
+            stream.Type = 2; // adTypeText
+            stream.Charset = "Shift_JIS";
+            stream.Open();
+            stream.WriteText(csvContent);
+            
+            var d = new Date();
+            var y = d.getFullYear();
+            var m = d.getMonth() + 1;
+            var day = d.getDate();
+            var h = d.getHours();
+            var min = d.getMinutes();
+            var filename = folderPath + "\\CRF_Output_" + y + (m < 10 ? '0'+m : m) + (day < 10 ? '0'+day : day) + "_" + (h < 10 ? '0'+h : h) + (min < 10 ? '0'+min : min) + ".csv";
+            
+            stream.SaveToFile(filename, 2); // adSaveCreateOverWrite
+            stream.Close();
+            alert("CRFデータをCSVで保存しました。\n保存先: " + filename);
+        } catch(e) {
+            alert("CSV保存に失敗しました。\n" + e.message);
+        }
+    }
     updateHeaderFilters(true);
     updateWardCheckboxes();
     renderTable();
