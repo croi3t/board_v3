@@ -80,7 +80,15 @@
     <div class="main-container">
         <!-- エディタエリア -->
         <div class="editor-pane">
-            <div id="empty-msg">上部のセクションと右側のページを選択してください。</div>
+            <div id="empty-msg">
+                <div style="text-align:center;">
+                    <div id="empty-default-text">上部のセクションと右側のページを選択してください。</div>
+                    <div id="reconnect-ui" style="display:none; margin-top:20px;">
+                        <h3 style="color:#2c3e50; margin-bottom:15px;">前回開いていたフォルダに再接続しますか？</h3>
+                        <button id="btn-reconnect-large" class="btn" style="font-size:16px; padding:12px 24px; background:#27ae60; box-shadow:0 4px 6px rgba(0,0,0,0.1);">📁 〇〇 に再接続</button>
+                    </div>
+                </div>
+            </div>
             
             <div id="editor-wrapper">
                 <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()">
@@ -125,7 +133,8 @@ const BookManager = {
     init: function() {
         return new Promise((resolve, reject) => {
             try {
-                const req = indexedDB.open('WardManualDB', 2);
+                // work_report等とのDB競合を完全に防ぐため、独自の名前を使用
+                const req = indexedDB.open('WardManualAppDB_v3', 1);
                 req.onupgradeneeded = e => {
                     if (!e.target.result.objectStoreNames.contains('books')) {
                         e.target.result.createObjectStore('books', { keyPath: 'name' });
@@ -719,12 +728,21 @@ const UI = {
                 this.renderAll();
             };
             
+            div.ondblclick = (e) => {
+                if (e.target === colorInput) return;
+                const newName = prompt("セクション名を入力してください:", sec.name);
+                if (newName && newName !== sec.name) {
+                    AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: sec.bgColor, name: newName });
+                    UI.renderSections();
+                }
+            };
+            
             div.oncontextmenu = (e) => {
                 e.preventDefault();
                 colorInput.showPicker ? colorInput.showPicker() : colorInput.click();
             };
             
-            div.title = "右クリックで色を変更";
+            div.title = "ダブルクリックで名前変更 / 右クリックで色を変更";
             div.appendChild(colorInput);
             container.appendChild(div);
         });
@@ -972,6 +990,32 @@ window.onload = async function() {
     }
     Editor.init();
     UI.renderAll();
+    
+    // ワンクリック再接続UIの構築
+    try {
+        const books = await BookManager.getBooks();
+        if (books && books.length > 0) {
+            const lastBook = books[0];
+            
+            // 権限が既に保持されているかチェック（稀なケース）
+            if (await lastBook.handle.queryPermission({ mode: 'readwrite' }) === 'granted') {
+                AppCore.connectHistory(lastBook.handle);
+            } else {
+                // UIの表示
+                document.getElementById('empty-default-text').style.display = 'none';
+                const reconnectUi = document.getElementById('reconnect-ui');
+                const reconnectBtn = document.getElementById('btn-reconnect-large');
+                
+                reconnectUi.style.display = 'block';
+                reconnectBtn.innerText = `📁 「${lastBook.name}」に再接続`;
+                reconnectBtn.onclick = () => {
+                    reconnectUi.style.display = 'none';
+                    document.getElementById('empty-default-text').style.display = 'block';
+                    AppCore.connectHistory(lastBook.handle);
+                };
+            }
+        }
+    } catch(e) {}
     
     document.addEventListener('click', function(e) {
         const menu = document.getElementById('book-menu');
