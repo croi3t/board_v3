@@ -34,6 +34,11 @@
         .status-badge.active.st-4 { background: #2ecc71; color: white; border-color: #2ecc71; font-weight:bold; } /* 提出 */
         .status-badge.active.st-5 { background: #1abc9c; color: white; border-color: #1abc9c; font-weight:bold; } /* 冷凍 */
         
+        .sub-status-grid { width: 70px; margin: auto; text-align: center; font-size: 0; }
+        .sub-status-badge { display: inline-block; width: 28px; margin: 1px; font-size: 11px; padding: 2px 0; text-align: center; border-radius: 2px; cursor: pointer; border: 1px solid #ccc; background: white; color: #999; user-select: none; }
+        .sub-status-badge:hover { border-color: #888; color: #333; }
+        .sub-status-badge.active { background: #34495e; color: white; border-color: #34495e; font-weight:bold; }
+
         .highlight { background: #fff9c4 !important; }
         
         /* Multiple Drugs highlight */
@@ -104,6 +109,11 @@
 
     <div id="wardFilterContainer" class="ward-filter-section"></div>
 
+    <div style="font-size: 11px; color: #555; text-align: right; margin-bottom: 5px;">
+        ※ステータス: 同未=同意未, 同済=同意済, 採血=採血済, 処理=処理済, 冷凍=冷凍, 提出=提出済<br>
+        ※確認状況: TD=医師ToDo済, 署名=医師署名済, 連絡=検査連絡済, 回覧=検査CoMedix回覧済
+    </div>
+
     <div id="table-view">
         <table id="patientTable">
             <thead>
@@ -131,10 +141,11 @@
                     <th style="width: 80px; cursor: pointer;" onclick="sortTable('start')">投与期間 <span id="sort-icon-start" class="sort-icon">↕</span></th>
                     <th style="width: 125px; cursor: pointer;" onclick="sortTable('sampleDate')">採血予定日 <span id="sort-icon-sampleDate" class="sort-icon">↕</span></th>
                     <th style="width: auto;">備考・コメント</th>
+                    <th style="width: 70px; text-align:center;">確認状況</th>
                     <th style="width: 105px; padding-bottom: 2px;">ステータス<br>
                         <div class="ms-container" id="ms-status">
                             <button class="ms-btn" onclick="toggleMs('ms-status', event)">▼ 絞り込み</button>
-                            <div class="ms-content" id="ms-status-content" onclick="event.stopPropagation()"></div>
+                            <div class="ms-content" id="ms-status-content" style="min-width: auto !important; width: 95px !important; box-sizing: border-box;" onclick="event.stopPropagation()"></div>
                         </div>
                     </th>
                     <th style="width: 60px; text-align: center;">操作</th>
@@ -153,12 +164,32 @@
 
 <script>
     var fso;
+    var folderPath = "";
+    var backupDir = "";
     var dataFilePath = "pk_study_crf_data.json";
+    var colsFilePath = "pk_study_crf_columns.json";
     try {
         fso = new ActiveXObject("Scripting.FileSystemObject");
         var htaPath = unescape(location.pathname).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\//g, '\\');
-        var folderPath = fso.GetParentFolderName(htaPath);
-        dataFilePath = folderPath + "\\pk_study_crf_data.json";
+        folderPath = fso.GetParentFolderName(htaPath);
+        backupDir = folderPath + "\\バックアップ";
+        
+        if (!fso.FolderExists(backupDir)) {
+            fso.CreateFolder(backupDir);
+        }
+
+        dataFilePath = backupDir + "\\pk_study_crf_data.json";
+        colsFilePath = backupDir + "\\pk_study_crf_columns.json";
+
+        var oldDataFilePath = folderPath + "\\pk_study_crf_data.json";
+        var oldColsFilePath = folderPath + "\\pk_study_crf_columns.json";
+        
+        if (fso.FileExists(oldDataFilePath) && !fso.FileExists(dataFilePath)) {
+            fso.MoveFile(oldDataFilePath, dataFilePath);
+        }
+        if (fso.FileExists(oldColsFilePath) && !fso.FileExists(colsFilePath)) {
+            fso.MoveFile(oldColsFilePath, colsFilePath);
+        }
     } catch(e) {}
 
     function toHalfWidth(str) {
@@ -255,7 +286,6 @@
                             var day = d.getDate();
                             var weekOfMonth = Math.ceil(day / 7);
                             var mStr = m < 10 ? '0' + m : m;
-                            var backupDir = folderPath + "\\バックアップ";
                             if (!fso.FolderExists(backupDir)) {
                                 fso.CreateFolder(backupDir);
                             }
@@ -286,8 +316,9 @@
     var patientData = loadData();
     var statusLabels = ["同意未", "同意済", "採血済", "処理済", "冷凍", "提出済"];
     var statusAbbr = ["同未", "同済", "採血", "処理", "冷凍", "提出"];
+    var subStatusLabels = ["医師ToDo済", "医師署名済", "検査連絡済", "検査CoMedix回覧済"];
+    var subStatusAbbr = ["TD", "署名", "連絡", "回覧"];
 
-    var colsFilePath = folderPath + "\\pk_study_crf_columns.json";
     var crfColumns = [];
     
     function loadColumns() {
@@ -629,6 +660,14 @@
         } else {
             patientData[key].status = valStr;
         }
+        saveAndRender();
+    }
+
+    function toggleSubStatus(key, subKey) {
+        if (!patientData[key].subStatus) {
+            patientData[key].subStatus = {};
+        }
+        patientData[key].subStatus[subKey] = !patientData[key].subStatus[subKey];
         saveAndRender();
     }
 
@@ -1133,6 +1172,16 @@
 
             var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
             html += "<td><textarea class='remarks-input' title='" + safeRemarks + "' ondblclick=\"expandTextarea(this)\" oninput=\"this.title=this.value\" onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ... ダブルクリックで拡大'>" + safeRemarks + "</textarea></td>";
+
+            html += "<td style='text-align: center;'>";
+            html += "  <div class='sub-status-grid'>";
+            var subStatusObj = p.subStatus || {};
+            for (var st=0; st<subStatusLabels.length; st++) {
+                var isActive = subStatusObj[subStatusLabels[st]] ? "active" : "";
+                html += "    <div class='sub-status-badge " + isActive + "' onclick=\"toggleSubStatus('" + key + "', '" + subStatusLabels[st] + "')\" title='" + subStatusLabels[st] + "'>" + subStatusAbbr[st] + "</div>";
+            }
+            html += "  </div>";
+            html += "</td>";
             
             html += "<td style='text-align: center;'>";
             html += "  <div class='status-grid'>";
