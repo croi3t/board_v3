@@ -1264,9 +1264,20 @@
                 
                 var isDone = false;
                 
-                iframe.onreadystatechange = function() {
-                    if (iframe.readyState === "complete" && !isDone) {
+                var fallbackTimer = setTimeout(function() {
+                    if (!isDone) {
                         isDone = true;
+                        document.body.removeChild(iframe);
+                        callback({});
+                    }
+                }, 30000); // 30s timeout
+                
+                iframe.onload = function() {
+                    setTimeout(function() {
+                        if (isDone) return;
+                        isDone = true;
+                        clearTimeout(fallbackTimer);
+                        
                         var result = {};
                         try {
                             var doc = iframe.contentWindow.document;
@@ -1285,7 +1296,7 @@
                         
                         document.body.removeChild(iframe);
                         callback(result);
-                    }
+                    }, 500);
                 };
                 iframe.src = url;
             }
