@@ -585,14 +585,26 @@
                     };
                 } else {
                     var key = matchedKey;
-                    patientData[key].department = department || patientData[key].department;
-                    patientData[key].doctor = doctor || patientData[key].doctor;
-                    patientData[key].ward = ward || patientData[key].ward;
-
                     var newDate = new Date(date);
+                    
                     if (!isNaN(newDate.getTime())) {
+                        var currentEnd = new Date(patientData[key].end);
+                        if (isNaN(currentEnd.getTime()) || newDate >= currentEnd) {
+                            if (department) patientData[key].department = department;
+                            if (doctor) patientData[key].doctor = doctor;
+                            if (ward) patientData[key].ward = ward;
+                        } else {
+                            if (!patientData[key].department && department) patientData[key].department = department;
+                            if (!patientData[key].doctor && doctor) patientData[key].doctor = doctor;
+                            if (!patientData[key].ward && ward) patientData[key].ward = ward;
+                        }
+                        
                         if (newDate < new Date(patientData[key].start)) patientData[key].start = date;
-                        if (newDate > new Date(patientData[key].end)) patientData[key].end = date;
+                        if (newDate > currentEnd) patientData[key].end = date;
+                    } else {
+                        patientData[key].department = department || patientData[key].department;
+                        patientData[key].doctor = doctor || patientData[key].doctor;
+                        patientData[key].ward = ward || patientData[key].ward;
                     }
                     
                     if (patientData[key].birthDate) {
