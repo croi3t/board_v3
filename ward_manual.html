@@ -164,16 +164,21 @@
             
             <div id="editor-wrapper">
                 <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()">
-                <div class="attachment-bar">
+                <div class="attachment-bar" id="attachment-bar">
                     <button class="btn" onclick="document.getElementById('file-upload').click()" style="background:#f39c12; color:white;">📎 添付ファイル追加</button>
                     <input type="file" id="file-upload" style="display:none" onchange="AppCore.attachFile(this.files[0])">
                 </div>
                 <textarea id="tinymce-editor"></textarea>
+                <!-- フローティング全画面トグルボタン -->
+                <button id="floating-fullscreen-btn" onclick="UI.toggleFullscreen()" style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 6px 10px; cursor: pointer; color: #555; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='#fff'" title="全画面表示の切り替え">⛶</button>
             </div>
         </div>
 
+        <!-- ドラッグ用リサイザー -->
+        <div id="resizer" style="width: 6px; cursor: col-resize; background: #e0e0e0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='#c0c0c0'" onmouseout="this.style.background='#e0e0e0'"></div>
+
         <!-- ページリストエリア -->
-        <div class="page-pane">
+        <div class="page-pane" id="page-pane" style="width: 220px;">
             <div class="page-header">
                 <span id="current-sec-name">ページ一覧</span>
                 <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="UI.addPage()">＋ 追加</button>
@@ -1181,6 +1186,45 @@ const UI = {
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
         menu.style.display = 'block';
+    },
+
+    toggleFullscreen: function() {
+        State.isFullscreen = !State.isFullscreen;
+        const header = document.querySelector('.header');
+        const sectionBar = document.getElementById('section-bar');
+        const pagePane = document.getElementById('page-pane');
+        const resizer = document.getElementById('resizer');
+        const attachmentBar = document.getElementById('attachment-bar');
+        const btn = document.getElementById('floating-fullscreen-btn');
+        const toxHeader = document.querySelector('.tox-editor-header');
+        
+        if (State.isFullscreen) {
+            header.style.display = 'none';
+            sectionBar.style.display = 'none';
+            pagePane.style.display = 'none';
+            if (resizer) resizer.style.display = 'none';
+            if (attachmentBar) attachmentBar.style.display = 'none';
+            if (toxHeader) toxHeader.style.display = 'none';
+            
+            btn.innerHTML = '🗗';
+            btn.title = "全画面表示を解除";
+        } else {
+            header.style.display = 'flex';
+            sectionBar.style.display = 'flex';
+            pagePane.style.display = 'flex';
+            if (resizer) resizer.style.display = 'block';
+            if (attachmentBar) attachmentBar.style.display = 'flex';
+            if (toxHeader) toxHeader.style.display = 'flex';
+            
+            btn.innerHTML = '⛶';
+            btn.title = "全画面表示";
+        }
+        
+        if (window.tinymce && tinymce.activeEditor) {
+            setTimeout(() => {
+                tinymce.activeEditor.execCommand('mceAutoResize');
+            }, 50);
+        }
     }
 };
 
@@ -1192,6 +1236,34 @@ window.onload = async function() {
     }
     Editor.init();
     UI.renderAll();
+    
+    // リサイザー（ドラッグでページリストの幅を変更）の処理
+    const resizer = document.getElementById('resizer');
+    const pagePane = document.getElementById('page-pane');
+    let isResizing = false;
+    
+    resizer.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        // 画面右端からの距離を新しい幅とする
+        let newWidth = window.innerWidth - e.clientX;
+        if (newWidth < 150) newWidth = 150; // 最小幅
+        if (newWidth > 600) newWidth = 600; // 最大幅
+        pagePane.style.width = newWidth + 'px';
+    });
+    
+    document.addEventListener('mouseup', function(e) {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = '';
+        }
+    });
     
 
     
