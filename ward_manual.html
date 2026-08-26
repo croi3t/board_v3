@@ -80,14 +80,86 @@
     <div class="main-container">
         <!-- エディタエリア -->
         <div class="editor-pane">
-            <div id="empty-msg">
-                <div style="text-align:center;">
-                    <div id="empty-default-text">上部のセクションと右側のページを選択してください。</div>
-                    <div id="reconnect-ui" style="display:none; margin-top:20px;">
-                        <h3 style="color:#2c3e50; margin-bottom:15px;">前回開いていたフォルダに再接続しますか？</h3>
-                        <button id="btn-reconnect-large" class="btn" style="font-size:16px; padding:12px 24px; background:#27ae60; box-shadow:0 4px 6px rgba(0,0,0,0.1);">📁 〇〇 に再接続</button>
+            <div id="empty-msg" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #f4f6f9; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 20px; overflow-y: auto;">
+                <div style="background: white; padding: 30px 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 650px; color: #333;">
+                    <h2 style="color: #2c3e50; margin-top: 0; font-size: 22px; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 30px;">📁 データフォルダの接続手順</h2>
+                    
+                    <!-- STEP 1 -->
+                    <div style="margin-bottom: 35px;">
+                        <div style="font-weight: bold; color: #3498db; margin-bottom: 12px; font-size: 16px;">STEP 1: メニューを開く</div>
+                        <p style="font-size: 13px; color: #666; margin-bottom: 10px;">左上の「ブックを開く」ボタンから、「新しいフォルダを開く...」を選びます。</p>
+                        <div style="background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; padding: 20px; position: relative;">
+                            <div style="display: inline-block;">
+                                <button style="background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-size: 14px; font-weight: bold;">📁 ブックを開く ▼</button>
+                            </div>
+                            <div style="margin-top: 5px; background: white; border: 1px solid #ccc; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 4px; width: 220px; position: relative;">
+                                <div style="padding: 12px; font-size: 13px; color: #333; border-bottom: 1px solid #eee;">最近開いたブック...</div>
+                                <div style="padding: 12px; font-size: 13px; color: #3498db; font-weight: bold; background: #f1f3f5;">＋ 新しいフォルダを開く...</div>
+                                <div style="position: absolute; left: 160px; top: 40px; font-size: 28px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); animation: float 2s infinite ease-in-out;">👆</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2 -->
+                    <div style="margin-bottom: 35px;">
+                        <div style="font-weight: bold; color: #3498db; margin-bottom: 12px; font-size: 16px;">STEP 2: パスをコピーして貼り付け</div>
+                        <p style="font-size: 13px; color: #666; margin-bottom: 10px;">以下のパスをコピーし、選択画面上部のアドレスバーに貼り付けて <strong>Enterキー</strong> を押します。</p>
+                        
+                        <!-- コピー用パス -->
+                        <div style="background: #eef2f5; padding: 10px 15px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #cdd4db; margin-bottom: 15px;">
+                            <code id="target-path" style="font-size: 15px; color: #d35400; font-family: monospace; font-weight: bold;">Z:\reiwa\work_manual_alt_Onenote\data</code>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('target-path').innerText); alert('コピーしました！');" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
+                        </div>
+                        
+                        <!-- アドレスバーモックアップ -->
+                        <div style="background: #fff; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                            <div style="background: #f0f0f0; padding: 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ddd;">
+                                <div style="display: flex; gap: 8px; color: #666;"><span style="font-size: 16px;">←</span><span style="font-size: 16px; opacity: 0.3;">→</span><span style="font-size: 16px;">↑</span></div>
+                                <div style="flex: 1; background: #fff; border: 1px solid #0078d7; border-radius: 3px; display: flex; align-items: center; padding: 4px 8px; position: relative;">
+                                    <span style="color: #f39c12; margin-right: 6px; font-size: 14px;">📁</span>
+                                    <span style="color: #111; font-family: Meiryo, sans-serif; font-size: 13px; background: #cce8ff; padding: 0 3px;">ここにパスを貼り付けて Enter</span>
+                                    <div style="position: absolute; right: 10px; top: 15px; font-size: 28px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); animation: float 2s infinite ease-in-out; animation-delay: 0.5s;">👆</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3 -->
+                    <div>
+                        <div style="font-weight: bold; color: #3498db; margin-bottom: 12px; font-size: 16px;">STEP 3: フォルダの選択</div>
+                        <p style="font-size: 13px; color: #666; margin-bottom: 10px;">移動先で対象のフォルダを選び、右下の <strong>「フォルダーの選択」</strong> ボタンを押します。</p>
+                        
+                        <div style="background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 15px; position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                            <div style="display: flex; height: 120px; border: 1px solid #eee; margin-bottom: 15px; border-radius: 4px; overflow: hidden;">
+                                <div style="width: 120px; border-right: 1px solid #eee; background: #fafafa;"></div>
+                                <div style="flex: 1; padding: 15px; display: flex; gap: 15px; align-items: flex-start; background: white;">
+                                    <div style="background: #cce8ff; border: 1px solid #99d1ff; border-radius: 3px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);">
+                                        <span style="color: #f39c12; font-size: 18px;">📁</span> <span style="font-size: 14px; color: #333;">data</span>
+                                    </div>
+                                    <div style="padding: 8px 12px; display: flex; align-items: center; gap: 8px;">
+                                        <span style="color: #f39c12; font-size: 18px;">📁</span> <span style="font-size: 14px; color: #333;">別のフォルダ</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eee; padding-top: 15px; position: relative; align-items: center;">
+                                <div style="flex: 1; display: flex; align-items: center; gap: 10px; padding-right: 20px;">
+                                    <span style="font-size: 13px; color: #666;">フォルダー:</span>
+                                    <div style="border: 1px solid #ccc; padding: 4px 8px; flex: 1; border-radius: 3px; font-size: 13px; color: #333; background: #fff;">data</div>
+                                </div>
+                                <button style="background: #e1e1e1; border: 1px solid #adadad; padding: 6px 15px; border-radius: 3px; font-size: 13px; color: #333;">フォルダーの選択</button>
+                                <button style="background: #e1e1e1; border: 1px solid #adadad; padding: 6px 15px; border-radius: 3px; font-size: 13px; color: #333;">キャンセル</button>
+                                <div style="position: absolute; right: 105px; top: 20px; font-size: 28px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); animation: float 2s infinite ease-in-out; animation-delay: 1s;">👆</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                <style>
+                    @keyframes float {
+                        0%, 100% { transform: translateY(0); }
+                        50% { transform: translateY(-6px); }
+                    }
+                    /* デフォルトのセンタリングを上書きするため #empty-msg 自体にインラインで指定 */
+                </style>
             </div>
             
             <div id="editor-wrapper">
@@ -117,7 +189,7 @@
 const State = {
     userId: "User_" + Math.floor(Math.random() * 10000), 
     index: { 
-        sections: [{ id: "sec1", name: "業務マニュアル" }, { id: "sec2", name: "業務日誌" }], 
+        sections: [], 
         pages: [], 
         last_merge_date: "" 
     },
@@ -234,7 +306,7 @@ const AppCore = (function() {
 
             await loadIndex();
             if(!State.index.sections || State.index.sections.length === 0) {
-                State.index.sections = [{ id: "sec1", name: "新しいセクション" }];
+                State.index.sections = [{ id: "sec1", name: "新しいセクション", bgColor: "#a0c4ff" }];
                 State.currentSecId = "sec1";
             } else if (!State.currentPageId) {
                 State.currentSecId = State.index.sections[0].id;
@@ -380,6 +452,14 @@ const AppCore = (function() {
                 s.bgColor = d.bgColor;
                 if (d.name) s.name = d.name;
             }
+        } else if (tx.op === 'DELETE_SECTION') {
+            State.index.sections = State.index.sections.filter(s => s.id !== d.id);
+            if (State.currentSecId === d.id) {
+                State.currentSecId = State.index.sections.length > 0 ? State.index.sections[0].id : null;
+                const firstPage = State.index.pages.find(p => p.secId === State.currentSecId);
+                State.currentPageId = firstPage ? firstPage.id : null;
+                UI.renderEditor();
+            }
         }
     }
 
@@ -509,12 +589,11 @@ const Editor = {
             menubar: false,
             license_key: 'gpl',
             promotion: false,
-            plugins: 'table lists advlist image autolink paste contextmenu accordion', 
+            plugins: 'table lists advlist image autolink accordion', 
             toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image | removeformat',
             advlist_bullet_styles: 'square,square,disc,circle,default,kome=kome,asterisk=asterisk',
             advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
             paste_data_images: true, 
-            contextmenu: 'link image table',
             content_style: `
                 ol { list-style-type: decimal; }
                 ol ol { list-style-type: upper-alpha; }
@@ -676,6 +755,7 @@ const UI = {
             const div = document.createElement('div');
             div.className = 'sec-tab' + (State.currentSecId === sec.id ? ' active' : '');
             div.draggable = true;
+            div.innerText = sec.name;
             
             div.ondragstart = (e) => {
                 e.dataTransfer.setData('text/plain', idx);
@@ -693,10 +773,6 @@ const UI = {
                 }
             };
             
-            const textSpan = document.createElement('span');
-            textSpan.innerText = sec.name;
-            div.appendChild(textSpan);
-            
             if (sec.bgColor) {
                 if (State.currentSecId === sec.id) {
                     div.style.borderTopColor = sec.bgColor;
@@ -707,21 +783,7 @@ const UI = {
                 }
             }
             
-            const colorInput = document.createElement('input');
-            colorInput.type = 'color';
-            colorInput.value = sec.bgColor || '#dee2e6';
-            colorInput.style.position = 'absolute';
-            colorInput.style.opacity = '0';
-            colorInput.style.width = '1px';
-            colorInput.style.height = '1px';
-            
-            colorInput.onchange = (e) => {
-                AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: e.target.value, name: sec.name });
-                UI.renderSections();
-            };
-            
             div.onclick = (e) => {
-                if (e.target === colorInput) return;
                 State.currentSecId = sec.id;
                 const firstPage = State.index.pages.find(p => p.secId === sec.id);
                 State.currentPageId = firstPage ? firstPage.id : null;
@@ -729,21 +791,19 @@ const UI = {
             };
             
             div.ondblclick = (e) => {
-                if (e.target === colorInput) return;
                 const newName = prompt("セクション名を入力してください:", sec.name);
                 if (newName && newName !== sec.name) {
                     AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: sec.bgColor, name: newName });
                     UI.renderSections();
                 }
             };
-            
+
             div.oncontextmenu = (e) => {
                 e.preventDefault();
-                colorInput.showPicker ? colorInput.showPicker() : colorInput.click();
+                UI.showSectionContextMenu(e.pageX, e.pageY, sec);
             };
             
-            div.title = "ダブルクリックで名前変更 / 右クリックで色を変更";
-            div.appendChild(colorInput);
+            div.title = "右クリックでメニューを表示 / ダブルクリックで名前変更";
             container.appendChild(div);
         });
         
@@ -754,8 +814,20 @@ const UI = {
             const name = prompt("新しいセクション名を入力してください:");
             if (name) {
                 const id = "sec_" + Date.now();
-                AppCore.appendTransaction('ADD_SECTION', { id, name });
-                this.renderSections();
+                const colors = ['#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff', '#e0e0e0'];
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                AppCore.appendTransaction('ADD_SECTION', { id, name, bgColor: randomColor });
+                
+                const pageId = "p_" + Date.now() + "_init";
+                AppCore.appendTransaction('UPDATE_PAGE', {
+                    id: pageId,
+                    indexData: { title: "", secId: id, sortOrder: 0 },
+                    pageData: { content: "" }
+                });
+                State.currentSecId = id;
+                State.currentPageId = pageId;
+                
+                this.renderAll();
             }
         };
         container.appendChild(addBtn);
@@ -775,8 +847,13 @@ const UI = {
         }
 
         pages.sort((a,b) => {
-            if (a.sortOrder !== undefined && b.sortOrder !== undefined) return a.sortOrder - b.sortOrder;
-            return (b.updatedAt || 0) - (a.updatedAt || 0);
+            const getOrder = (p) => {
+                if (p.sortOrder !== undefined) return p.sortOrder;
+                // sortOrderが無い（新規作成された）場合は、リストの一番下に来るように巨大な数値を割り当てる
+                // 同時に作成順（idのタイムスタンプ）で並ぶようにする
+                return 999999999 + (parseInt(p.id.replace('p_','')) || 0);
+            };
+            return getOrder(a) - getOrder(b);
         });
 
         const visiblePages = [];
@@ -891,7 +968,12 @@ const UI = {
             
             const titleSpan = document.createElement('span');
             titleSpan.className = 'page-title';
-            titleSpan.innerText = p.title || "無題";
+            titleSpan.innerText = p.title || "無題のページ";
+            if (!p.title) {
+                titleSpan.style.color = "#aaa";
+                titleSpan.style.fontStyle = "italic";
+                titleSpan.style.fontWeight = "normal";
+            }
             titleTextWrap.appendChild(titleSpan);
             
             const indentControls = document.createElement('div');
@@ -973,12 +1055,132 @@ const UI = {
         const id = "p_" + Date.now();
         const payload = {
             id: id,
-            indexData: { title: "無題のページ", secId: State.currentSecId },
+            indexData: { title: "", secId: State.currentSecId },
             pageData: { content: "" }
         };
         AppCore.appendTransaction('UPDATE_PAGE', payload);
         State.currentPageId = id;
         this.renderAll();
+    },
+    
+    deleteSection: function(secId) {
+        if (!confirm("本当にこのセクションと、中のすべてのページを削除しますか？\n（この操作は取り消せません）")) return;
+        
+        // まず中のページをすべて削除
+        const pages = State.index.pages.filter(p => p.secId === secId);
+        pages.forEach(p => {
+            AppCore.appendTransaction('DELETE_PAGE', { id: p.id });
+        });
+        
+        // セクションを削除
+        AppCore.appendTransaction('DELETE_SECTION', { id: secId });
+        this.renderAll();
+    },
+
+    duplicateSection: async function(secId) {
+        const sec = State.index.sections.find(s => s.id === secId);
+        if (!sec) return;
+        
+        const newSecId = "sec_" + Date.now();
+        const newName = sec.name + " (コピー)";
+        
+        // 新しいセクションを追加
+        AppCore.appendTransaction('ADD_SECTION', { id: newSecId, name: newName, bgColor: sec.bgColor });
+        
+        // 中のページをすべて複製
+        const pages = State.index.pages.filter(p => p.secId === secId);
+        for (const p of pages) {
+            const pageData = await AppCore.loadPageData(p.id);
+            const newPageId = "p_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+            
+            AppCore.appendTransaction('UPDATE_PAGE', {
+                id: newPageId,
+                indexData: {
+                    title: p.title,
+                    secId: newSecId,
+                    indentLevel: p.indentLevel,
+                    sortOrder: p.sortOrder
+                },
+                pageData: { content: pageData.content }
+            });
+        }
+        
+        State.currentSecId = newSecId;
+        this.renderAll();
+    },
+
+    showSectionContextMenu: function(x, y, sec) {
+        let menu = document.getElementById('section-context-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'section-context-menu';
+            menu.style.position = 'absolute';
+            menu.style.background = 'white';
+            menu.style.border = '1px solid #ccc';
+            menu.style.boxShadow = '2px 2px 5px rgba(0,0,0,0.2)';
+            menu.style.zIndex = '9999';
+            menu.style.padding = '5px 0';
+            menu.style.borderRadius = '3px';
+            menu.style.minWidth = '150px';
+            menu.style.fontSize = '13px';
+            document.body.appendChild(menu);
+            
+            document.addEventListener('click', (e) => {
+                if (menu.style.display === 'block') menu.style.display = 'none';
+            });
+            window.addEventListener('scroll', () => {
+                if (menu.style.display === 'block') menu.style.display = 'none';
+            });
+        }
+        
+        menu.innerHTML = '';
+        
+        const createItem = (text, icon, onClick) => {
+            const item = document.createElement('div');
+            item.innerHTML = `<span style="margin-right:8px;">${icon}</span>${text}`;
+            item.style.padding = '8px 15px';
+            item.style.cursor = 'pointer';
+            item.onmouseover = () => item.style.background = '#f1f3f5';
+            item.onmouseout = () => item.style.background = 'none';
+            item.onclick = (e) => {
+                e.stopPropagation();
+                menu.style.display = 'none';
+                onClick();
+            };
+            return item;
+        };
+        
+        menu.appendChild(createItem('名前の変更', '✏️', () => {
+            const newName = prompt("セクション名を入力してください:", sec.name);
+            if (newName && newName !== sec.name) {
+                AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: sec.bgColor, name: newName });
+                UI.renderSections();
+            }
+        }));
+        
+        menu.appendChild(createItem('色の変更', '🎨', () => {
+            const tempInput = document.createElement('input');
+            tempInput.type = 'color';
+            tempInput.value = sec.bgColor || '#dee2e6';
+            tempInput.style.position = 'absolute';
+            tempInput.style.opacity = '0';
+            document.body.appendChild(tempInput);
+            tempInput.onchange = (ev) => {
+                AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: ev.target.value, name: sec.name });
+                UI.renderSections();
+                document.body.removeChild(tempInput);
+            };
+            setTimeout(() => {
+                tempInput.showPicker ? tempInput.showPicker() : tempInput.click();
+            }, 10);
+        }));
+        
+        menu.appendChild(createItem('セクションをコピー', '📑', () => UI.duplicateSection(sec.id)));
+        menu.appendChild(createItem('削除', '✕', () => UI.deleteSection(sec.id)));
+        
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.display = 'block';
     }
 };
 
@@ -991,31 +1193,7 @@ window.onload = async function() {
     Editor.init();
     UI.renderAll();
     
-    // ワンクリック再接続UIの構築
-    try {
-        const books = await BookManager.getBooks();
-        if (books && books.length > 0) {
-            const lastBook = books[0];
-            
-            // 権限が既に保持されているかチェック（稀なケース）
-            if (await lastBook.handle.queryPermission({ mode: 'readwrite' }) === 'granted') {
-                AppCore.connectHistory(lastBook.handle);
-            } else {
-                // UIの表示
-                document.getElementById('empty-default-text').style.display = 'none';
-                const reconnectUi = document.getElementById('reconnect-ui');
-                const reconnectBtn = document.getElementById('btn-reconnect-large');
-                
-                reconnectUi.style.display = 'block';
-                reconnectBtn.innerText = `📁 「${lastBook.name}」に再接続`;
-                reconnectBtn.onclick = () => {
-                    reconnectUi.style.display = 'none';
-                    document.getElementById('empty-default-text').style.display = 'block';
-                    AppCore.connectHistory(lastBook.handle);
-                };
-            }
-        }
-    } catch(e) {}
+
     
     document.addEventListener('click', function(e) {
         const menu = document.getElementById('book-menu');
