@@ -63,14 +63,18 @@
                 <div id="book-menu" style="display:none; position:absolute; top:35px; left:0; background:white; border:1px solid #ccc; box-shadow:0 4px 8px rgba(0,0,0,0.2); border-radius:4px; z-index:100; min-width:250px; color:#333;">
                     <div style="padding:10px; border-bottom:1px solid #eee; font-size:12px; color:#666;">最近開いたブック (フォルダ)</div>
                     <div id="book-history-list" style="max-height:200px; overflow-y:auto;"></div>
-                    <div style="padding:10px; border-top:1px solid #eee; cursor:pointer; color:#3498db; font-weight:bold; font-size:13px;" onclick="AppCore.connectNew()" onmouseover="this.style.background='#f1f3f5'" onmouseout="this.style.background='none'">＋ 新しいフォルダを開く...</div>
+                    <div style="padding:10px; border-top:1px solid #eee; cursor:pointer; color:#3498db; font-weight:bold; font-size:13px;" onclick="AppCore.connectNew(false)" onmouseover="this.style.background='#f1f3f5'" onmouseout="this.style.background='none'">＋ 新しいフォルダを開く (編集)</div>
+                    <div style="padding:10px; border-top:1px solid #eee; cursor:pointer; color:#2ecc71; font-weight:bold; font-size:13px;" onclick="AppCore.connectNew(true)" onmouseover="this.style.background='#f1f3f5'" onmouseout="this.style.background='none'">👁️ 新しいフォルダを開く (閲覧モード/高速)</div>
                 </div>
                 <span id="sync-status">未接続</span>
             </div>
         </div>
         <div class="header-right">
-            <input type="text" id="search-box" placeholder="🔍 ページを検索..." oninput="UI.renderPages()">
-            <button class="btn" style="background:#6c757d;" onclick="AppCore.forceMerge()">🔄 手動最適化</button>
+            <div style="display:flex; align-items:center;">
+                <input type="text" id="search-box" placeholder="🔍 全文検索 (Enter)" onkeydown="if(event.key==='Enter') UI.performFullSearch()" style="padding: 5px 10px; border-radius: 4px 0 0 4px; border: 1px solid #ccc; border-right: none; width: 180px; font-size: 13px;">
+                <button class="btn" style="border-radius: 0 4px 4px 0; background: #3498db; padding: 6px 10px; margin-right: 10px; font-size: 13px;" onclick="UI.performFullSearch()">検索</button>
+            </div>
+            <button class="btn" id="btn-force-merge" style="background:#6c757d;" onclick="AppCore.forceMerge()">🔄 手動最適化</button>
         </div>
     </div>
 
@@ -169,6 +173,7 @@
                     <input type="file" id="file-upload" style="display:none" onchange="AppCore.attachFile(this.files[0])">
                 </div>
                 <textarea id="tinymce-editor"></textarea>
+                <div id="readonly-viewer" style="display:none; padding: 30px; overflow-y: auto; height: 100%; box-sizing: border-box; background: white; font-family: sans-serif; line-height: 1.6;"></div>
                 <!-- フローティング全画面トグルボタン -->
                 <button id="floating-fullscreen-btn" onclick="UI.toggleFullscreen()" style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 6px 10px; cursor: pointer; color: #555; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='#fff'" title="全画面表示の切り替え">⛶</button>
             </div>
@@ -181,7 +186,7 @@
         <div class="page-pane" id="page-pane" style="width: 220px;">
             <div class="page-header">
                 <span id="current-sec-name">ページ一覧</span>
-                <button class="btn" style="padding:4px 8px; font-size:12px;" onclick="UI.addPage()">＋ 追加</button>
+                <button class="btn" id="btn-add-page" style="padding:4px 8px; font-size:12px;" onclick="UI.addPage()">＋ 追加</button>
             </div>
             <div class="page-list" id="page-list"></div>
         </div>
@@ -265,43 +270,55 @@ const AppCore = (function() {
         el.style.color = isError ? "#ffcccc" : "#2ecc71";
     }
 
-    async function connectNew() {
+    async function connectNew(isViewOnly = false) {
         if (State.isConnecting) return;
         document.getElementById('book-menu').style.display = 'none';
         try {
-            const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            BookManager.saveBook(handle);
-            await startWithHandle(handle);
+            const handle = await window.showDirectoryPicker({ mode: isViewOnly ? 'read' : 'readwrite' });
+            if (!isViewOnly) BookManager.saveBook(handle); // 履歴は編集モードのみ保存
+            await startWithHandle(handle, isViewOnly);
         } catch(e) {}
     }
 
-    async function connectHistory(handle) {
+    async function connectHistory(handle, isViewOnly = false) {
         document.getElementById('book-menu').style.display = 'none';
         try {
-            if ((await handle.queryPermission({ mode: 'readwrite' })) !== 'granted') {
-                if ((await handle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+            const reqMode = isViewOnly ? 'read' : 'readwrite';
+            if ((await handle.queryPermission({ mode: reqMode })) !== 'granted') {
+                if ((await handle.requestPermission({ mode: reqMode })) !== 'granted') {
                     alert("アクセス権限が付与されませんでした。");
                     return;
                 }
             }
-            BookManager.saveBook(handle);
-            await startWithHandle(handle);
+            if (!isViewOnly) BookManager.saveBook(handle);
+            await startWithHandle(handle, isViewOnly);
         } catch(e) {
             alert("フォルダが見つからないか、アクセスできません。");
         }
     }
 
-    async function startWithHandle(handle) {
+    async function startWithHandle(handle, isViewOnly = false) {
         State.isConnecting = true;
+        State.isViewOnly = isViewOnly;
         try {
             dirHandle = handle;
-            txDirHandle = await dirHandle.getDirectoryHandle('tx', { create: true });
-            pagesDirHandle = await dirHandle.getDirectoryHandle('pages', { create: true }); 
-            attachDirHandle = await dirHandle.getDirectoryHandle('attachments', { create: true });
             
-            document.getElementById('btn-connect').innerText = `📁 ${handle.name} ▼`;
-            document.getElementById('btn-connect').style.background = '#27ae60';
-            setStatus("読込中...");
+            if (isViewOnly) {
+                try { txDirHandle = await dirHandle.getDirectoryHandle('tx'); } catch(e) { txDirHandle = null; }
+                try { pagesDirHandle = await dirHandle.getDirectoryHandle('pages'); } catch(e) { pagesDirHandle = null; }
+                try { attachDirHandle = await dirHandle.getDirectoryHandle('attachments'); } catch(e) { attachDirHandle = null; }
+            } else {
+                txDirHandle = await dirHandle.getDirectoryHandle('tx', { create: true });
+                pagesDirHandle = await dirHandle.getDirectoryHandle('pages', { create: true }); 
+                attachDirHandle = await dirHandle.getDirectoryHandle('attachments', { create: true });
+            }
+            
+            const btnColor = isViewOnly ? '#2ecc71' : '#27ae60';
+            const btnText = isViewOnly ? `👁️ ${handle.name} ▼` : `📁 ${handle.name} ▼`;
+            document.getElementById('btn-connect').innerText = btnText;
+            document.getElementById('btn-connect').style.background = btnColor;
+            
+            setStatus(isViewOnly ? "読込中 (閲覧モード)..." : "読込中...");
 
             State.index = { sections: [], pages: [], last_merge_date: "" };
             State.pageDataCache = {};
@@ -309,8 +326,14 @@ const AppCore = (function() {
             State.currentSecId = null;
             processedTxIds.clear();
 
-            await loadIndex();
+            if (pagesDirHandle) {
+                await loadIndex();
+            }
             if(!State.index.sections || State.index.sections.length === 0) {
+                if (isViewOnly) {
+                    alert("データがありません。");
+                    return;
+                }
                 State.index.sections = [{ id: "sec1", name: "新しいセクション", bgColor: "#a0c4ff" }];
                 State.currentSecId = "sec1";
             } else if (!State.currentPageId) {
@@ -319,7 +342,9 @@ const AppCore = (function() {
                 State.currentPageId = firstPage ? firstPage.id : null;
             }
             
-            await checkDailyMerge();
+            if (!isViewOnly) {
+                await checkDailyMerge();
+            }
             await replayTransactions();
             UI.renderAll();
             
@@ -328,7 +353,7 @@ const AppCore = (function() {
                 if (await replayTransactions()) UI.renderAll();
             }, 60000);
             
-            setStatus("接続済み・同期中");
+            setStatus(isViewOnly ? "閲覧モード (同期中)" : "接続済み・同期中");
         } catch (e) {
             setStatus("接続エラー", true);
             alert("接続エラーの詳細:\n" + e.message);
@@ -469,6 +494,8 @@ const AppCore = (function() {
     }
 
     async function checkDailyMerge(force = false) {
+        if (State.isViewOnly) return;
+        
         const today = new Date().toLocaleDateString('ja-JP');
         if (!force && State.index.last_merge_date === today) return;
 
@@ -598,30 +625,54 @@ const Editor = {
             indentation: '16px',
             plugins: 'table lists advlist image autolink accordion', 
             toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image | removeformat',
-            advlist_bullet_styles: 'square,square,disc,circle,default,kome=kome,asterisk=asterisk',
+            advlist_bullet_styles: 'square,disc,circle,default',
             advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
             paste_data_images: true, 
             paste_webkit_styles: 'none',
             paste_retain_style_properties: 'color,font-size,font-weight,font-style,text-decoration,text-align,background-color',
             paste_preprocess: function (plugin, args) {
                 // LINEWORKSなどのプレーンテキスト系コピーで改行が消える問題の対策
-                if (args.content && !args.content.includes('<p>') && !args.content.includes('<br') && !args.content.includes('<div')) {
+                // ※画像(img)やテーブル(table)等のHTMLが含まれる場合は構造を壊さないようスキップする
+                if (args.content && !/<(p|br|div|img|html|table|ul|ol|li)[ >]/i.test(args.content)) {
                     args.content = args.content.replace(/\r?\n/g, '<br>');
                 }
             },
+            images_upload_handler: function (blobInfo, progress) {
+                return new Promise((resolve, reject) => {
+                    const blob = blobInfo.blob();
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            const MAX = 1200; // 最大サイズ
+                            if (width > MAX || height > MAX) {
+                                if (width > height) {
+                                    height = Math.round(height * MAX / width);
+                                    width = MAX;
+                                } else {
+                                    width = Math.round(width * MAX / height);
+                                    height = MAX;
+                                }
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            // 透過PNG等を黒背景にしないよう白で塗りつぶす
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, width, height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            // JPEGとして軽量化（品質75%）
+                            resolve(canvas.toDataURL('image/jpeg', 0.75));
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(blob);
+                });
+            },
             content_style: `
-                ol { list-style-type: decimal; }
-                ol ol { list-style-type: upper-alpha; }
-                ol ol ol { list-style-type: lower-roman; }
-                ol ol ol ol { list-style-type: lower-alpha; }
-                ol ol ol ol ol { list-style-type: decimal; }
-                
-                ul { list-style-type: "\\25A0  "; }
-                ul ul { list-style-type: "\\25A1  "; }
-                ul ul ul { list-style-type: disc; }
-                ul ul ul ul { list-style-type: circle; }
-                ul ul ul ul ul { list-style-type: "\\30FB  "; }
-                
                 ul[style*="list-style-type: kome"] { list-style-type: "※ " !important; }
                 ul[style*="list-style-type: asterisk"] { list-style-type: "* " !important; }
                 
@@ -645,7 +696,8 @@ const Editor = {
                     tooltip: 'フォントサイズを大きく',
                     onAction: function () {
                         let node = editor.selection.getNode();
-                        let currentSize = parseInt(editor.dom.getStyle(node, 'font-size', true)) || 14;
+                        let pxSize = parseFloat(editor.dom.getStyle(node, 'font-size', true)) || 16;
+                        let currentSize = Math.round(pxSize * 0.75);
                         let nextSize = sizes.find(s => s > currentSize) || sizes[sizes.length - 1];
                         editor.execCommand('FontSize', false, nextSize + 'pt');
                     }
@@ -655,7 +707,8 @@ const Editor = {
                     tooltip: 'フォントサイズを小さく',
                     onAction: function () {
                         let node = editor.selection.getNode();
-                        let currentSize = parseInt(editor.dom.getStyle(node, 'font-size', true)) || 14;
+                        let pxSize = parseFloat(editor.dom.getStyle(node, 'font-size', true)) || 16;
+                        let currentSize = Math.round(pxSize * 0.75);
                         let prevSize = sizes.slice().reverse().find(s => s < currentSize) || sizes[0];
                         editor.execCommand('FontSize', false, prevSize + 'pt');
                     }
@@ -738,7 +791,7 @@ const Editor = {
         
         let idxPage = State.index.pages.find(p => p.id === State.currentPageId);
         let indent = idxPage ? (idxPage.indentLevel || 0) : 0;
-        let sortOrder = idxPage ? (idxPage.sortOrder || 0) : 0;
+        let sortOrder = idxPage ? idxPage.sortOrder : undefined;
         
         const payload = {
             id: State.currentPageId,
@@ -769,6 +822,36 @@ const Editor = {
 // 3. UI描画エンジン (UI)
 // =========================================================
 const UI = {
+    performFullSearch: async function() {
+        const query = document.getElementById('search-box').value.toLowerCase().trim();
+        if (!query) {
+            State.searchResults = null;
+            this.renderPages();
+            return;
+        }
+        
+        document.getElementById('current-sec-name').innerText = "検索中...";
+        document.getElementById('page-list').innerHTML = '<div style="padding: 15px; color: #666; font-size: 13px;">全文検索を実行中...<br><br>※ページ数が多い場合は数秒かかることがあります。</div>';
+        
+        let results = [];
+        for (const p of State.index.pages) {
+            let matches = p.title && p.title.toLowerCase().includes(query);
+            
+            if (!matches) {
+                const data = await AppCore.loadPageData(p.id);
+                const rawText = data.content ? data.content.replace(/<[^>]*>?/gm, '').toLowerCase() : '';
+                matches = rawText.includes(query);
+            }
+            
+            if (matches) {
+                results.push(p);
+            }
+        }
+        
+        State.searchResults = results;
+        this.renderPages();
+    },
+
     toggleBookMenu: async function(e) {
         if (e) e.stopPropagation();
         try {
@@ -799,17 +882,41 @@ const UI = {
             const item = document.createElement('div');
             item.style.padding = '8px 10px';
             item.style.fontSize = '13px';
-            item.style.cursor = 'pointer';
             item.style.borderBottom = '1px dotted #eee';
-            item.innerText = `📁 ${b.name}`;
+            item.style.display = 'flex';
+            item.style.justifyContent = 'space-between';
+            item.style.alignItems = 'center';
             item.onmouseover = () => item.style.background = '#e3f2fd';
             item.onmouseout = () => item.style.background = 'none';
-            item.onclick = () => AppCore.connectHistory(b.handle);
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.innerText = `📁 ${b.name}`;
+            nameSpan.style.cursor = 'pointer';
+            nameSpan.style.flex = '1';
+            nameSpan.onclick = () => AppCore.connectHistory(b.handle, false);
+            
+            const viewBtn = document.createElement('span');
+            viewBtn.innerText = '👁️ 閲覧';
+            viewBtn.style.cursor = 'pointer';
+            viewBtn.style.color = '#2ecc71';
+            viewBtn.style.fontWeight = 'bold';
+            viewBtn.style.fontSize = '12px';
+            viewBtn.style.padding = '2px 6px';
+            viewBtn.style.borderRadius = '3px';
+            viewBtn.onmouseover = () => viewBtn.style.background = '#d4edda';
+            viewBtn.onmouseout = () => viewBtn.style.background = 'none';
+            viewBtn.onclick = (e) => { e.stopPropagation(); AppCore.connectHistory(b.handle, true); };
+            
+            item.appendChild(nameSpan);
+            item.appendChild(viewBtn);
             list.appendChild(item);
         });
     },
 
     renderAll: function() {
+        document.getElementById('btn-add-page').style.display = State.isViewOnly ? 'none' : 'block';
+        document.getElementById('btn-force-merge').style.display = State.isViewOnly ? 'none' : 'inline-block';
+        
         this.renderSections();
         this.renderPages();
         this.renderEditor();
@@ -821,24 +928,69 @@ const UI = {
         State.index.sections.forEach((sec, idx) => {
             const div = document.createElement('div');
             div.className = 'sec-tab' + (State.currentSecId === sec.id ? ' active' : '');
-            div.draggable = true;
+            div.draggable = !State.isViewOnly;
             div.innerText = sec.name;
             
-            div.ondragstart = (e) => {
-                e.dataTransfer.setData('text/plain', idx);
-                e.dataTransfer.effectAllowed = 'move';
-            };
-            div.ondragover = (e) => e.preventDefault();
-            div.ondrop = (e) => {
-                e.preventDefault();
-                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                if (fromIdx !== idx) {
-                    const movedSec = State.index.sections.splice(fromIdx, 1)[0];
-                    State.index.sections.splice(idx, 0, movedSec);
-                    AppCore.forceMerge(); 
-                    UI.renderSections();
-                }
-            };
+            if (!State.isViewOnly) {
+                div.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', idx);
+                    e.dataTransfer.effectAllowed = 'move';
+                };
+                div.ondragover = (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.types.includes('application/x-page-id')) {
+                        div.style.filter = 'brightness(0.9)';
+                    }
+                };
+                div.ondragleave = (e) => {
+                    div.style.filter = '';
+                };
+                div.ondrop = (e) => {
+                    e.preventDefault();
+                    div.style.filter = '';
+                    
+                    const pageId = e.dataTransfer.getData('application/x-page-id');
+                    if (pageId) {
+                        const page = State.index.pages.find(p => p.id === pageId);
+                        if (page && page.secId !== sec.id) {
+                            AppCore.appendTransaction('UPDATE_PAGE', {
+                                id: page.id,
+                                indexData: {
+                                    title: page.title,
+                                    secId: sec.id,
+                                    indentLevel: 0,
+                                    sortOrder: 999999999
+                                },
+                                pageData: State.pageDataCache[page.id] || { content: "" }
+                            });
+                            State.currentSecId = sec.id;
+                            UI.renderAll();
+                        }
+                        return;
+                    }
+                    
+                    const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    if (!isNaN(fromIdx) && fromIdx !== idx) {
+                        const movedSec = State.index.sections.splice(fromIdx, 1)[0];
+                        State.index.sections.splice(idx, 0, movedSec);
+                        AppCore.forceMerge(); 
+                        UI.renderSections();
+                    }
+                };
+                
+                div.ondblclick = (e) => {
+                    const newName = prompt("セクション名を入力してください:", sec.name);
+                    if (newName && newName !== sec.name) {
+                        AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: sec.bgColor, name: newName });
+                        UI.renderSections();
+                    }
+                };
+
+                div.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    UI.showSectionContextMenu(e.pageX, e.pageY, sec);
+                };
+            }
             
             if (sec.bgColor) {
                 if (State.currentSecId === sec.id) {
@@ -851,25 +1003,15 @@ const UI = {
             
             div.onclick = (e) => {
                 State.currentSecId = sec.id;
+                State.searchResults = null; // 検索結果をリセット
                 const firstPage = State.index.pages.find(p => p.secId === sec.id);
                 State.currentPageId = firstPage ? firstPage.id : null;
                 this.renderAll();
             };
             
-            div.ondblclick = (e) => {
-                const newName = prompt("セクション名を入力してください:", sec.name);
-                if (newName && newName !== sec.name) {
-                    AppCore.appendTransaction('UPDATE_SECTION', { id: sec.id, bgColor: sec.bgColor, name: newName });
-                    UI.renderSections();
-                }
-            };
-
-            div.oncontextmenu = (e) => {
-                e.preventDefault();
-                UI.showSectionContextMenu(e.pageX, e.pageY, sec);
-            };
-            
-            div.title = "右クリックでメニューを表示 / ダブルクリックで名前変更";
+            if (!State.isViewOnly) {
+                div.title = "右クリックでメニューを表示 / ダブルクリックで名前変更";
+            }
             container.appendChild(div);
         });
         
@@ -901,15 +1043,18 @@ const UI = {
 
     renderPages: function() {
         const container = document.getElementById('page-list');
-        const searchQ = document.getElementById('search-box').value.toLowerCase();
         container.innerHTML = '';
         
-        const secName = State.index.sections.find(s => s.id === State.currentSecId)?.name || "";
-        document.getElementById('current-sec-name').innerText = secName;
-
-        let pages = State.index.pages.filter(p => p.secId === State.currentSecId);
-        if (searchQ) {
-            pages = State.index.pages.filter(p => p.title.toLowerCase().includes(searchQ));
+        let pages = [];
+        const searchQ = document.getElementById('search-box').value.toLowerCase().trim();
+        
+        if (State.searchResults && searchQ) {
+            document.getElementById('current-sec-name').innerText = `検索結果 (${State.searchResults.length}件)`;
+            pages = State.searchResults;
+        } else {
+            const secName = State.index.sections.find(s => s.id === State.currentSecId)?.name || "";
+            document.getElementById('current-sec-name').innerText = secName;
+            pages = State.index.pages.filter(p => p.secId === State.currentSecId);
         }
 
         pages.sort((a,b) => {
@@ -925,21 +1070,25 @@ const UI = {
         const visiblePages = [];
         let currentHiddenIndent = -1;
         
+        const isSearch = !!State.searchResults;
+        
         pages.forEach((p, idx) => {
-            if (currentHiddenIndent !== -1) {
-                if ((p.indentLevel || 0) > currentHiddenIndent) {
-                    return; 
-                } else {
-                    currentHiddenIndent = -1; 
+            if (!isSearch) {
+                if (currentHiddenIndent !== -1) {
+                    if ((p.indentLevel || 0) > currentHiddenIndent) {
+                        return; 
+                    } else {
+                        currentHiddenIndent = -1; 
+                    }
+                }
+                
+                if (State.collapsedPages && State.collapsedPages.has(p.id)) {
+                    currentHiddenIndent = p.indentLevel || 0;
                 }
             }
             
-            if (State.collapsedPages && State.collapsedPages.has(p.id)) {
-                currentHiddenIndent = p.indentLevel || 0;
-            }
-            
             const nextP = pages[idx + 1];
-            const hasChildren = nextP && (nextP.indentLevel || 0) > (p.indentLevel || 0);
+            const hasChildren = !isSearch && nextP && (nextP.indentLevel || 0) > (p.indentLevel || 0);
             
             visiblePages.push({ page: p, idx: idx, hasChildren: hasChildren });
         });
@@ -952,44 +1101,49 @@ const UI = {
             const isActive = State.currentPageId === p.id;
             const div = document.createElement('div');
             div.className = 'page-item' + (isActive ? ' active' : '');
-            const paddingLeft = 15 + ((p.indentLevel || 0) * 12);
+            
+            const indentLevel = isSearch ? 0 : (p.indentLevel || 0);
+            const paddingLeft = 15 + (indentLevel * 12);
             div.style.paddingLeft = paddingLeft + 'px';
             
-            div.draggable = true;
-            div.ondragstart = (e) => {
-                e.dataTransfer.setData('text/plain', idx);
-                e.dataTransfer.effectAllowed = 'move';
-            };
-            div.ondragover = (e) => {
-                e.preventDefault();
-                div.style.borderTop = '2px solid #3498db';
-            };
-            div.ondragleave = (e) => {
-                div.style.borderTop = '';
-            };
-            div.ondrop = (e) => {
-                e.preventDefault();
-                div.style.borderTop = '';
-                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                if (fromIdx !== idx && !isNaN(fromIdx)) {
-                    const movedPage = pages[fromIdx];
-                    pages.splice(fromIdx, 1);
-                    pages.splice(idx, 0, movedPage);
-                    pages.forEach((page, newSortOrder) => {
-                        AppCore.appendTransaction('UPDATE_PAGE', {
-                            id: page.id,
-                            indexData: {
-                                title: page.title,
-                                secId: page.secId,
-                                indentLevel: page.indentLevel,
-                                sortOrder: newSortOrder
-                            },
-                            pageData: State.pageDataCache[page.id] || { content: "" }
+            div.draggable = !State.isViewOnly && !isSearch;
+            if (!State.isViewOnly && !isSearch) {
+                div.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', idx);
+                    e.dataTransfer.setData('application/x-page-id', p.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                };
+                div.ondragover = (e) => {
+                    e.preventDefault();
+                    div.style.borderTop = '2px solid #3498db';
+                };
+                div.ondragleave = (e) => {
+                    div.style.borderTop = '';
+                };
+                div.ondrop = (e) => {
+                    e.preventDefault();
+                    div.style.borderTop = '';
+                    const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                    if (fromIdx !== idx && !isNaN(fromIdx)) {
+                        const movedPage = pages[fromIdx];
+                        pages.splice(fromIdx, 1);
+                        pages.splice(idx, 0, movedPage);
+                        pages.forEach((page, newSortOrder) => {
+                            AppCore.appendTransaction('UPDATE_PAGE', {
+                                id: page.id,
+                                indexData: {
+                                    title: page.title,
+                                    secId: page.secId,
+                                    indentLevel: page.indentLevel,
+                                    sortOrder: newSortOrder
+                                },
+                                pageData: State.pageDataCache[page.id] || { content: "" }
+                            });
                         });
-                    });
-                    UI.renderPages();
-                }
-            };
+                        UI.renderPages();
+                    }
+                };
+            }
             
             const titleArea = document.createElement('div');
             titleArea.style.display = 'flex';
@@ -1025,7 +1179,7 @@ const UI = {
                     UI.renderPages();
                 };
                 titleTextWrap.appendChild(toggleBtn);
-            } else {
+            } else if (!isSearch) {
                 const spacer = document.createElement('span');
                 spacer.style.width = '17px';
                 spacer.style.display = 'inline-block';
@@ -1034,7 +1188,14 @@ const UI = {
             
             const titleSpan = document.createElement('span');
             titleSpan.className = 'page-title';
-            titleSpan.innerText = p.title || "無題のページ";
+            
+            let displayTitle = p.title || "無題のページ";
+            if (isSearch) {
+                const parentSec = State.index.sections.find(s => s.id === p.secId);
+                if (parentSec) displayTitle += ` <span style="color:#aaa; font-size:11px;">(${parentSec.name})</span>`;
+            }
+            titleSpan.innerHTML = displayTitle;
+            
             if (!p.title) {
                 titleSpan.style.color = "#aaa";
                 titleSpan.style.fontStyle = "italic";
@@ -1044,7 +1205,7 @@ const UI = {
             
             const indentControls = document.createElement('div');
             indentControls.style.display = 'flex';
-            if (isActive && !searchQ) {
+            if (isActive && !isSearch && !State.isViewOnly) {
                 indentControls.innerHTML = `
                     <button class="indent-btn" onclick="event.stopPropagation(); UI.changeIndent('${p.id}', -1)">←</button>
                     <button class="indent-btn" onclick="event.stopPropagation(); UI.changeIndent('${p.id}', 1)">→</button>
@@ -1056,10 +1217,12 @@ const UI = {
             
             div.appendChild(titleArea);
             
-            div.oncontextmenu = (e) => {
-                e.preventDefault();
-                UI.showPageContextMenu(e.pageX, e.pageY, p);
-            };
+            if (!State.isViewOnly) {
+                div.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    UI.showPageContextMenu(e.pageX, e.pageY, p);
+                };
+            }
             
             div.onclick = async () => {
                 if (State.currentPageId === p.id) return;
@@ -1107,7 +1270,27 @@ const UI = {
         }
         
         const pageData = await AppCore.loadPageData(State.currentPageId);
-        Editor.loadContent(pageData.content);
+        
+        if (State.isViewOnly) {
+            document.getElementById('page-title').readOnly = true;
+            document.getElementById('attachment-bar').style.display = 'none';
+            document.getElementById('tinymce-editor').style.display = 'none';
+            const tox = document.querySelector('.tox-tinymce');
+            if (tox) tox.style.display = 'none';
+            
+            const viewer = document.getElementById('readonly-viewer');
+            viewer.style.display = 'block';
+            viewer.innerHTML = pageData.content;
+        } else {
+            document.getElementById('page-title').readOnly = false;
+            document.getElementById('attachment-bar').style.display = 'flex';
+            document.getElementById('tinymce-editor').style.display = 'none'; // TinyMCE本体が非表示にしているのでそのまま維持
+            document.getElementById('readonly-viewer').style.display = 'none';
+            const tox = document.querySelector('.tox-tinymce');
+            if (tox) tox.style.display = '';
+            
+            Editor.loadContent(pageData.content);
+        }
     },
     
     addPage: function() {
