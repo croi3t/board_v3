@@ -396,8 +396,11 @@ const AppCore = (function() {
 
     async function loadPageData(pageId) {
         if (State.pageDataCache[pageId]) return State.pageDataCache[pageId];
+        if (!pagesDirHandle) return { content: "" };
         try {
-            const fh = await pagesDirHandle.getFileHandle(`${pageId}.json`, { create: false });
+            const pageMeta = State.index.pages.find(p => p.id === pageId);
+            const fileName = (pageMeta && pageMeta.fileName) ? pageMeta.fileName : `${pageId}.json`;
+            const fh = await pagesDirHandle.getFileHandle(fileName, { create: false });
             const file = await fh.getFile();
             const data = JSON.parse(await file.text());
             State.pageDataCache[pageId] = data;
@@ -520,15 +523,42 @@ const AppCore = (function() {
             await replayTransactions(); 
             State.index.last_merge_date = today;
 
-            const wIndex = await (await dirHandle.getFileHandle('index.json', { create: true })).createWritable();
-            await wIndex.write(JSON.stringify(State.index));
-            await wIndex.close();
-
             for (const pId in State.pageDataCache) {
-                const wPage = await (await pagesDirHandle.getFileHandle(`${pId}.json`, { create: true })).createWritable();
+                const idxPage = State.index.pages.find(p => p.id === pId);
+                let safeTitle = (idxPage && idxPage.title) ? idxPage.title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 30) : "無題";
+                let fileName = `${safeTitle}_${pId}.json`;
+                
+                if (idxPage && idxPage.fileName && idxPage.fileName !== fileName) {
+                    try { await pagesDirHandle.removeEntry(idxPage.fileName); } catch(e) {}
+                }
+                // 後方互換のため、fileNameが未設定の古いファイル(p_xxx.json)があれば削除を試みる
+                if (idxPage && !idxPage.fileName) {
+                    try { await pagesDirHandle.removeEntry(`${pId}.json`); } catch(e) {}
+                }
+                
+                if (idxPage) idxPage.fileName = fileName;
+
+                const wPage = await (await pagesDirHandle.getFileHandle(fileName, { create: true })).createWritable();
                 await wPage.write(JSON.stringify(State.pageDataCache[pId]));
                 await wPage.close();
             }
+
+            // オーファン（ゴミ）ファイルの削除: index.json に存在しないページデータは削除
+            for await (const entry of pagesDirHandle.values()) {
+                if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+                    let isActive = State.index.pages.some(p => {
+                        return (p.fileName === entry.name) || (!p.fileName && entry.name === `${p.id}.json`);
+                    });
+                    if (!isActive) {
+                        try { await pagesDirHandle.removeEntry(entry.name); } catch(e) {}
+                    }
+                }
+            }
+
+            // index.json の保存 (fileNameの更新を反映するためループの後に配置)
+            const wIndex = await (await dirHandle.getFileHandle('index.json', { create: true })).createWritable();
+            await wIndex.write(JSON.stringify(State.index));
+            await wIndex.close();
 
             for await (const entry of txDirHandle.values()) {
                 if (entry.kind === 'file' && entry.name.startsWith('tx_')) {
