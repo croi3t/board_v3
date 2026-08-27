@@ -229,7 +229,7 @@
         </div>
         
         <!-- フォルダ未接続時のチュートリアル画面 -->
-    <div id="tutorial-overlay" style="position: absolute; top: 42px; left: 0; right: 0; height: calc(100vh - 50px); background: rgba(244, 246, 249, 0.95); z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 20px; overflow-y: auto; backdrop-filter: blur(3px);">
+    <div id="tutorial-overlay" style="user-select: text; position: absolute; top: 42px; left: 0; right: 0; height: calc(100vh - 50px); background: rgba(244, 246, 249, 0.95); z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 20px; overflow-y: auto; backdrop-filter: blur(3px);">
         <div style="background: white; padding: 30px 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 650px; color: #333;">
             <h2 style="color: #2c3e50; margin-top: 0; font-size: 22px; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 30px;">📁 データファイルの読み込み手順</h2>
             
@@ -260,8 +260,8 @@
                 
                 <!-- コピー用パス -->
                 <div style="background: #eef2f5; padding: 10px 15px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #cdd4db; margin-bottom: 15px;">
-                    <code id="target-path" style="font-size: 15px; color: #d35400; font-family: monospace; font-weight: bold;">Z:\reiwa\report\data</code>
-                    <button onclick="navigator.clipboard.writeText(document.getElementById('target-path').innerText); alert('コピーしました！');" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
+                    <code id="target-path" style="user-select: all; font-size: 15px; color: #d35400; font-family: monospace; font-weight: bold;">Z:\reiwa\report\data</code>
+                    <button onclick="copyTargetPath()" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
                 </div>
                 
                 <!-- アドレスバーモックアップ -->
@@ -797,6 +797,31 @@
             }
 
             updateUserSelect(); loadUserData();
+        }
+
+        
+        function copyTargetPath() {
+            const text = document.getElementById('target-path').innerText;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => alert('コピーしました！')).catch(() => fallbackCopyTextToClipboard(text));
+            } else {
+                fallbackCopyTextToClipboard(text);
+            }
+        }
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('コピーしました！');
+            } catch (err) {
+                alert('コピーに失敗しました。手動で選択してコピーしてください。');
+            }
+            document.body.removeChild(textArea);
         }
 
         function handleConnectionError(err) {
