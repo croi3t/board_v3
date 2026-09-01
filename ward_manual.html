@@ -112,7 +112,7 @@
                         <!-- コピー用パス -->
                         <div style="background: #eef2f5; padding: 10px 15px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #cdd4db; margin-bottom: 15px;">
                             <code id="target-path" style="font-size: 15px; color: #d35400; font-family: monospace; font-weight: bold;">Z:\reiwa\work_manual_alt_Onenote\note</code>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('target-path').innerText); alert('コピーしました！');" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('target-path').innerText); const btn = this; const originalText = btn.innerHTML; btn.innerHTML = '✓ コピー完了'; btn.style.background = '#2ecc71'; setTimeout(() => { btn.innerHTML = originalText; btn.style.background = '#3498db'; }, 2000);" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
                         </div>
                         
                         <!-- フォルダ選択ウィンドウ全体のモックアップ -->
