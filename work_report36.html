@@ -47,29 +47,7 @@
         body.fz-normal .master-dur-input { width: 50px; }
         body.fz-medium .master-dur-input { width: 60px; }
         body.fz-large .master-dur-input { width: 75px; }
-                body.fz-xlarge .master-dur-input { width: 90px; }
-
-        /* 追加：UIコンポーネントのフォントサイズ追従 */
-        body.fz-medium .section-title { font-size: 16px !important; }
-        body.fz-large .section-title { font-size: 20px !important; }
-        body.fz-xlarge .section-title { font-size: 24px !important; }
-
-        body.fz-medium .timeline-gauge { font-size: 14px !important; height: 30px; }
-        body.fz-large .timeline-gauge { font-size: 18px !important; height: 35px; }
-        body.fz-xlarge .timeline-gauge { font-size: 22px !important; height: 40px; }
-
-        body.fz-medium .ward-btn { font-size: 14px !important; }
-        body.fz-large .ward-btn { font-size: 18px !important; }
-        body.fz-xlarge .ward-btn { font-size: 22px !important; }
-
-        body.fz-medium #userSelect, body.fz-medium .size-btn { font-size: 15px !important; height: auto !important; width: auto !important; padding: 4px !important; }
-        body.fz-large #userSelect, body.fz-large .size-btn { font-size: 19px !important; height: auto !important; width: auto !important; padding: 6px !important; }
-        body.fz-xlarge #userSelect, body.fz-xlarge .size-btn { font-size: 23px !important; height: auto !important; width: auto !important; padding: 8px !important; }
-
-        body.fz-medium .ward-label, body.fz-medium .fz-label { font-size: 14px !important; }
-        body.fz-large .ward-label, body.fz-large .fz-label { font-size: 18px !important; }
-        body.fz-xlarge .ward-label, body.fz-xlarge .fz-label { font-size: 22px !important; }
-
+        body.fz-xlarge .master-dur-input { width: 90px; }
 
         .timeline-container { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; position: sticky; top: 0; z-index: 100; }
         .timeline-title-row { position: relative; z-index: 150; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -105,7 +83,7 @@
         .resize-handle:hover { background: rgba(0,0,0,0.3); }
 
         .main-content { display: flex; gap: 15px; width: 100%; margin-bottom: 15px; }
-        .control-box { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .control-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .flex-left { width: 900px; min-width: 900px; }
         .flex-right { flex: 1; }
 
@@ -290,15 +268,54 @@
                     <button onclick="copyTargetPath()" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
                 </div>
                 
-                <!-- アドレスバーモックアップ -->
-                <div style="background: #fff; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-                    <div style="background: #f0f0f0; padding: 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ddd;">
-                        <div style="display: flex; gap: 8px; color: #666;"><span style="font-size: 16px;">←</span><span style="font-size: 16px; opacity: 0.3;">→</span><span style="font-size: 16px;">↑</span></div>
+                <!-- アドレスバーモックアップ (Window overall) -->
+                <div style="background: #fff; border: 1px solid #1883d7; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column;">
+                    <!-- Window Title Bar -->
+                    <div style="background: white; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #333; font-family: Meiryo, sans-serif; user-select: none;">
+                        <span>このサイトに変更の保存を許可する場所を選択してください</span>
+                        <div style="display: flex; gap: 15px; color: #666; font-size: 12px;">
+                            <span>─</span><span>□</span><span>✕</span>
+                        </div>
+                    </div>
+                    <!-- Address Bar / Toolbar Area -->
+                    <div style="background: #f5f6f7; padding: 8px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ddd; border-top: 1px solid #eee;">
+                        <div style="display: flex; gap: 10px; color: #666;"><span style="font-size: 16px;">←</span><span style="font-size: 16px; opacity: 0.3;">→</span><span style="font-size: 16px;">↑</span></div>
                         <div style="flex: 1; background: #fff; border: 1px solid #0078d7; border-radius: 3px; display: flex; align-items: center; padding: 4px 8px; position: relative;">
                             <span style="color: #f39c12; margin-right: 6px; font-size: 14px;">📁</span>
                             <span style="color: #111; font-family: Meiryo, sans-serif; font-size: 13px; background: #cce8ff; padding: 0 3px;">ここにパスを貼り付けて Enter</span>
-                            <div style="position: absolute; right: 10px; top: 15px; font-size: 28px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); animation: float 2s infinite ease-in-out; animation-delay: 0.5s;">👆</div>
+                            <div style="position: absolute; right: 20px; top: 12px; font-size: 28px; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); animation: float 2s infinite ease-in-out; animation-delay: 0.5s;">👆</div>
                         </div>
+                        <div style="background: #fff; border: 1px solid #ccc; border-radius: 3px; padding: 4px 8px; font-size: 12px; color: #999; width: 120px;">
+                            検索
+                        </div>
+                    </div>
+                    <!-- Main Content Area -->
+                    <div style="display: flex; height: 100px; background: #fff;">
+                        <div style="width: 100px; border-right: 1px solid #eee; background: #f9f9f9; padding: 10px;">
+                            <div style="height: 10px; background: #e0e0e0; margin-bottom: 8px; border-radius: 2px;"></div>
+                            <div style="height: 10px; background: #e0e0e0; margin-bottom: 8px; border-radius: 2px;"></div>
+                            <div style="height: 10px; background: #e0e0e0; margin-bottom: 8px; border-radius: 2px; width: 60%;"></div>
+                        </div>
+                        <div style="flex: 1; padding: 15px; display: flex; gap: 15px; align-items: flex-start;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                                <span style="color: #f39c12; font-size: 24px;">📁</span>
+                                <span style="font-size: 11px; color: #333;">ドキュメント</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                                <span style="color: #f39c12; font-size: 24px;">📁</span>
+                                <span style="font-size: 11px; color: #333;">ダウンロード</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Bottom Bar -->
+                    <div style="background: #f0f0f0; padding: 10px 15px; border-top: 1px solid #dfdfdf; display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            <span style="font-size: 12px; color: #333;">フォルダー:</span>
+                            <div style="background: #fff; border: 1px solid #ccc; border-radius: 3px; padding: 4px 8px; font-size: 12px; color: #666; flex: 1;">
+                            </div>
+                        </div>
+                        <button style="background: #e1e1e1; border: 1px solid #adadad; padding: 4px 15px; border-radius: 3px; font-size: 12px; color: #333;">フォルダーの選択</button>
+                        <button style="background: #e1e1e1; border: 1px solid #adadad; padding: 4px 15px; border-radius: 3px; font-size: 12px; color: #333;">キャンセル</button>
                     </div>
                 </div>
             </div>
@@ -354,29 +371,28 @@
         <div class="control-box flex-left">
             <div class="section-title">👤 作業者情報 ＆ ユーザー管理</div>
             
-            <div class="form-group" style="display:flex; gap:4px; align-items:center; flex-wrap: wrap;">
-                <select id="userSelect" onchange="changeUser()" style="width:120px; height: 26px; font-size: 11px; padding: 2px;"></select>
-                <span class="ward-label" style="margin-left: 4px; font-size: 11px; font-weight:bold; color: #555;">担当病棟:</span>
+            <div class="form-group" style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+                <select id="userSelect" onchange="changeUser()" style="width:160px; height: 28px;"></select>
+                <span style="margin-left: 10px; font-size: 12px; font-weight:bold; color: #555;">担当病棟:</span>
                 <span id="wardButtonsContainer" style="display:flex; gap:5px; margin-left:5px;"></span>
                 <button class="btn btn-outline" style="padding: 2px 6px; font-size:11px; margin-left: 5px;" onclick="openWardSettings()">⚙️ 設定</button>
-                <button class="btn btn-purple" style="padding:2px 6px; font-size:11px;" onclick="openDashboardModal()">📊 業務集計</button>
-                <button class="btn" style="padding:2px 6px; font-size:11px;" onclick="addUser()">👤 追加</button>
-                <button class="btn btn-info" style="padding:2px 6px; font-size:11px;" onclick="renameUser()">✏️ 名前変更</button>
-                <button class="btn btn-danger" style="padding:2px 6px; font-size:11px;" onclick="deleteUser()">🗑️ 削除</button>
+                <button class="btn btn-purple" style="padding:4px 8px;" onclick="openDashboardModal()">📊 業務集計</button>
+                <button class="btn" style="padding:4px 8px;" onclick="addUser()">👤 追加</button>
+                <button class="btn btn-info" style="padding:4px 8px;" onclick="renameUser()">✏️ 名前変更</button>
+                <button class="btn btn-danger" style="padding:4px 8px;" onclick="deleteUser()">🗑️ 削除</button>
+                <span style="color:#ccc;">|</span>
+                <button class="btn btn-outline" style="padding:4px 8px;" onclick="document.getElementById('csvFileInput').click()">📥 CSV読込</button>
+                <input type="file" id="csvFileInput" style="display:none" accept=".csv" onchange="importUsersFromCSV(event)">
+                <button class="btn btn-purple" style="padding:6px 14px; font-size:13px; margin-left: auto;" onclick="openPreviewModal()">👁️ JUST calc プレビュー</button>
             </div>
             
-            <div style="display:flex; gap:4px; margin-bottom:10px; margin-top:4px; align-items: center; flex-wrap: wrap;">
-                <button id="btnPattern1" class="step-btn" style="padding:2px 8px; font-size:11px;" onclick="changePattern(1)">パターン1</button>
-                <button id="btnPattern2" class="step-btn" style="padding:2px 8px; font-size:11px;" onclick="changePattern(2)">パターン2</button>
-                <button id="btnPattern3" class="step-btn" style="padding:2px 8px; font-size:11px;" onclick="changePattern(3)">パターン3</button>
-                <span style="margin-left: 4px; border-left: 1px solid #ccc; padding-left: 4px; display:flex; gap:4px;">
-                    <button class="btn btn-outline" style="padding:2px 6px; font-size:11px;" onclick="saveAsInitialLayout()">💾 【初期配置】に登録</button>
-                    <button class="btn btn-info" style="padding:2px 6px; font-size:11px;" onclick="loadInitialLayout()">🔄 【初期配置】呼出</button>
-                </span>
-                <span style="margin-left: auto; display:flex; gap:4px; align-items: center;">
-                    <button class="btn btn-outline" style="padding:2px 6px; font-size:11px;" onclick="document.getElementById('csvFileInput').click()">📥 CSV読込</button>
-                    <input type="file" id="csvFileInput" style="display:none" accept=".csv" onchange="importUsersFromCSV(event)">
-                    <button class="btn btn-purple" style="padding:2px 6px; font-size:11px;" onclick="openPreviewModal()">👁️ JUST calc プレビュー</button>
+            <div style="display:flex; gap:5px; margin-bottom:15px; margin-top:5px; align-items: center;">
+                <button id="btnPattern1" class="step-btn" style="padding:4px 12px; font-size:11px;" onclick="changePattern(1)">パターン 1</button>
+                <button id="btnPattern2" class="step-btn" style="padding:4px 12px; font-size:11px;" onclick="changePattern(2)">パターン 2</button>
+                <button id="btnPattern3" class="step-btn" style="padding:4px 12px; font-size:11px;" onclick="changePattern(3)">パターン 3</button>
+                <span style="margin-left: 10px; border-left: 1px solid #ccc; padding-left: 10px; display:flex; gap:5px;">
+                    <button class="btn btn-outline" style="padding:4px 8px; font-size:11px;" onclick="saveAsInitialLayout()">💾 現在の状態を【初期配置】に登録</button>
+                    <button class="btn btn-info" style="padding:4px 8px; font-size:11px;" onclick="loadInitialLayout()">🔄 【初期配置】を呼出</button>
                 </span>
             </div>
 
@@ -923,30 +939,31 @@
         }
 
         function ensureUserStructure(userName) {
-            if(!appData.users[userName]) appData.users[userName] = {};
-            let u = appData.users[userName];
-            
-            if(u.jobs) {
-                u.patterns = {
-                    1: u.jobs,
+            if(!appData.users[userName]) {
+                appData.users[userName] = {
+                    currentPattern: 1,
+                    patterns: {
+                        1: JSON.parse(JSON.stringify(masterBackupTemplate)),
+                        2: JSON.parse(JSON.stringify(masterBackupTemplate)),
+                        3: JSON.parse(JSON.stringify(masterBackupTemplate))
+                    },
+                    initialLayouts: { 1: [], 2: [], 3: [] },
+                    assignedWards: []
+                };
+            }
+            if(appData.users[userName].jobs) {
+                appData.users[userName].patterns = {
+                    1: appData.users[userName].jobs,
                     2: JSON.parse(JSON.stringify(masterBackupTemplate)),
                     3: JSON.parse(JSON.stringify(masterBackupTemplate))
                 };
-                u.currentPattern = 1;
-                delete u.jobs;
+                appData.users[userName].currentPattern = 1;
+                delete appData.users[userName].jobs;
             }
-            
-            if(!u.patterns) {
-                u.patterns = {
-                    1: JSON.parse(JSON.stringify(masterBackupTemplate)),
-                    2: JSON.parse(JSON.stringify(masterBackupTemplate)),
-                    3: JSON.parse(JSON.stringify(masterBackupTemplate))
-                };
+            // V32向けアップデート：初期配置の入れ物がない場合は作成
+            if(!appData.users[userName].initialLayouts) {
+                appData.users[userName].initialLayouts = { 1: [], 2: [], 3: [] };
             }
-            if(typeof u.currentPattern === 'undefined') u.currentPattern = 1;
-            if(!u.initialLayouts) u.initialLayouts = { 1: [], 2: [], 3: [] };
-            if(!u.assignedWards) u.assignedWards = [];
-            
             if(!appData.timelines[userName]) appData.timelines[userName] = [];
         }
 
@@ -1252,7 +1269,7 @@
             select.value = currentUser;
         }
 
-        function loadUserData() { ensureUserStructure(currentUser); updatePatternUI(); renderWardButtons(); renderPanels(); renderMasterTable(); renderTimeline(); }
+        function loadUserData() { updatePatternUI(); renderPanels(); renderMasterTable(); renderTimeline(); }
 
         function renderPanels() {
             const tGrid = document.getElementById("targetGrid"); const ntGrid = document.getElementById("nontargetGrid");
@@ -1408,7 +1425,7 @@
             if (start === -1 || start + job.duration > TOTAL_MINS) { alert("空き枠スペースがありません。"); return; }
             list.push({
                 id: Date.now() + Math.random(), outputName: job.outputName, name: job.name,
-                duration: job.duration, start: start, isTarget: job.isTarget, color: job.color, detail: job.defaultDetail, ward: currentWard
+                duration: job.duration, start: start, isTarget: job.isTarget, color: job.color, detail: job.defaultDetail
             });
             syncSaveToFile(); renderTimeline();
         }
