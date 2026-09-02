@@ -939,34 +939,35 @@
         }
 
         function ensureUserStructure(userName) {
-            if(!appData.users[userName]) {
-                appData.users[userName] = {
-                    currentPattern: 1,
-                    patterns: {
-                        1: JSON.parse(JSON.stringify(masterBackupTemplate)),
-                        2: JSON.parse(JSON.stringify(masterBackupTemplate)),
-                        3: JSON.parse(JSON.stringify(masterBackupTemplate))
-                    },
-                    initialLayouts: { 1: [], 2: [], 3: [] },
-                    assignedWards: []
-                };
-            }
-            if(appData.users[userName].jobs) {
-                appData.users[userName].patterns = {
-                    1: appData.users[userName].jobs,
+            if(!appData.users[userName]) appData.users[userName] = {};
+            let u = appData.users[userName];
+            
+            if(u.jobs) {
+                u.patterns = {
+                    1: u.jobs,
                     2: JSON.parse(JSON.stringify(masterBackupTemplate)),
                     3: JSON.parse(JSON.stringify(masterBackupTemplate))
                 };
-                appData.users[userName].currentPattern = 1;
-                delete appData.users[userName].jobs;
+                u.currentPattern = 1;
+                delete u.jobs;
             }
-            // V32向けアップデート：初期配置の入れ物がない場合は作成
-            if(!appData.users[userName].initialLayouts) {
-                appData.users[userName].initialLayouts = { 1: [], 2: [], 3: [] };
+            
+            if(!u.patterns) {
+                u.patterns = {
+                    1: JSON.parse(JSON.stringify(masterBackupTemplate)),
+                    2: JSON.parse(JSON.stringify(masterBackupTemplate)),
+                    3: JSON.parse(JSON.stringify(masterBackupTemplate))
+                };
             }
+            if(typeof u.currentPattern === \'undefined\') u.currentPattern = 1;
+            if(!u.initialLayouts) u.initialLayouts = { 1: [], 2: [], 3: [] };
+            if(!Array.isArray(u.assignedWards)) {
+                if(u.assignedWards && typeof u.assignedWards === 'string') u.assignedWards = [u.assignedWards];
+                else u.assignedWards = [];
+            }
+            
             if(!appData.timelines[userName]) appData.timelines[userName] = [];
         }
-
         function migrateAllUsers() { Object.keys(appData.users).forEach(u => ensureUserStructure(u)); }
 
         async function loadDataFromHandle() {
@@ -1117,6 +1118,7 @@
             appData.users[currentUser].assignedWards = selected;
             syncSaveToFile();
             renderWardButtons();
+            renderTimeline();
             closeWardSettings();
         }
 
