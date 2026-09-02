@@ -1287,7 +1287,17 @@
         }
 
         function loadUserData() {
-    try { updatePatternUI(); renderPanels(); renderMasterTable(); renderTimeline(); } catch(e) { alert('Error in loadUserData: ' + e.message); console.error(e); }
+    try { 
+        ensureUserStructure(currentUser); 
+        updatePatternUI(); 
+        renderWardButtons(); 
+        renderPanels(); 
+        renderMasterTable(); 
+        renderTimeline(); 
+    } catch(e) { 
+        alert('Error in loadUserData: ' + e.message); 
+        console.error(e); 
+    }
 }
 
         function renderPanels() {
