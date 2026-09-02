@@ -375,7 +375,7 @@
                 <select id="userSelect" onchange="changeUser()" style="width:160px; height: 28px;"></select>
                 <span style="margin-left: 10px; font-size: 12px; font-weight:bold; color: #555;">担当病棟:</span>
                 <span id="wardButtonsContainer" style="display:flex; gap:5px; margin-left:5px;"></span>
-                <button class="btn btn-outline" style="padding: 2px 6px; font-size:11px; margin-left: 5px;" onclick="openWardSettings()">⚙️ 設定</button>
+                <button class="btn btn-outline" style="display:none; padding: 2px 6px; font-size:11px; margin-left: 5px;" onclick="openWardSettings()">⚙️ 設定</button>
                 <button class="btn btn-purple" style="padding:4px 8px;" onclick="openDashboardModal()">📊 業務集計</button>
                 <button class="btn" style="padding:4px 8px;" onclick="addUser()">👤 追加</button>
                 <button class="btn btn-info" style="padding:4px 8px;" onclick="renameUser()">✏️ 名前変更</button>
@@ -939,6 +939,7 @@
         }
 
         function ensureUserStructure(userName) {
+    try {
             if(!appData.users[userName]) appData.users[userName] = {};
             let u = appData.users[userName];
             
@@ -952,13 +953,16 @@
                 delete u.jobs;
             }
             
-            if(!u.patterns) {
+            if(!u.patterns || typeof u.patterns !== 'object') {
                 u.patterns = {
                     1: JSON.parse(JSON.stringify(masterBackupTemplate)),
                     2: JSON.parse(JSON.stringify(masterBackupTemplate)),
                     3: JSON.parse(JSON.stringify(masterBackupTemplate))
                 };
             }
+            if(!u.patterns[1]) u.patterns[1] = JSON.parse(JSON.stringify(masterBackupTemplate));
+            if(!u.patterns[2]) u.patterns[2] = JSON.parse(JSON.stringify(masterBackupTemplate));
+            if(!u.patterns[3]) u.patterns[3] = JSON.parse(JSON.stringify(masterBackupTemplate));
             if(typeof u.currentPattern === 'undefined') u.currentPattern = 1;
             if(!u.initialLayouts) u.initialLayouts = { 1: [], 2: [], 3: [] };
             if(!Array.isArray(u.assignedWards)) {
@@ -967,7 +971,8 @@
             }
             
             if(!appData.timelines[userName]) appData.timelines[userName] = [];
-        }
+        } catch(e) { alert('Error in ensureUserStructure: ' + e.message); console.error(e); }
+}
         function migrateAllUsers() { Object.keys(appData.users).forEach(u => ensureUserStructure(u)); }
 
         async function loadDataFromHandle() {
@@ -997,8 +1002,16 @@
             }
         }
 
+        let isSavingToFolder = false;
+        let pendingSaveToFolder = false;
+
         async function writeDataToSharedFolder() {
             if (!dirHandle || isFallbackMode) return;
+            if (isSavingToFolder) {
+                pendingSaveToFolder = true;
+                return;
+            }
+            isSavingToFolder = true;
             try {
                 const configHandle = await dirHandle.getFileHandle('ward_diary_config_v2.json', { create: true });
                 const configWritable = await configHandle.createWritable();
@@ -1009,9 +1022,16 @@
                 const dayWritable = await dayHandle.createWritable();
                 await dayWritable.write(JSON.stringify(appData.timelines, null, 2));
                 await dayWritable.close();
-            } catch (e) {}
+            } catch (e) {
+                console.error("Save error:", e);
+            } finally {
+                isSavingToFolder = false;
+                if (pendingSaveToFolder) {
+                    pendingSaveToFolder = false;
+                    writeDataToSharedFolder();
+                }
+            }
         }
-
         function handleManualLoad(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1077,25 +1097,18 @@
 
         function renderWardButtons() {
             let container = document.getElementById("wardButtonsContainer");
-            let wards = appData.users[currentUser].assignedWards || [];
             container.innerHTML = "";
-            if (wards.length === 0) {
-                container.innerHTML = `<span style="font-size:11px; color:#e74c3c; margin-top: 4px;">未設定</span>`;
-                currentWard = "";
-                return;
+            if (!ALL_WARDS.includes(currentWard)) {
+                currentWard = ALL_WARDS[0];
             }
-            if (!wards.includes(currentWard)) {
-                currentWard = wards[0];
-            }
-            wards.forEach(w => {
+            ALL_WARDS.forEach(w => {
                 let btn = document.createElement("button");
                 btn.className = "ward-btn" + (currentWard === w ? " active" : "");
                 btn.innerText = w;
-                btn.onclick = () => { currentWard = w; renderWardButtons(); };
+                btn.onclick = () => { currentWard = w; renderWardButtons(); renderTimeline(); };
                 container.appendChild(btn);
             });
         }
-
         function openWardSettings() {
             document.getElementById("wsUserName").innerText = currentUser;
             let assigned = appData.users[currentUser].assignedWards || [];
@@ -1123,13 +1136,15 @@
         }
 
         function changeUser() {
+    try {
 
             currentUser = document.getElementById("userSelect").value;
             ensureUserStructure(currentUser);
             currentPattern = appData.users[currentUser].currentPattern || 1;
             renderWardButtons();
             loadUserData();
-        }
+        } catch(e) { alert('Error in changeUser: ' + e.message); console.error(e); }
+}
 
         function addUser() {
             let name = prompt("追加するスタッフ名を入力してください:");
@@ -1271,9 +1286,12 @@
             select.value = currentUser;
         }
 
-        function loadUserData() { updatePatternUI(); renderPanels(); renderMasterTable(); renderTimeline(); }
+        function loadUserData() {
+    try { updatePatternUI(); renderPanels(); renderMasterTable(); renderTimeline(); } catch(e) { alert('Error in loadUserData: ' + e.message); console.error(e); }
+}
 
         function renderPanels() {
+    try {
             const tGrid = document.getElementById("targetGrid"); const ntGrid = document.getElementById("nontargetGrid");
             tGrid.innerHTML = ""; ntGrid.innerHTML = "";
             let jobs = appData.users[currentUser].patterns[currentPattern];
@@ -1306,7 +1324,8 @@
                 btn.onclick = () => createBlock(job);
                 if(job.isTarget) tGrid.appendChild(btn); else ntGrid.appendChild(btn);
             });
-        }
+        } catch(e) { alert('Error in renderPanels: ' + e.message); console.error(e); }
+}
 
         function renderMasterTable() {
             const tbody = document.getElementById("masterTableBody"); tbody.innerHTML = "";
