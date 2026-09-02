@@ -959,7 +959,7 @@
                     3: JSON.parse(JSON.stringify(masterBackupTemplate))
                 };
             }
-            if(typeof u.currentPattern === \'undefined\') u.currentPattern = 1;
+            if(typeof u.currentPattern === 'undefined') u.currentPattern = 1;
             if(!u.initialLayouts) u.initialLayouts = { 1: [], 2: [], 3: [] };
             if(!Array.isArray(u.assignedWards)) {
                 if(u.assignedWards && typeof u.assignedWards === 'string') u.assignedWards = [u.assignedWards];
