@@ -104,6 +104,7 @@
         <span id="header-tools">
             <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
             <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
+            <button onclick="fetchMissingAges()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #e67e22; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">未取得の年齢を再取得</button>
             <button id="wardFetchBtn" onclick="checkCurrentWards()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #2980b9; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">最新の病棟情報を確認 (3C/6C)</button>
         </span>
     </div>
@@ -1333,6 +1334,160 @@
         renderTable();
     }
 
+    function fetchMissingAges() {
+        if(isFetchingAll) return;
+        fetchQueue = [];
+        
+        var searchInput = document.getElementById("searchInput").value.toUpperCase();
+        var checkboxes = document.getElementsByClassName('ward-cb');
+        var selectedWards = [];
+        for(var i=0; i<checkboxes.length; i++) {
+            if(checkboxes[i].checked) selectedWards.push(checkboxes[i].value);
+        }
+        
+        for (var key in patientData) {
+            if (!patientData.hasOwnProperty(key)) continue;
+            var p = patientData[key];
+            if ((p.tab || "screening") !== currentTab) continue;
+            
+            var searchText = (p.id + p.name).toUpperCase();
+            if (searchInput !== "" && searchText.indexOf(searchInput) === -1) continue;
+            
+            if (selectedWards.length > 0) {
+                var wardMatch = false;
+                for(var j=0; j<selectedWards.length; j++) {
+                    if (p.ward === selectedWards[j]) wardMatch = true;
+                }
+                if (!wardMatch) continue;
+            }
+            
+            if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
+            if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
+            if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
+            var safeDept = p.department || "(未登録)";
+            if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
+
+            if (!p.age || p.ageGroup === "未取得") {
+                fetchQueue.push(key);
+            }
+        }
+        
+        if (fetchQueue.length === 0) {
+            alert("現在表示されているリストの中に、年齢が未取得の患者はいません。");
+            return;
+        }
+        
+        if (confirm("表示されている未取得の患者 " + fetchQueue.length + " 名の年齢情報を取得しますか？\n(※採血予定日は取得しません)")) {
+            isFetchingAll = true;
+            processAgeFetchQueue();
+        }
+    }
+
+    function processAgeFetchQueue() {
+        if(fetchQueue.length === 0) {
+            isFetchingAll = false;
+            alert("年齢の取得が完了しました。");
+            return;
+        }
+        var nextKey = fetchQueue.shift();
+        fetchSingleAge(nextKey, processAgeFetchQueue); 
+    }
+
+    function fetchSingleAge(key, callback) {
+        var p = patientData[key];
+        if (!p || !p.id) {
+            if (callback) callback();
+            return;
+        }
+        
+        var btn = document.getElementById('btn-' + key);
+        if(btn) { btn.innerText = "年齢取得中..."; btn.disabled = true; }
+
+        var userId = "16622";
+        var paddedId = zeroPadId(p.id);
+        
+        var url1 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?kanja_id=" + paddedId + 
+                   "&ichiran_code=31&user_id=" + userId + "&section_code=0000022&page_num=0&login_flg=";
+                   
+        var iframeId = "fetch-iframe-" + key;
+        var existing = document.getElementById(iframeId);
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+        var iframe = document.createElement("iframe");
+        iframe.id = iframeId;
+        iframe.style.display = "none";
+        iframe.setAttribute("application", "yes"); 
+        document.body.appendChild(iframe);
+
+        var isDone = false;
+        
+        var cleanup = function() {
+            if (isDone) return;
+            isDone = true;
+            setTimeout(function() {
+                var ifr = document.getElementById(iframeId);
+                if (ifr && ifr.parentNode) ifr.parentNode.removeChild(ifr);
+                if (callback) callback();
+            }, 500);
+            if(btn) { btn.innerText = "一括確認(年齢+採血)"; btn.disabled = false; }
+            saveAndRender(); 
+        };
+
+        var fallbackTimer = setTimeout(function() {
+            if (!isDone) {
+                if(!p.bloodDetail) p.bloodDetail = "年齢取得T/O";
+                cleanup();
+            }
+        }, 15000); 
+
+        iframe.onload = function() {
+            setTimeout(function() {
+                if (isDone) return;
+                try {
+                    var doc = iframe.contentWindow.document;
+                    var allText = "";
+                    
+                    function collectText(currentDoc) {
+                        if (!currentDoc) return;
+                        try { if (currentDoc.body && currentDoc.body.innerText) allText += " " + currentDoc.body.innerText; } catch(e) {}
+                        var frames = currentDoc.getElementsByTagName("frame");
+                        var iframes = currentDoc.getElementsByTagName("iframe");
+                        for(var j=0; j<frames.length; j++) { try { collectText(frames[j].contentWindow.document); } catch(e){} }
+                        for(var k=0; k<iframes.length; k++) { try { collectText(iframes[k].contentWindow.document); } catch(e){} }
+                    }
+                    collectText(doc);
+
+                    var idx = allText.indexOf(paddedId);
+                    var searchText = idx !== -1 ? allText.substring(idx) : allText;
+                    
+                    var bdRegex = /(?:生年月日.*?|)((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
+                    var match = searchText.match(bdRegex);
+                    if (match) {
+                        var y = parseInt(match[1], 10);
+                        var m = parseInt(match[2], 10);
+                        var d = parseInt(match[3], 10);
+                        p.birthDate = y + "/" + (m<10?'0'+m:m) + "/" + (d<10?'0'+d:d);
+                        p.age = calculateAgeAtStart(p.birthDate, p.start);
+                        p.ageGroup = getAgeGroup(p.age);
+                    }
+                    
+                    clearTimeout(fallbackTimer);
+                    cleanup();
+                } catch(e) {
+                    clearTimeout(fallbackTimer);
+                    cleanup();
+                }
+            }, 1500); 
+        };
+        
+        try {
+            iframe.src = url1;
+        } catch(e) {
+            clearTimeout(fallbackTimer);
+            cleanup();
+        }
+    }
+
     function fetchAllBloodDates() {
         if(isFetchingAll) return;
         fetchQueue = [];
@@ -1550,39 +1705,96 @@
 
         html += '<table id="crfTable" style="table-layout: auto; min-width: 100%;">';
         html += '<thead><tr>';
+        html += '<th style="min-width: 50px;">並び替え</th>';
         html += '<th style="min-width: 70px;">患者ID</th>';
         html += '<th style="min-width: 80px;">氏名</th>';
         html += '<th style="min-width: 120px;">対象薬品</th>';
         
         for (var i = 0; i < crfColumns.length; i++) {
             html += '<th style="min-width: 150px;">' + escapeHtml(crfColumns[i]) + '<br>';
-            html += '<button onclick="removeCrfColumn(\'' + escapeHtml(crfColumns[i]).replace(/'/g, "\\'") + '\')" style="font-size:10px; background:#e74c3c; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-top:3px;">削除</button>';
-            html += '</th>';
+            html += '<div style="margin-top:3px;">';
+            if (i > 0) html += '<button onclick="moveCrfColumn(' + i + ', -1)" style="font-size:10px; background:#95a5a6; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-right:3px;">◀</button>';
+            html += '<button onclick="removeCrfColumn(\'' + escapeHtml(crfColumns[i]).replace(/'/g, "\\'") + '\')" style="font-size:10px; background:#e74c3c; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-right:3px;">削除</button>';
+            if (i < crfColumns.length - 1) html += '<button onclick="moveCrfColumn(' + i + ', 1)" style="font-size:10px; background:#95a5a6; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer;">▶</button>';
+            html += '</div></th>';
         }
         
         html += '</tr></thead><tbody>';
         
+        var crfPatients = [];
         for (var key in patientData) {
             if (!patientData.hasOwnProperty(key)) continue;
             var p = patientData[key];
             if (p.tab === "target" && (p.status === "提出済" || p.status === "冷凍")) {
-                html += '<tr>';
-                html += '<td>' + escapeHtml(p.id) + '</td>';
-                html += '<td>' + escapeHtml(p.name) + '</td>';
-                html += '<td>' + escapeHtml(p.drug) + '</td>';
-                
-                var cData = p.crfData || {};
-                for (var i = 0; i < crfColumns.length; i++) {
-                    var colName = crfColumns[i];
-                    var val = cData[colName] || "";
-                    html += '<td><textarea class="remarks-input" style="min-height:45px; resize:vertical; font-size:11px;" title="' + escapeHtml(val) + '" ondblclick="expandTextarea(this)" oninput="this.title=this.value" onchange="updateCrfData(\'' + key + '\', \'' + escapeHtml(colName).replace(/'/g, "\\'") + '\', this.value)" placeholder="ダブルクリックで拡大">' + escapeHtml(val) + '</textarea></td>';
+                if (typeof p.crfSortIndex === "undefined") {
+                    p.crfSortIndex = new Date().getTime() + Math.random(); 
                 }
-                html += '</tr>';
+                crfPatients.push({key: key, data: p});
             }
+        }
+        crfPatients.sort(function(a, b) {
+            return (a.data.crfSortIndex || 0) - (b.data.crfSortIndex || 0);
+        });
+        
+        for (var i = 0; i < crfPatients.length; i++) {
+            crfPatients[i].data.crfSortIndex = i;
+            var item = crfPatients[i];
+            var p = item.data;
+            html += '<tr>';
+            html += '<td style="text-align:center;">';
+            if (i > 0) html += '<button onclick="moveCrfRow(' + i + ', -1)" style="font-size:12px; background:#7f8c8d; color:white; border:none; padding:2px 5px; border-radius:2px; cursor:pointer; margin-bottom:2px; width:100%;">▲</button><br>';
+            if (i < crfPatients.length - 1) html += '<button onclick="moveCrfRow(' + i + ', 1)" style="font-size:12px; background:#7f8c8d; color:white; border:none; padding:2px 5px; border-radius:2px; cursor:pointer; width:100%;">▼</button>';
+            html += '</td>';
+            html += '<td>' + escapeHtml(p.id) + '</td>';
+            html += '<td>' + escapeHtml(p.name) + '</td>';
+            html += '<td>' + escapeHtml(p.drug) + '</td>';
+            
+            var cData = p.crfData || {};
+            for (var c = 0; c < crfColumns.length; c++) {
+                var colName = crfColumns[c];
+                var val = cData[colName] || "";
+                html += '<td><textarea class="remarks-input" style="min-height:45px; resize:vertical; font-size:11px;" title="' + escapeHtml(val) + '" ondblclick="expandTextarea(this)" oninput="this.title=this.value" onchange="updateCrfData(\'' + item.key + '\', \'' + escapeHtml(colName).replace(/'/g, "\\'") + '\', this.value)" placeholder="ダブルクリックで拡大">' + escapeHtml(val) + '</textarea></td>';
+            }
+            html += '</tr>';
         }
         
         html += '</tbody></table>';
         document.getElementById('crf-view').innerHTML = html;
+        saveDataToFile();
+    }
+
+    function moveCrfColumn(idx, direction) {
+        if (idx + direction < 0 || idx + direction >= crfColumns.length) return;
+        var temp = crfColumns[idx];
+        crfColumns[idx] = crfColumns[idx + direction];
+        crfColumns[idx + direction] = temp;
+        saveColumns();
+        renderCRF();
+    }
+
+    function moveCrfRow(index, direction) {
+        var crfPatients = [];
+        for (var key in patientData) {
+            if (patientData.hasOwnProperty(key)) {
+                var p = patientData[key];
+                if (p.tab === "target" && (p.status === "提出済" || p.status === "冷凍")) {
+                    crfPatients.push({key: key, data: p});
+                }
+            }
+        }
+        crfPatients.sort(function(a, b) {
+            return (a.data.crfSortIndex || 0) - (b.data.crfSortIndex || 0);
+        });
+
+        var targetIdx = index + direction;
+        if (targetIdx < 0 || targetIdx >= crfPatients.length) return;
+
+        var tempIndex = crfPatients[index].data.crfSortIndex;
+        crfPatients[index].data.crfSortIndex = crfPatients[targetIdx].data.crfSortIndex;
+        crfPatients[targetIdx].data.crfSortIndex = tempIndex;
+
+        saveDataToFile();
+        renderCRF();
     }
 
     function addCrfColumn() {
@@ -1626,24 +1838,33 @@
         var header = ["患者ID", "氏名", "対象薬品"].concat(crfColumns);
         var csvContent = header.join(",") + "\n";
         
+        var crfPatients = [];
         for (var k in patientData) {
             if (patientData.hasOwnProperty(k)) {
                 var p = patientData[k];
                 if (p.tab === "target" && (p.status === "提出済" || p.status === "冷凍")) {
-                    var row = [
-                        '"' + String(p.id).replace(/"/g, '""') + '"',
-                        '"' + String(p.name).replace(/"/g, '""') + '"',
-                        '"' + String(p.drug).replace(/"/g, '""') + '"'
-                    ];
-                    var cData = p.crfData || {};
-                    for (var i = 0; i < crfColumns.length; i++) {
-                        var val = cData[crfColumns[i]] || "";
-                        var valClean = String(val).replace(/"/g, '""');
-                        row.push('"' + valClean + '"');
-                    }
-                    csvContent += row.join(",") + "\n";
+                    crfPatients.push(p);
                 }
             }
+        }
+        crfPatients.sort(function(a, b) {
+            return (a.crfSortIndex || 0) - (b.crfSortIndex || 0);
+        });
+        
+        for (var j = 0; j < crfPatients.length; j++) {
+            var p = crfPatients[j];
+            var row = [
+                '"' + String(p.id).replace(/"/g, '""') + '"',
+                '"' + String(p.name).replace(/"/g, '""') + '"',
+                '"' + String(p.drug).replace(/"/g, '""') + '"'
+            ];
+            var cData = p.crfData || {};
+            for (var i = 0; i < crfColumns.length; i++) {
+                var val = cData[crfColumns[i]] || "";
+                var valClean = String(val).replace(/"/g, '""');
+                row.push('"' + valClean + '"');
+            }
+            csvContent += row.join(",") + "\n";
         }
         
         try {
