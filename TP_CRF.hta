@@ -911,23 +911,22 @@
             var y = d.getFullYear();
             var m = d.getMonth() + 1;
             var day = d.getDate();
-            var dateStr = y + (m < 10 ? '0' + m : m) + (day < 10 ? '0' + day : day);
+            var h = d.getHours();
+            var min = d.getMinutes();
+            var sec = d.getSeconds();
+            var dateStr = y + (m < 10 ? '0' + m : m) + (day < 10 ? '0' + day : day) + "_" + (h < 10 ? '0'+h : h) + (min < 10 ? '0'+min : min) + (sec < 10 ? '0'+sec : sec);
             
             var htaPath = unescape(location.pathname).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\//g, '\\');
             var folderPath = fso.GetParentFolderName(htaPath);
             var expPath = folderPath + "\\管理一覧出力_" + dateStr + ".csv";
             
-            var stream = new ActiveXObject("ADODB.Stream");
-            stream.Type = 2;
-            stream.Charset = "Shift_JIS";
-            stream.Open();
-            stream.WriteText(csvContent);
-            stream.SaveToFile(expPath, 2);
-            stream.Close();
+            var ts = fso.CreateTextFile(expPath, true, false); // overwrite=true, unicode=false (ANSI=Shift_JIS)
+            ts.Write(csvContent);
+            ts.Close();
             
             alert("「" + expPath + "」にCSVを出力しました。");
         } catch (e) {
-            alert("CSV出力に失敗しました: " + e.message);
+            alert("CSV出力に失敗しました。\n\n詳細エラー: " + e.message);
         }
     }
 
@@ -1405,8 +1404,9 @@
 
         var userId = "16622";
         var paddedId = zeroPadId(p.id);
+        var searchId = encodeURIComponent(p.id);
         
-        var url1 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?kanja_id=" + paddedId + 
+        var url1 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?kanja_id=" + searchId + 
                    "&ichiran_code=31&user_id=" + userId + "&section_code=0000022&page_num=0&login_flg=";
                    
         var iframeId = "fetch-iframe-" + key;
@@ -1460,8 +1460,29 @@
                     var idx = allText.indexOf(paddedId);
                     var searchText = idx !== -1 ? allText.substring(idx) : allText;
                     
-                    var bdRegex = /(?:生年月日.*?|)((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
+                    var bdIdx = searchText.indexOf("生年月日");
+                    if (bdIdx !== -1) {
+                        searchText = searchText.substring(bdIdx);
+                    }
+                    
+                    var bdRegex = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
                     var match = searchText.match(bdRegex);
+                    
+                    // If the first date found is very recent (e.g., this year), it might be an admission date. 
+                    // Let's try to find a plausible birthdate by scanning all dates if "生年月日" wasn't found.
+                    if (match && bdIdx === -1) {
+                        var regexAll = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/g;
+                        var mAll;
+                        var currentYear = new Date().getFullYear();
+                        while ((mAll = regexAll.exec(searchText)) !== null) {
+                            var yCheck = parseInt(mAll[1], 10);
+                            if (yCheck < currentYear - 15) { // Assuming patients are at least 15 years old for these drugs
+                                match = mAll;
+                                break;
+                            }
+                        }
+                    }
+
                     if (match) {
                         var y = parseInt(match[1], 10);
                         var m = parseInt(match[2], 10);
@@ -1566,11 +1587,12 @@
 
         var userId = "16622";
         var paddedId = zeroPadId(p.id);
+        var searchId = encodeURIComponent(p.id);
         
-        var url1 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?kanja_id=" + paddedId + 
+        var url1 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?kanja_id=" + searchId + 
                    "&ichiran_code=31&user_id=" + userId + "&section_code=0000022&page_num=0&login_flg=";
                    
-        var url2 = "http://10.5.171.42:8082/karte/karte.php?kanja_id=" + paddedId + 
+        var url2 = "http://10.5.171.42:8082/karte/karte.php?kanja_id=" + searchId + 
                    "&user_id=" + userId + "&order_search_flg=1&order_search_code=3&order_search_name=#top" +
                    "&_nocache=" + new Date().getTime();
 
@@ -1627,8 +1649,27 @@
                         var idx = allText.indexOf(paddedId);
                         var searchText = idx !== -1 ? allText.substring(idx) : allText;
                         
-                        var bdRegex = /(?:生年月日.*?|)((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
+                        var bdIdx = searchText.indexOf("生年月日");
+                        if (bdIdx !== -1) {
+                            searchText = searchText.substring(bdIdx);
+                        }
+                        
+                        var bdRegex = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
                         var match = searchText.match(bdRegex);
+                        
+                        if (match && bdIdx === -1) {
+                            var regexAll = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/g;
+                            var mAll;
+                            var currentYear = new Date().getFullYear();
+                            while ((mAll = regexAll.exec(searchText)) !== null) {
+                                var yCheck = parseInt(mAll[1], 10);
+                                if (yCheck < currentYear - 15) { 
+                                    match = mAll;
+                                    break;
+                                }
+                            }
+                        }
+
                         if (match) {
                             var y = parseInt(match[1], 10);
                             var m = parseInt(match[2], 10);
@@ -1714,6 +1755,7 @@
             html += '<th style="min-width: 150px;">' + escapeHtml(crfColumns[i]) + '<br>';
             html += '<div style="margin-top:3px;">';
             if (i > 0) html += '<button onclick="moveCrfColumn(' + i + ', -1)" style="font-size:10px; background:#95a5a6; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-right:3px;">◀</button>';
+            html += '<button onclick="renameCrfColumn(\'' + escapeHtml(crfColumns[i]).replace(/'/g, "\\'") + '\')" style="font-size:10px; background:#f39c12; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-right:3px;">編集</button>';
             html += '<button onclick="removeCrfColumn(\'' + escapeHtml(crfColumns[i]).replace(/'/g, "\\'") + '\')" style="font-size:10px; background:#e74c3c; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer; margin-right:3px;">削除</button>';
             if (i < crfColumns.length - 1) html += '<button onclick="moveCrfColumn(' + i + ', 1)" style="font-size:10px; background:#95a5a6; color:white; border:none; padding:1px 3px; border-radius:2px; cursor:pointer;">▶</button>';
             html += '</div></th>';
@@ -1812,11 +1854,51 @@
     }
 
     function removeCrfColumn(colName) {
-        if (!confirm("列「" + colName + "」を削除しますか？\n(※入力されているデータは見えなくなります)")) return;
+        if (!confirm("列「" + colName + "」を削除しますか？\n(※この列に入力されているデータも完全に削除されます)")) return;
         var idx = crfColumns.indexOf(colName);
         if (idx !== -1) {
             crfColumns.splice(idx, 1);
             saveColumns();
+            
+            for (var key in patientData) {
+                if (patientData.hasOwnProperty(key)) {
+                    var p = patientData[key];
+                    if (p.crfData && p.crfData.hasOwnProperty(colName)) {
+                        delete p.crfData[colName];
+                    }
+                }
+            }
+            saveDataToFile();
+            renderCRF();
+        }
+    }
+
+    function renameCrfColumn(oldName) {
+        var newName = prompt("列「" + oldName + "」の新しい名前を入力してください:", oldName);
+        if (!newName) return;
+        newName = newName.replace(/^\s+|\s+$/g, '');
+        if (newName === "" || newName === oldName) return;
+        
+        if (crfColumns.indexOf(newName) !== -1) {
+            alert("その列名はすでに存在します。");
+            return;
+        }
+        
+        var idx = crfColumns.indexOf(oldName);
+        if (idx !== -1) {
+            crfColumns[idx] = newName;
+            saveColumns();
+            
+            for (var key in patientData) {
+                if (patientData.hasOwnProperty(key)) {
+                    var p = patientData[key];
+                    if (p.crfData && p.crfData.hasOwnProperty(oldName)) {
+                        p.crfData[newName] = p.crfData[oldName];
+                        delete p.crfData[oldName];
+                    }
+                }
+            }
+            saveDataToFile();
             renderCRF();
         }
     }
@@ -1868,25 +1950,25 @@
         }
         
         try {
-            var stream = new ActiveXObject("ADODB.Stream");
-            stream.Type = 2; // adTypeText
-            stream.Charset = "Shift_JIS";
-            stream.Open();
-            stream.WriteText(csvContent);
-            
             var d = new Date();
             var y = d.getFullYear();
             var m = d.getMonth() + 1;
             var day = d.getDate();
             var h = d.getHours();
             var min = d.getMinutes();
-            var filename = folderPath + "\\CRF_Output_" + y + (m < 10 ? '0'+m : m) + (day < 10 ? '0'+day : day) + "_" + (h < 10 ? '0'+h : h) + (min < 10 ? '0'+min : min) + ".csv";
+            var sec = d.getSeconds();
             
-            stream.SaveToFile(filename, 2); // adSaveCreateOverWrite
-            stream.Close();
+            var htaPath = unescape(location.pathname).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\//g, '\\');
+            var folderPath = fso.GetParentFolderName(htaPath);
+            var filename = folderPath + "\\CRF_Output_" + y + (m < 10 ? '0'+m : m) + (day < 10 ? '0'+day : day) + "_" + (h < 10 ? '0'+h : h) + (min < 10 ? '0'+min : min) + (sec < 10 ? '0'+sec : sec) + ".csv";
+            
+            var ts = fso.CreateTextFile(filename, true, false); // overwrite=true, unicode=false (ANSI=Shift_JIS)
+            ts.Write(csvContent);
+            ts.Close();
+            
             alert("CRFデータをCSVで保存しました。\n保存先: " + filename);
         } catch(e) {
-            alert("CSV保存に失敗しました。\n" + e.message);
+            alert("CSV保存に失敗しました。\n\n詳細エラー: " + e.message);
         }
     }
     updateHeaderFilters(true);
