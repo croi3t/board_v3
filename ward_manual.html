@@ -501,16 +501,18 @@ const AppCore = (function() {
             let idxPage = State.index.pages.find(p => p.id === d.id);
             if (idxPage) {
                 Object.assign(idxPage, d.indexData);
-                idxPage.updatedAt = tx.ts;
+                idxPage.updatedAt = d.indexData.overrideUpdatedAt ? d.indexData.overrideUpdatedAt : tx.ts;
+                delete idxPage.overrideUpdatedAt;
             } else {
-                State.index.pages.push({ ...d.indexData, id: d.id, updatedAt: tx.ts });
+                State.index.pages.push({ ...d.indexData, id: d.id, updatedAt: d.indexData.overrideUpdatedAt ? d.indexData.overrideUpdatedAt : tx.ts });
                 idxPage = State.index.pages[State.index.pages.length - 1];
+                delete idxPage.overrideUpdatedAt;
             }
             State.pageDataCache[d.id] = d.pageData;
             
             if (State.currentPageId === d.id) {
                 const el = document.getElementById('page-updated-at');
-                if (el) el.innerText = "最終更新: " + new Date(tx.ts).toLocaleString('ja-JP');
+                if (el) el.value = new Date(idxPage.updatedAt).toLocaleString('ja-JP');
                 
                 if (tx.userId !== State.userId && document.activeElement !== document.querySelector('.tox-edit-area__iframe')) {
                     Editor.loadContent(d.pageData.content);
@@ -681,15 +683,33 @@ window.onDateChange = function(el) {
     const p = State.index.pages.find(x => x.id === State.currentPageId);
     if (!p) return;
     const val = el.value.trim();
-    if (val === '') {
-        p.isCustomDate = false;
-        p.customDate = "";
-        el.value = p.updatedAt ? new Date(p.updatedAt).toLocaleString('ja-JP') : "";
+    let overrideTimestamp = null;
+    
+    if (val !== '') {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+            overrideTimestamp = d.getTime();
+        } else {
+            alert("無効な日付フォーマットです。 YYYY/MM/DD の形式で入力してください。");
+            el.value = p.updatedAt ? new Date(p.updatedAt).toLocaleString('ja-JP') : "";
+            return;
+        }
     } else {
-        p.isCustomDate = true;
-        p.customDate = val;
+        el.value = p.updatedAt ? new Date(p.updatedAt).toLocaleString('ja-JP') : "";
+        return;
     }
-    Editor.triggerSave();
+    
+    AppCore.appendTransaction('UPDATE_PAGE', {
+        id: p.id,
+        indexData: {
+            title: p.title,
+            secId: p.secId,
+            indentLevel: p.indentLevel,
+            sortOrder: p.sortOrder,
+            overrideUpdatedAt: overrideTimestamp
+        },
+        pageData: State.pageDataCache[p.id] || { content: "" }
+    });
 };
 
 const Editor = {
@@ -907,9 +927,7 @@ const Editor = {
                 title: title,
                 secId: State.currentSecId,
                 indentLevel: indent,
-                sortOrder: sortOrder,
-                isCustomDate: idxPage ? idxPage.isCustomDate : false,
-                customDate: idxPage ? idxPage.customDate : ""
+                sortOrder: sortOrder
             },
             pageData: {
                 content: content
@@ -1379,7 +1397,7 @@ const UI = {
             document.getElementById('page-title').value = pageMeta.title || "";
             const el = document.getElementById('page-updated-at');
             if (el) {
-                el.innerText = pageMeta.updatedAt ? "最終更新: " + new Date(pageMeta.updatedAt).toLocaleString('ja-JP') : "";
+                el.value = pageMeta.updatedAt ? new Date(pageMeta.updatedAt).toLocaleString('ja-JP') : "";
             }
         }
         
