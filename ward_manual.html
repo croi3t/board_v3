@@ -702,7 +702,22 @@ const Editor = {
                 // ※画像(img)やテーブル(table)等のHTMLが含まれる場合は構造を壊さないようスキップする
                 if (args.content && !/<(p|br|div|img|html|table|ul|ol|li)[ >]/i.test(args.content)) {
                     let lines = args.content.split(/\r?\n/);
-                    args.content = lines.map(line => `<p>${line || '<br>'}</p>`).join('');
+                    args.content = lines.map(line => {
+                        let match = line.match(/^([ \t　]+)(.*)/);
+                        if (match) {
+                            let indentStr = match[1];
+                            let text = match[2];
+                            // タブ=30px, スペース=8px, 全角スペース=16pxとして大まかに計算
+                            let indentPx = 0;
+                            for(let i=0; i<indentStr.length; i++) {
+                                if(indentStr[i] === '\t') indentPx += 30;
+                                else if(indentStr[i] === '　') indentPx += 16;
+                                else indentPx += 8;
+                            }
+                            return `<p style="margin-left: ${indentPx}px">${text || '<br>'}</p>`;
+                        }
+                        return `<p>${line || '<br>'}</p>`;
+                    }).join('');
                 }
             },
             images_upload_handler: function (blobInfo, progress) {
