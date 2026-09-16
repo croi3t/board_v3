@@ -203,7 +203,10 @@
             </div>
             
             <div id="editor-wrapper">
-                <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px;">
+                    <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()" style="border: none; flex: 1; margin: 0; padding: 0; outline: none; background: transparent; font-size: 24px; font-weight: bold; color: #2c3e50;">
+                    <span id="page-updated-at" style="font-size: 12px; color: #888; margin-left: 15px; white-space: nowrap;"></span>
+                </div>
                 <div class="attachment-bar" id="attachment-bar">
                     <button class="btn" onclick="document.getElementById('file-upload').click()" style="background:#f39c12; color:white;">📎 添付ファイル追加</button>
                     <input type="file" id="file-upload" style="display:none" onchange="AppCore.attachFile(this.files[0])">
@@ -498,11 +501,15 @@ const AppCore = (function() {
                 idxPage.updatedAt = tx.ts;
             } else {
                 State.index.pages.push({ ...d.indexData, id: d.id, updatedAt: tx.ts });
+                idxPage = State.index.pages[State.index.pages.length - 1];
             }
             State.pageDataCache[d.id] = d.pageData;
             
-            if (State.currentPageId === d.id && tx.userId !== State.userId) {
-                if (document.activeElement !== document.querySelector('.tox-edit-area__iframe')) {
+            if (State.currentPageId === d.id) {
+                const el = document.getElementById('page-updated-at');
+                if (el) el.innerText = "最終更新: " + new Date(tx.ts).toLocaleString('ja-JP');
+                
+                if (tx.userId !== State.userId && document.activeElement !== document.querySelector('.tox-edit-area__iframe')) {
                     Editor.loadContent(d.pageData.content);
                 }
             }
@@ -1350,6 +1357,10 @@ const UI = {
         const pageMeta = State.index.pages.find(p => p.id === State.currentPageId);
         if (pageMeta) {
             document.getElementById('page-title').value = pageMeta.title || "";
+            const el = document.getElementById('page-updated-at');
+            if (el) {
+                el.innerText = pageMeta.updatedAt ? "最終更新: " + new Date(pageMeta.updatedAt).toLocaleString('ja-JP') : "";
+            }
         }
         
         const pageData = await AppCore.loadPageData(State.currentPageId);
