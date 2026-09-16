@@ -205,7 +205,10 @@
             <div id="editor-wrapper">
                 <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px;">
                     <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()" style="border: none; flex: 1; margin: 0; padding: 0; outline: none; background: transparent; font-size: 24px; font-weight: bold; color: #2c3e50;">
-                    <span id="page-updated-at" style="font-size: 12px; color: #888; margin-left: 15px; white-space: nowrap;"></span>
+                    <div style="display: flex; align-items: center;">
+                        <span style="font-size: 12px; color: #888;">最終更新: </span>
+                        <input type="text" id="page-updated-at" placeholder="自動更新 (クリアで戻す)" onchange="window.onDateChange(this)" style="font-size: 12px; color: #888; border: 1px solid transparent; background: transparent; margin-left: 5px; width: 140px; outline: none; cursor: text;" onfocus="this.style.border='1px solid #ccc'; this.style.background='#fff'" onblur="this.style.border='1px solid transparent'; this.style.background='transparent'">
+                    </div>
                 </div>
                 <div class="attachment-bar" id="attachment-bar">
                     <button class="btn" onclick="document.getElementById('file-upload').click()" style="background:#f39c12; color:white;">📎 添付ファイル追加</button>
@@ -674,6 +677,21 @@ const AppCore = (function() {
 // =========================================================
 // 2. TinyMCE エディタ管理 (Editor)
 // =========================================================
+window.onDateChange = function(el) {
+    const p = State.index.pages.find(x => x.id === State.currentPageId);
+    if (!p) return;
+    const val = el.value.trim();
+    if (val === '') {
+        p.isCustomDate = false;
+        p.customDate = "";
+        el.value = p.updatedAt ? new Date(p.updatedAt).toLocaleString('ja-JP') : "";
+    } else {
+        p.isCustomDate = true;
+        p.customDate = val;
+    }
+    Editor.triggerSave();
+};
+
 const Editor = {
     saveTimer: null,
     
@@ -889,7 +907,9 @@ const Editor = {
                 title: title,
                 secId: State.currentSecId,
                 indentLevel: indent,
-                sortOrder: sortOrder
+                sortOrder: sortOrder,
+                isCustomDate: idxPage ? idxPage.isCustomDate : false,
+                customDate: idxPage ? idxPage.customDate : ""
             },
             pageData: {
                 content: content
