@@ -701,7 +701,8 @@ const Editor = {
                 // LINEWORKSなどのプレーンテキスト系コピーで改行が消える問題の対策
                 // ※画像(img)やテーブル(table)等のHTMLが含まれる場合は構造を壊さないようスキップする
                 if (args.content && !/<(p|br|div|img|html|table|ul|ol|li)[ >]/i.test(args.content)) {
-                    args.content = args.content.replace(/\r?\n/g, '<br>');
+                    let lines = args.content.split(/\r?\n/);
+                    args.content = lines.map(line => `<p>${line || '<br>'}</p>`).join('');
                 }
             },
             images_upload_handler: function (blobInfo, progress) {
