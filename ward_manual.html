@@ -74,6 +74,7 @@
                 <input type="text" id="search-box" placeholder="🔍 全文検索 (Enter)" onkeydown="if(event.key==='Enter') UI.performFullSearch()" style="padding: 5px 10px; border-radius: 4px 0 0 4px; border: 1px solid #ccc; border-right: none; width: 180px; font-size: 13px;">
                 <button class="btn" style="border-radius: 0 4px 4px 0; background: #3498db; padding: 6px 10px; margin-right: 10px; font-size: 13px;" onclick="UI.performFullSearch()">検索</button>
             </div>
+            <button class="btn" style="background:#e67e22; margin-right:10px;" onclick="AppCore.cleanupAttachments()">🗑️ 不要ファイル削除</button>
             <button class="btn" id="btn-force-merge" style="background:#6c757d;" onclick="AppCore.forceMerge()">🔄 手動最適化</button>
         </div>
     </div>
@@ -437,19 +438,42 @@ const AppCore = (function() {
     }
 
     async function loadPageData(pageId) {
-        if (State.pageDataCache[pageId]) return State.pageDataCache[pageId];
-        if (!pagesDirHandle) return { content: "" };
-        try {
-            const pageMeta = State.index.pages.find(p => p.id === pageId);
-            const fileName = (pageMeta && pageMeta.fileName) ? pageMeta.fileName : `${pageId}.json`;
-            const fh = await pagesDirHandle.getFileHandle(fileName, { create: false });
-            const file = await fh.getFile();
-            const data = JSON.parse(await file.text());
-            State.pageDataCache[pageId] = data;
-            return data;
-        } catch (e) {
-            return { content: "" };
+        let cached = State.pageDataCache[pageId];
+        
+        if (!cached) {
+            if (!pagesDirHandle) return { content: "" };
+            try {
+                const pageMeta = State.index.pages.find(p => p.id === pageId);
+                const fileName = (pageMeta && pageMeta.fileName) ? pageMeta.fileName : `${pageId}.json`;
+                const fh = await pagesDirHandle.getFileHandle(fileName, { create: false });
+                const file = await fh.getFile();
+                cached = JSON.parse(await file.text());
+                State.pageDataCache[pageId] = cached;
+            } catch (e) {
+                return { content: "" };
+            }
         }
+        
+        let data = { ...cached };
+        
+        // ローカル画像のパスをblob URLに置換 (キャッシュには保存せず、表示用データのみ置換する)
+        if (data.content && data.content.includes('local-img:')) {
+            const regex = /src="local-img:([^"]+)"/g;
+            const matches = [...data.content.matchAll(regex)];
+            const replacements = {};
+            for (const m of matches) {
+                const fname = m[1];
+                if (!replacements[fname]) {
+                    const url = await getAttachmentUrl(fname);
+                    if (url) replacements[fname] = url;
+                }
+            }
+            for (const fname in replacements) {
+                data.content = data.content.split(`src="local-img:${fname}"`).join(`src="${replacements[fname]}" data-local-src="local-img:${fname}"`);
+            }
+        }
+        
+        return data;
     }
 
     async function appendTransaction(op, payload) {
@@ -626,6 +650,28 @@ const AppCore = (function() {
         }
     }
 
+    async function getPageAttachmentDir(pageId, createIfMissing = false) {
+        if (!attachDirHandle) return null;
+        if (!pageId) return attachDirHandle;
+        
+        for await (const [name, handle] of attachDirHandle.entries()) {
+            if (handle.kind === 'directory' && name.endsWith(`_${pageId}`)) {
+                return handle;
+            }
+        }
+        
+        if (createIfMissing) {
+            let pageMeta = State.index.pages.find(p => p.id === pageId);
+            let folderName = `page_${pageId}`;
+            if (pageMeta && pageMeta.title) {
+                const safeTitle = pageMeta.title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 30);
+                if (safeTitle) folderName = `${safeTitle}_${pageId}`;
+            }
+            return await attachDirHandle.getDirectoryHandle(folderName, { create: true });
+        }
+        return null;
+    }
+
     async function attachFile(file) {
         if (!file || !attachDirHandle) {
             alert("共有フォルダに接続してください。");
@@ -635,12 +681,15 @@ const AppCore = (function() {
         setStatus("📎 添付中...");
         try {
             const safeName = Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-            const fh = await attachDirHandle.getFileHandle(safeName, { create: true });
+            const pageId = State.currentPageId;
+            const targetDir = pageId ? await getPageAttachmentDir(pageId, true) : attachDirHandle;
+            const fh = await targetDir.getFileHandle(safeName, { create: true });
             const w = await fh.createWritable();
             await w.write(file);
             await w.close();
             
-            const linkHtml = `<a href="#" data-attachment="${safeName}" style="display:inline-block; background:#e3f2fd; border:1px solid #90caf9; color:#0d47a1; padding:4px 8px; border-radius:4px; font-size:12px; text-decoration:none; margin:2px;" title="クリックでダウンロード">📎 ${file.name}</a>&nbsp;`;
+            const internalPath = pageId ? `${pageId}/${safeName}` : safeName;
+            const linkHtml = `<a href="#" data-attachment="${internalPath}" style="display:inline-block; background:#e3f2fd; border:1px solid #90caf9; color:#0d47a1; padding:4px 8px; border-radius:4px; font-size:12px; text-decoration:none; margin:2px;" title="クリックでダウンロード">📎 ${file.name}</a>&nbsp;`;
             if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
                 tinymce.activeEditor.insertContent(linkHtml);
             } else {
@@ -655,10 +704,19 @@ const AppCore = (function() {
         }
     }
 
-    async function downloadAttachment(filename, originalName) {
+    async function downloadAttachment(filepath, originalName) {
         if (!attachDirHandle) return;
         try {
-            const fh = await attachDirHandle.getFileHandle(filename, { create: false });
+            let targetDir = attachDirHandle;
+            let filename = filepath;
+            if (filepath.includes('/')) {
+                const parts = filepath.split('/');
+                targetDir = await getPageAttachmentDir(parts[0], false);
+                filename = parts[1];
+            }
+            if (!targetDir) throw new Error("Dir not found");
+            
+            const fh = await targetDir.getFileHandle(filename, { create: false });
             const file = await fh.getFile();
             const url = URL.createObjectURL(file);
             const a = document.createElement('a');
@@ -667,13 +725,123 @@ const AppCore = (function() {
             document.body.appendChild(a); 
             a.click(); 
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
         } catch (e) { 
             alert("ファイルが見つかりません。"); 
         }
     }
 
-    return { connectNew, connectHistory, loadPageData, appendTransaction, checkDailyMerge, forceMerge: () => checkDailyMerge(true), attachFile, downloadAttachment };
+    async function saveInlineImage(blob) {
+        if (!attachDirHandle) throw new Error("Not connected");
+        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        const filename = `img_${Date.now()}_${Math.floor(Math.random()*1000)}.${ext}`;
+        const pageId = State.currentPageId;
+        const targetDir = pageId ? await getPageAttachmentDir(pageId, true) : attachDirHandle;
+        
+        const fh = await targetDir.getFileHandle(filename, { create: true });
+        const w = await fh.createWritable();
+        await w.write(blob);
+        await w.close();
+        return pageId ? `${pageId}/${filename}` : filename;
+    }
+
+    async function getAttachmentUrl(filepath) {
+        if (!attachDirHandle) return null;
+        try {
+            let targetDir = attachDirHandle;
+            let filename = filepath;
+            if (filepath.includes('/')) {
+                const parts = filepath.split('/');
+                targetDir = await getPageAttachmentDir(parts[0], false);
+                filename = parts[1];
+            }
+            if (!targetDir) return null;
+            
+            const fh = await targetDir.getFileHandle(filename, { create: false });
+            const file = await fh.getFile();
+            return URL.createObjectURL(file);
+        } catch(e) {
+            return null;
+        }
+    }
+
+    async function cleanupAttachments() {
+        if (!attachDirHandle || !pagesDirHandle) {
+            alert("フォルダが接続されていません。");
+            return;
+        }
+        
+        if (!confirm("ページ内で使用されていない不要な画像や添付ファイルをスキャンして削除しますか？\n（この操作は元に戻せません）")) return;
+        
+        setStatus("🗑️ お掃除準備中...");
+        if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
+            Editor.saveCurrentPage();
+        }
+        await checkDailyMerge(true);
+        
+        setStatus("🗑️ 不要ファイルをスキャン中...");
+        try {
+            const usedFiles = new Set();
+            for await (const [name, handle] of pagesDirHandle.entries()) {
+                if (name.endsWith('.json')) {
+                    const file = await handle.getFile();
+                    const text = await file.text();
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.content) {
+                            const regexImg = /src="local-img:([^"]+)"/g;
+                            for (const match of data.content.matchAll(regexImg)) {
+                                usedFiles.add(match[1]);
+                            }
+                            const regexAtt = /data-attachment="([^"]+)"/g;
+                            for (const match of data.content.matchAll(regexAtt)) {
+                                usedFiles.add(match[1]);
+                            }
+                        }
+                    } catch(e) {}
+                }
+            }
+            
+            let deletedCount = 0;
+            let deletedSize = 0;
+            
+            async function scanAndDelete(dirHandle, currentPath = "") {
+                for await (const [name, handle] of dirHandle.entries()) {
+                    if (handle.kind === 'file') {
+                        const relativePath = currentPath ? `${currentPath}/${name}` : name;
+                        if (!usedFiles.has(relativePath)) {
+                            const file = await handle.getFile();
+                            deletedSize += file.size;
+                            await dirHandle.removeEntry(name);
+                            deletedCount++;
+                        }
+                    } else if (handle.kind === 'directory') {
+                        await scanAndDelete(handle, currentPath ? `${currentPath}/${name}` : name);
+                        let isEmpty = true;
+                        for await (const _ of handle.entries()) {
+                            isEmpty = false; break;
+                        }
+                        if (isEmpty) {
+                            await dirHandle.removeEntry(name);
+                        }
+                    }
+                }
+            }
+            
+            await scanAndDelete(attachDirHandle, "");
+            
+            setStatus(`✅ 削除完了 (${deletedCount}ファイル, ${(deletedSize/1024/1024).toFixed(2)}MB)`);
+            setTimeout(() => setStatus(""), 4000);
+            alert(`${deletedCount}個の不要なファイル（合計 ${(deletedSize/1024/1024).toFixed(2)} MB）を削除しました！`);
+            
+        } catch (e) {
+            console.error(e);
+            alert("不要ファイルの削除中にエラーが発生しました。");
+            setStatus("");
+        }
+    }
+
+    return { connectNew, connectHistory, loadPageData, appendTransaction, checkDailyMerge, forceMerge: () => checkDailyMerge(true), attachFile, downloadAttachment, saveInlineImage, getAttachmentUrl, cleanupAttachments };
 })();
 
 // =========================================================
@@ -735,7 +903,7 @@ const Editor = {
             toolbar_mode: 'sliding',
             indentation: '16px',
             plugins: 'table lists advlist image autolink accordion searchreplace', 
-            toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image hr | removeformat',
+            toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image hr | removeformat',
             table_toolbar: 'tableprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
             advlist_bullet_styles: 'square,disc,circle,default',
             advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
@@ -771,29 +939,39 @@ const Editor = {
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         const img = new Image();
-                        img.onload = function() {
+                        img.onload = async function() {
                             const canvas = document.createElement('canvas');
                             let width = img.width;
                             let height = img.height;
-                            const MAX = 1200; // 最大サイズ
+                            const MAX = 1200;
                             if (width > MAX || height > MAX) {
-                                if (width > height) {
-                                    height = Math.round(height * MAX / width);
-                                    width = MAX;
-                                } else {
-                                    width = Math.round(width * MAX / height);
-                                    height = MAX;
-                                }
+                                if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+                                else { width = Math.round(width * MAX / height); height = MAX; }
                             }
                             canvas.width = width;
                             canvas.height = height;
                             const ctx = canvas.getContext('2d');
-                            // 透過PNG等を黒背景にしないよう白で塗りつぶす
                             ctx.fillStyle = '#FFFFFF';
                             ctx.fillRect(0, 0, width, height);
                             ctx.drawImage(img, 0, 0, width, height);
-                            // JPEGとして軽量化（品質75%）
-                            resolve(canvas.toDataURL('image/jpeg', 0.75));
+                            
+                            canvas.toBlob(async (compressedBlob) => {
+                                try {
+                                    const filename = await AppCore.saveInlineImage(compressedBlob);
+                                    const url = await AppCore.getAttachmentUrl(filename);
+                                    
+                                    resolve(url);
+                                    
+                                    setTimeout(() => {
+                                        if (tinymce.activeEditor) {
+                                            const imgEl = tinymce.activeEditor.dom.select(`img[src="${url}"]`)[0];
+                                            if (imgEl) imgEl.setAttribute('data-local-src', `local-img:${filename}`);
+                                        }
+                                    }, 100);
+                                } catch(err) {
+                                    resolve(canvas.toDataURL('image/jpeg', 0.75));
+                                }
+                            }, 'image/jpeg', 0.75);
                         };
                         img.src = e.target.result;
                     };
@@ -899,7 +1077,7 @@ const Editor = {
         clearTimeout(this.saveTimer);
         this.saveTimer = setTimeout(() => {
             this.saveCurrentPage();
-        }, 2000);
+        }, 10000);
     },
     
     saveCurrentPage: function() {
@@ -917,7 +1095,30 @@ const Editor = {
             content = document.getElementById('tinymce-editor').value;
         }
         
+        // 保存時にローカル画像のblob URLを元の local-img: 形式に戻す
+        if (content.includes('data-local-src="local-img:')) {
+            try {
+                let parser = new DOMParser();
+                let doc = parser.parseFromString(content, 'text/html');
+                let imgs = doc.querySelectorAll('img[data-local-src]');
+                imgs.forEach(img => {
+                    img.setAttribute('src', img.getAttribute('data-local-src'));
+                    img.removeAttribute('data-local-src');
+                });
+                content = doc.body.innerHTML;
+            } catch(e) {}
+        }
+        
         let idxPage = State.index.pages.find(p => p.id === State.currentPageId);
+        let cachedData = State.pageDataCache[State.currentPageId];
+        
+        // 変更がない場合はトランザクションを生成しない（軽量化）
+        if (idxPage && cachedData) {
+            if (idxPage.title === title && cachedData.content === content) {
+                return;
+            }
+        }
+        
         let indent = idxPage ? (idxPage.indentLevel || 0) : 0;
         let sortOrder = idxPage ? idxPage.sortOrder : undefined;
         
@@ -1717,6 +1918,12 @@ window.onload = async function() {
         const btn = document.getElementById('btn-connect');
         if (menu && menu.style.display === 'block' && !menu.contains(e.target)) {
             menu.style.display = 'none';
+        }
+        
+        const attachLink = e.target.closest('[data-attachment]');
+        if (attachLink) {
+            e.preventDefault();
+            AppCore.downloadAttachment(attachLink.getAttribute('data-attachment'), attachLink.innerText);
         }
     });
 };
