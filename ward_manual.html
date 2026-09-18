@@ -805,10 +805,10 @@ const AppCore = (function() {
             let deletedCount = 0;
             let deletedSize = 0;
             
-            async function scanAndDelete(dirHandle, currentPath = "") {
+            async function scanAndDelete(dirHandle, currentPath = "", logicalPath = "") {
                 for await (const [name, handle] of dirHandle.entries()) {
                     if (handle.kind === 'file') {
-                        const relativePath = currentPath ? `${currentPath}/${name}` : name;
+                        const relativePath = logicalPath ? `${logicalPath}/${name}` : name;
                         if (!usedFiles.has(relativePath)) {
                             const file = await handle.getFile();
                             deletedSize += file.size;
@@ -816,7 +816,15 @@ const AppCore = (function() {
                             deletedCount++;
                         }
                     } else if (handle.kind === 'directory') {
-                        await scanAndDelete(handle, currentPath ? `${currentPath}/${name}` : name);
+                        let nextLogicalPath = name;
+                        if (name.includes('_p_')) {
+                            nextLogicalPath = 'p_' + name.split('_p_').pop();
+                        } else if (name.startsWith('p_')) {
+                            nextLogicalPath = name;
+                        }
+                        const nextCurrentPath = currentPath ? `${currentPath}/${name}` : name;
+                        
+                        await scanAndDelete(handle, nextCurrentPath, nextLogicalPath);
                         let isEmpty = true;
                         for await (const _ of handle.entries()) {
                             isEmpty = false; break;
@@ -828,7 +836,7 @@ const AppCore = (function() {
                 }
             }
             
-            await scanAndDelete(attachDirHandle, "");
+            await scanAndDelete(attachDirHandle, "", "");
             
             setStatus(`✅ 削除完了 (${deletedCount}ファイル, ${(deletedSize/1024/1024).toFixed(2)}MB)`);
             setTimeout(() => setStatus(""), 4000);
@@ -904,7 +912,7 @@ const Editor = {
             indentation: '16px',
             plugins: 'table lists advlist image autolink accordion searchreplace', 
             toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image hr | removeformat',
-            table_toolbar: 'tableprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
+            table_toolbar: 'tableprops tablerowprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
             advlist_bullet_styles: 'square,disc,circle,default',
             advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
             paste_data_images: true, 
@@ -1331,6 +1339,10 @@ const UI = {
             }
             
             div.onclick = (e) => {
+                if (State.currentSecId === sec.id) return;
+                if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
+                    Editor.saveCurrentPage();
+                }
                 State.currentSecId = sec.id;
                 State.searchResults = null; // 検索結果をリセット
                 const firstPage = State.index.pages.find(p => p.secId === sec.id);
@@ -1555,6 +1567,9 @@ const UI = {
             
             div.onclick = async () => {
                 if (State.currentPageId === p.id) return;
+                if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
+                    Editor.saveCurrentPage();
+                }
                 State.currentPageId = p.id;
                 this.renderPages(); 
                 await this.renderEditor();
@@ -1627,6 +1642,9 @@ const UI = {
     },
     
     addPage: function() {
+        if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
+            Editor.saveCurrentPage();
+        }
         const id = "p_" + Date.now();
         const payload = {
             id: id,
@@ -1924,6 +1942,12 @@ window.onload = async function() {
         if (attachLink) {
             e.preventDefault();
             AppCore.downloadAttachment(attachLink.getAttribute('data-attachment'), attachLink.innerText);
+        }
+    });
+
+    window.addEventListener('beforeunload', function() {
+        if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
+            Editor.saveCurrentPage();
         }
     });
 };
