@@ -181,7 +181,23 @@
         .fallback-ui span { color: #8a6d3b; font-weight: bold; font-size: 12px; }
 
         @keyframes blink { 0% { opacity: 0.4; } 100% { opacity: 1; } }
-    </style>
+    
+        .ward-btn {
+            background-color: #f1f2f6;
+            border: 1px solid #ced6e0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ward-btn.active {
+            background-color: #2980b9;
+            color: white;
+            border-color: #2980b9;
+            font-weight: bold;
+        }
+</style>
 </head>
 <body class="fz-normal">
 
@@ -311,7 +327,23 @@
                 0%, 100% { transform: translateY(0); }
                 50% { transform: translateY(-6px); }
             }
-        </style>
+        
+        .ward-btn {
+            background-color: #f1f2f6;
+            border: 1px solid #ced6e0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ward-btn.active {
+            background-color: #2980b9;
+            color: white;
+            border-color: #2980b9;
+            font-weight: bold;
+        }
+</style>
     </div>
     
         <div class="gauge-outer">
@@ -328,22 +360,11 @@
         <div class="control-box flex-left">
             <div class="section-title">👤 作業者情報 ＆ ユーザー管理</div>
             
-            <div class="form-group" style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
+            <div class="form-group" style="display:flex; gap:8px; align-items:center; flex-wrap: wrap; margin-bottom: 5px;">
                 <select id="userSelect" onchange="changeUser()" style="width:160px; height: 28px;"></select>
-                <select id="wardSelect" onchange="changeWard()" style="width:100px; height: 28px;">
-                    <option value="3A">3A</option>
-                    <option value="NICU">NICU</option>
-                    <option value="3C">3C</option>
-                    <option value="4B">4B</option>
-                    <option value="4C">4C</option>
-                    <option value="5A">5A</option>
-                    <option value="HCU">HCU</option>
-                    <option value="5C">5C</option>
-                    <option value="6A">6A</option>
-                    <option value="6B">6B</option>
-                    <option value="6C">6C</option>
-                </select>
-                <button class="btn btn-purple" style="padding:4px 8px;" onclick="openDashboardModal()">📊 業務集計</button>
+                <div id="wardButtonsContainer" style="display:flex; gap:5px; align-items:center;"></div>
+                <button class="btn btn-purple" style="padding:4px 8px;" onclick="openDashboardModal()">📊 業務集計</button></div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
                 <button class="btn" style="padding:4px 8px;" onclick="addUser()">👤 追加</button>
                 <button class="btn btn-info" style="padding:4px 8px;" onclick="renameUser()">✏️ 名前変更</button>
                 <button class="btn btn-danger" style="padding:4px 8px;" onclick="deleteUser()">🗑️ 削除</button>
@@ -361,6 +382,7 @@
                     <button class="btn btn-outline" style="padding:4px 8px; font-size:11px;" onclick="saveAsInitialLayout()">💾 現在の状態を【初期配置】に登録</button>
                     <button class="btn btn-info" style="padding:4px 8px; font-size:11px;" onclick="loadInitialLayout()">🔄 【初期配置】を呼出</button>
                 </span>
+                
             </div>
 
             <div class="section-title">🔄 ブロック生成時の位置ルール</div>
@@ -369,10 +391,10 @@
                 <div class="mode-btn" id="modeFree" onclick="setAddMode('free')">任意配置（操作している現在の時刻に仮配置）</div>
             </div>
 
-            <div class="section-title">🟩 算定対象業務パネル（ブルー系：クリックで追加）</div>
+            <div class="section-title"><div>🟩 算定対象業務パネル（ブルー系：クリックで追加）</div><select id="quickAddTarget" style="margin-left:auto; padding: 2px; font-size: 11px; font-weight: normal; max-width: 150px;" onchange="quickAddJob(this)"><option value="">＋ 非表示を追加</option></select></div>
             <div class="panel-grid" id="targetGrid"></div>
 
-            <div class="section-title">⬜ 算定対象外・その他パネル（グレー系）</div>
+            <div class="section-title"><div>⬜ 算定対象外・その他パネル（グレー系）</div><select id="quickAddNontarget" style="margin-left:auto; padding: 2px; font-size: 11px; font-weight: normal; max-width: 150px;" onchange="quickAddJob(this)"><option value="">＋ 非表示を追加</option></select></div>
             <div class="panel-grid" id="nontargetGrid"></div>
         </div>
 
@@ -390,6 +412,7 @@
                     <thead>
                         <tr>
                             <th class="time-col">時間枠（1行）</th>
+                            <th width="100">病棟</th>
                             <th class="name-col">パネル名</th>
                             <th class="flag-col">算定</th>
                             <th class="memo-col">詳細内容・備考</th>
@@ -1016,24 +1039,43 @@
 
         /* ユーザー管理系 */
         
-        function changeWard() {
-            currentWard = document.getElementById("wardSelect").value;
-            let list = appData.timelines[currentUser] || [];
-            let needsSave = false;
-            list.forEach(b => {
-                if (!b.ward) {
-                    b.ward = currentWard;
-                    needsSave = true;
-                }
+        const ALL_WARDS = ['3A', 'NICU', '3C', '4B', '4C', '5A', 'HCU', '5C', '6A', '6B', '6C'];
+        let currentWard = '';
+        function renderWardButtons() {
+            let container = document.getElementById("wardButtonsContainer");
+            if(!container) return;
+            container.innerHTML = "";
+            if (!ALL_WARDS.includes(currentWard)) {
+                currentWard = ALL_WARDS[0];
+            }
+            ALL_WARDS.forEach(w => {
+                let btn = document.createElement("button");
+                btn.className = "ward-btn" + (currentWard === w ? " active" : "");
+                btn.innerText = w;
+                btn.onclick = () => {
+                    currentWard = w;
+                    appData.users[currentUser].defaultWard = w;
+                    renderWardButtons();
+                    let list = appData.timelines[currentUser] || [];
+                    let needsSave = false;
+                    list.forEach(b => {
+                        if (!b.ward) {
+                            b.ward = currentWard;
+                            needsSave = true;
+                        }
+                    });
+                    if(needsSave) syncSaveToFile();
+                    renderDetailTable();
+                };
+                container.appendChild(btn);
             });
-            if(needsSave) syncSaveToFile();
-            renderDetailTable();
         }
 
         function changeUser() {
             currentUser = document.getElementById("userSelect").value;
             ensureUserStructure(currentUser);
             currentPattern = appData.users[currentUser].currentPattern || 1;
+            currentWard = appData.users[currentUser].defaultWard || '3A';
             loadUserData();
         }
 
@@ -1176,12 +1218,41 @@
             select.value = currentUser;
         }
 
-        function loadUserData() { updatePatternUI(); renderPanels(); renderMasterTable(); renderTimeline(); }
+        function loadUserData() { ensureUserStructure(currentUser); updatePatternUI(); renderWardButtons(); renderPanels(); renderMasterTable(); renderTimeline(); }
 
+        
+        function quickAddJob(sel) {
+            if(sel.value === "") return;
+            let idx = parseInt(sel.value);
+            let job = appData.users[currentUser].patterns[currentPattern][idx];
+            if(job) createBlock(job);
+            sel.value = ""; // Reset
+        }
         function renderPanels() {
             const tGrid = document.getElementById("targetGrid"); const ntGrid = document.getElementById("nontargetGrid");
             tGrid.innerHTML = ""; ntGrid.innerHTML = "";
             let jobs = appData.users[currentUser].patterns[currentPattern];
+            
+            let selTarget = document.getElementById("quickAddTarget");
+            let selNontarget = document.getElementById("quickAddNontarget");
+            
+            if (selTarget) {
+                selTarget.innerHTML = '<option value="">＋ 対象を追加</option>';
+            }
+            if (selNontarget) {
+                selNontarget.innerHTML = '<option value="">＋ 対象外を追加</option>';
+            }
+            
+            jobs.forEach((job, i) => {
+                let opt = document.createElement("option");
+                opt.value = i; opt.innerText = job.name;
+                
+                if(job.isHidden) {
+                    if(job.isTarget && selTarget) selTarget.appendChild(opt);
+                    else if(!job.isTarget && selNontarget) selNontarget.appendChild(opt);
+                }
+            });
+
             jobs.forEach(job => {
                 if (job.isHidden) return; // 🌟非表示なら描画しない
                 let btn = document.createElement("button");
