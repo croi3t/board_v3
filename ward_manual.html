@@ -206,9 +206,12 @@
             <div id="editor-wrapper">
                 <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px;">
                     <input type="text" id="page-title" placeholder="無題のページ" oninput="Editor.triggerSave()" style="border: none; flex: 1; margin: 0; padding: 0; outline: none; background: transparent; font-size: 24px; font-weight: bold; color: #2c3e50;">
-                    <div style="display: flex; align-items: center;">
-                        <span style="font-size: 12px; color: #888;">最終更新: </span>
-                        <input type="text" id="page-updated-at" placeholder="自動更新 (クリアで戻す)" onchange="window.onDateChange(this)" style="font-size: 12px; color: #888; border: 1px solid transparent; background: transparent; margin-left: 5px; width: 140px; outline: none; cursor: text;" onfocus="this.style.border='1px solid #ccc'; this.style.background='#fff'" onblur="this.style.border='1px solid transparent'; this.style.background='transparent'">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button class="btn" id="btn-manual-save" onclick="if(typeof Editor!=='undefined' && Editor.saveCurrentPage){ Editor.saveCurrentPage(); const btn = this; const orig = btn.innerHTML; btn.innerHTML = '✅ 保存完了'; btn.style.background = '#2ecc71'; btn.style.color = 'white'; btn.style.borderColor = '#2ecc71'; setTimeout(()=> { btn.innerHTML = orig; btn.style.background = '#fff'; btn.style.color = '#333'; btn.style.borderColor = '#ccc'; }, 2000); }" style="background: #fff; border: 1px solid #ccc; color: #333; font-size: 12px; padding: 4px 10px; transition: 0.2s;">💾 手動保存</button>
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-size: 12px; color: #888;">最終更新: </span>
+                            <input type="text" id="page-updated-at" placeholder="自動更新 (クリアで戻す)" onchange="window.onDateChange(this)" style="font-size: 12px; color: #888; border: 1px solid transparent; background: transparent; margin-left: 5px; width: 140px; outline: none; cursor: text;" onfocus="this.style.border='1px solid #ccc'; this.style.background='#fff'" onblur="this.style.border='1px solid transparent'; this.style.background='transparent'">
+                        </div>
                     </div>
                 </div>
                 <div class="attachment-bar" id="attachment-bar">
@@ -663,9 +666,11 @@ const AppCore = (function() {
         if (createIfMissing) {
             let pageMeta = State.index.pages.find(p => p.id === pageId);
             let folderName = `page_${pageId}`;
-            if (pageMeta && pageMeta.title) {
-                const safeTitle = pageMeta.title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 30);
-                if (safeTitle) folderName = `${safeTitle}_${pageId}`;
+            if (pageMeta) {
+                let sec = State.index.sections.find(s => s.id === pageMeta.secId);
+                let secName = sec ? sec.name.replace(/[\\/:*?"<>|]/g, '_').substring(0, 20) : "不明セクション";
+                let title = (pageMeta.title || "無題").replace(/[\\/:*?"<>|]/g, '_').substring(0, 30);
+                folderName = `${secName}_${title}_${pageId}`;
             }
             return await attachDirHandle.getDirectoryHandle(folderName, { create: true });
         }
@@ -838,9 +843,40 @@ const AppCore = (function() {
             
             await scanAndDelete(attachDirHandle, "", "");
             
-            setStatus(`✅ 削除完了 (${deletedCount}ファイル, ${(deletedSize/1024/1024).toFixed(2)}MB)`);
+            // フォルダ名の最適化（セクション名_ページ名_ID 形式へのリネーム）
+            let renamedCount = 0;
+            for await (const [name, handle] of attachDirHandle.entries()) {
+                if (handle.kind === 'directory' && name.includes('_p_')) {
+                    const pageId = 'p_' + name.split('_p_').pop();
+                    const pageMeta = State.index.pages.find(p => p.id === pageId);
+                    if (pageMeta) {
+                        let sec = State.index.sections.find(s => s.id === pageMeta.secId);
+                        let secName = sec ? sec.name.replace(/[\\/:*?"<>|]/g, '_').substring(0, 20) : "不明セクション";
+                        let title = (pageMeta.title || "無題").replace(/[\\/:*?"<>|]/g, '_').substring(0, 30);
+                        let expectedName = `${secName}_${title}_${pageId}`;
+                        
+                        if (name !== expectedName) {
+                            try {
+                                const newDir = await attachDirHandle.getDirectoryHandle(expectedName, { create: true });
+                                for await (const [fName, fHandle] of handle.entries()) {
+                                    if (fHandle.kind === 'file') {
+                                        const file = await fHandle.getFile();
+                                        const w = await (await newDir.getFileHandle(fName, { create: true })).createWritable();
+                                        await w.write(file);
+                                        await w.close();
+                                    }
+                                }
+                                await attachDirHandle.removeEntry(name, { recursive: true });
+                                renamedCount++;
+                            } catch(e) { console.error("Rename failed for", name, e); }
+                        }
+                    }
+                }
+            }
+            
+            setStatus(`✅ 削除完了 (${deletedCount}ファイル) / フォルダ名整理 (${renamedCount}件)`);
             setTimeout(() => setStatus(""), 4000);
-            alert(`${deletedCount}個の不要なファイル（合計 ${(deletedSize/1024/1024).toFixed(2)} MB）を削除しました！`);
+            alert(`${deletedCount}個の不要ファイルを削除し、${renamedCount}個のフォルダ名を最新の状態に整理しました！`);
             
         } catch (e) {
             console.error(e);
@@ -911,7 +947,7 @@ const Editor = {
             toolbar_mode: 'sliding',
             indentation: '16px',
             plugins: 'table lists advlist image autolink accordion searchreplace', 
-            toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion table image hr | removeformat',
+            toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion acc_menu table image hr | removeformat',
             table_toolbar: 'tableprops tablerowprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
             advlist_bullet_styles: 'square,disc,circle,default',
             advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
@@ -1042,6 +1078,45 @@ const Editor = {
                     }
                 });
 
+                editor.ui.registry.addMenuButton('acc_menu', {
+                    text: 'アコーディオン操作',
+                    tooltip: 'アコーディオン全体を移動・インデント',
+                    fetch: function (callback) {
+                        const getAcc = () => editor.selection.getNode().closest('details.mce-accordion');
+                        callback([
+                            { type: 'menuitem', text: '↑ 全体を上に移動', onAction: () => {
+                                const acc = getAcc();
+                                if (acc && acc.previousElementSibling) {
+                                    acc.parentNode.insertBefore(acc, acc.previousElementSibling);
+                                    editor.focus();
+                                }
+                            }},
+                            { type: 'menuitem', text: '↓ 全体を下に移動', onAction: () => {
+                                const acc = getAcc();
+                                if (acc && acc.nextElementSibling) {
+                                    acc.parentNode.insertBefore(acc.nextElementSibling, acc);
+                                    editor.focus();
+                                }
+                            }},
+                            { type: 'menuitem', text: '➡ インデント (+)', onAction: () => {
+                                const acc = getAcc();
+                                if (acc) {
+                                    const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0);
+                                    editor.dom.setStyle(acc, 'margin-left', (m + 20) + 'px');
+                                }
+                            }},
+                            { type: 'menuitem', text: '⬅ インデント解除 (-)', onAction: () => {
+                                const acc = getAcc();
+                                if (acc) {
+                                    const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0);
+                                    const nm = Math.max(0, m - 20);
+                                    editor.dom.setStyle(acc, 'margin-left', nm > 0 ? nm + 'px' : '');
+                                }
+                            }}
+                        ]);
+                    }
+                });
+
                 editor.on('ExecCommand', function(e) {
                     if (e.command === 'InsertAccordion') {
                         setTimeout(() => {
@@ -1149,6 +1224,7 @@ const Editor = {
     loadContent: function(content) {
         if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
             tinymce.activeEditor.setContent(content || '');
+            tinymce.activeEditor.undoManager.clear();
         } else {
             document.getElementById('tinymce-editor').value = content || '';
         }
