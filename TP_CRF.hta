@@ -57,7 +57,7 @@
         
         .ward-filter-section { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; margin-bottom: 10px; clear: both; line-height: 1.8; }
         .ward-label { display: inline-block; margin-right: 15px; font-size: 12px; white-space: nowrap; cursor: pointer; }
-        .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; overflow-y: scroll; }
+        .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; overflow-y: hidden; }
 
         /* Summary Dashboard */
         .summary-dashboard { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
@@ -105,7 +105,7 @@
             <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
             <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
             <button onclick="fetchMissingAges()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #e67e22; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">未取得の年齢を再取得</button>
-            <button id="wardFetchBtn" onclick="checkCurrentWards()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #2980b9; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">最新の病棟情報を確認 (3C/6C)</button>
+            <button id="wardFetchBtn" onclick="checkCurrentInfo()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #2980b9; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">最新情報（病棟/科/医）を再取得</button>
         </span>
     </div>
 
@@ -886,9 +886,9 @@
 
         var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与回数,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
         
-        for (var key in patientData) {
-            if (!patientData.hasOwnProperty(key)) continue;
-            var p = patientData[key];
+        var keys = getFilteredKeys();
+        for (var k = 0; k < keys.length; k++) {
+            var p = patientData[keys[k]];
             
             var rowArray = [
                 p.id, p.name, p.age, p.ageGroup, p.ward, p.department, p.doctor,
@@ -924,7 +924,12 @@
             ts.Write(csvContent);
             ts.Close();
             
-            alert("「" + expPath + "」にCSVを出力しました。");
+            try {
+                var wsh = new ActiveXObject("WScript.Shell");
+                wsh.Run('"' + expPath + '"');
+            } catch (err) {
+                alert("「" + expPath + "」にCSVを出力しました。");
+            }
         } catch (e) {
             alert("CSV出力に失敗しました。\n\n詳細エラー: " + e.message);
         }
@@ -1009,45 +1014,14 @@
         return false;
     }
 
-    function renderTable() {
-        updateHeaderFilters();
-
-        var tbody = document.getElementById('tableBody');
-        var alertList = document.getElementById('alertList');
-        var alertSection = document.getElementById('todayAlert');
+    function getFilteredKeys() {
+        var keys = [];
         var searchInput = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toUpperCase() : "";
-        
         var checkboxes = document.getElementsByClassName('ward-cb');
         var selectedWards = [];
         for(var i=0; i<checkboxes.length; i++) {
-            if(checkboxes[i].checked) {
-                selectedWards.push(checkboxes[i].value);
-            }
+            if(checkboxes[i].checked) selectedWards.push(checkboxes[i].value);
         }
-        
-        var d = new Date();
-        var y = d.getFullYear();
-        var m = d.getMonth() + 1;
-        var day = d.getDate();
-        var todayStr = y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
-        
-        tbody.innerHTML = "";
-        alertList.innerHTML = "";
-        var alertCount = 0;
-
-        var idCounts = {};
-        var idInTarget = {};
-        for(var k in patientData) {
-            if(patientData.hasOwnProperty(k)) {
-                var pid = patientData[k].id;
-                idCounts[pid] = (idCounts[pid] || 0) + 1;
-                if (patientData[k].tab === "target") {
-                    idInTarget[pid] = true;
-                }
-            }
-        }
-
-        var keys = [];
 
         for (var key in patientData) {
             if (!patientData.hasOwnProperty(key)) continue;
@@ -1094,6 +1068,48 @@
                 return 0;
             });
         }
+        return keys;
+    }
+
+    function renderTable() {
+        updateHeaderFilters();
+
+        var tbody = document.getElementById('tableBody');
+        var alertList = document.getElementById('alertList');
+        var alertSection = document.getElementById('todayAlert');
+        var searchInput = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toUpperCase() : "";
+        
+        var checkboxes = document.getElementsByClassName('ward-cb');
+        var selectedWards = [];
+        for(var i=0; i<checkboxes.length; i++) {
+            if(checkboxes[i].checked) {
+                selectedWards.push(checkboxes[i].value);
+            }
+        }
+        
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = d.getMonth() + 1;
+        var day = d.getDate();
+        var todayStr = y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+        
+        tbody.innerHTML = "";
+        alertList.innerHTML = "";
+        var alertCount = 0;
+
+        var idCounts = {};
+        var idInTarget = {};
+        for(var k in patientData) {
+            if(patientData.hasOwnProperty(k)) {
+                var pid = patientData[k].id;
+                idCounts[pid] = (idCounts[pid] || 0) + 1;
+                if (patientData[k].tab === "target") {
+                    idInTarget[pid] = true;
+                }
+            }
+        }
+
+        var keys = getFilteredKeys();
 
         var sortCols = ["id", "name", "age", "ward", "start", "sampleDate"];
         for (var i=0; i<sortCols.length; i++) {
@@ -1141,7 +1157,18 @@
             } else if (p.currentWard && p.currentWard === p.ward) {
                 safeWard = safeWard + "<br><span style='color:#27ae60; font-size:10px; font-weight:bold;'>✓現在も" + escapeHtml(p.currentWard) + "</span>";
             }
-            var infoStr = safeWard + "<br><span style='font-size:10px;color:#555;'>" + escapeHtml(p.department) + " / " + escapeHtml(p.doctor) + "</span>";
+            
+            var deptDisplay = escapeHtml(p.department);
+            if (p.currentDept && p.currentDept !== p.department) {
+                deptDisplay = "<span style='text-decoration:line-through; color:#999;'>" + deptDisplay + "</span> <span style='color:#e74c3c; font-weight:bold;'>" + escapeHtml(p.currentDept) + "</span>";
+            }
+            
+            var docDisplay = escapeHtml(p.doctor);
+            if (p.currentDoctor && p.currentDoctor !== p.doctor) {
+                docDisplay = "<span style='text-decoration:line-through; color:#999;'>" + docDisplay + "</span> <span style='color:#e74c3c; font-weight:bold;'>" + escapeHtml(p.currentDoctor) + "</span>";
+            }
+            
+            var infoStr = safeWard + "<br><span style='font-size:10px;color:#555;'>" + deptDisplay + " / " + docDisplay + "</span>";
             var ageDisplay = (p.age !== null && p.age !== "") ? escapeHtml(p.age) + "歳<br><span style='font-size:10px;'>" + escapeHtml(p.ageGroup) + "</span>" : "<span style='color:#ccc; font-size:10px;'>未取得</span>";
 
             var drugDisplay = escapeHtml(p.drug);
@@ -1190,7 +1217,9 @@
             html += "</td>";
 
             var safeRemarks = p.remarks ? escapeHtml(p.remarks) : "";
-            html += "<td><textarea class='remarks-input' title='" + safeRemarks + "' ondblclick=\"expandTextarea(this)\" oninput=\"this.title=this.value\" onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ... ダブルクリックで拡大'>" + safeRemarks + "</textarea></td>";
+            var lines = (p.remarks || "").split(/\r\n|\r|\n/).length;
+            var calcHeight = Math.max(45, lines * 15 + 10);
+            html += "<td><textarea class='remarks-input' style='height:" + calcHeight + "px;' title='" + safeRemarks + "' ondblclick=\"expandTextarea(this)\" oninput=\"this.style.height='auto';this.style.height=(this.scrollHeight+2)+'px';this.title=this.value\" onchange=\"updateRemarks('" + key + "', this.value)\" placeholder='メモ... ダブルクリックで拡大'>" + safeRemarks + "</textarea></td>";
 
             html += "<td style='text-align: center;'>";
             html += "  <div class='sub-status-grid'>";
@@ -1238,134 +1267,45 @@
         return id;
     }
 
-    function checkCurrentWards() {
-        if(confirm("3C病棟および6C病棟の最新患者リストを取得し、一覧に反映させますか？")) {
-            var btn = document.getElementById("wardFetchBtn");
-            if(btn) { btn.innerText = "情報取得中..."; btn.disabled = true; }
+    function checkCurrentInfo() {
+        if(isFetchingAll) return;
+        
+        fetchQueue = getFilteredKeys();
+        
+        if (fetchQueue.length === 0) {
+            alert("表示されている患者がいません。");
+            return;
+        }
+        
+        if (confirm("表示されている患者 " + fetchQueue.length + " 名の最新の基本情報（病棟/診療科/主治医）を取得しますか？\n(※数分かかる場合があります)")) {
+            isFetchingAll = true;
             
-            var d = new Date();
-            var y = d.getFullYear();
-            var m = d.getMonth() + 1;
-            var day = d.getDate();
-            var todayStr = y + "%2F" + (m < 10 ? '0' + m : m) + "%2F" + (day < 10 ? '0' + day : day);
-            
-            var userId = "16622";
-            var url33 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?byoto_code=33&search_date=" + todayStr + "&ichiran_code=58&user_id=" + userId + "&section_code=&page_num=0&login_flg=";
-            var url63 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?byoto_code=63&search_date=" + todayStr + "&ichiran_code=58&user_id=" + userId + "&section_code=&page_num=0&login_flg=";
-            
-            var patients33 = {};
-            var patients63 = {};
-            
-            function fetchWard(url, callback) {
-                var iframe = document.createElement("iframe");
-                iframe.style.display = "none";
-                iframe.setAttribute("application", "yes");
-                document.body.appendChild(iframe);
-                
-                var isDone = false;
-                
-                var fallbackTimer = setTimeout(function() {
-                    if (!isDone) {
-                        isDone = true;
-                        document.body.removeChild(iframe);
-                        callback({});
-                    }
-                }, 30000); // 30s timeout
-                
-                iframe.onload = function() {
-                    setTimeout(function() {
-                        if (isDone) return;
-                        isDone = true;
-                        clearTimeout(fallbackTimer);
-                        
-                        var result = {};
-                        try {
-                            var doc = iframe.contentWindow.document;
-                            var links = doc.getElementsByTagName("a");
-                            for(var i=0; i<links.length; i++) {
-                                var href = links[i].href || "";
-                                if(href.indexOf("kanja_id=") !== -1) {
-                                    var idMatch = href.match(/kanja_id=(\d+)/);
-                                    if(idMatch && idMatch[1]) {
-                                        var paddedId = zeroPadId(idMatch[1]);
-                                        result[paddedId] = true;
-                                    }
-                                }
-                            }
-                        } catch(e) {}
-                        
-                        document.body.removeChild(iframe);
-                        callback(result);
-                    }, 500);
-                };
-                iframe.src = url;
-            }
-            
-            fetchWard(url33, function(res33) {
-                patients33 = res33;
-                setTimeout(function() {
-                    fetchWard(url63, function(res63) {
-                        patients63 = res63;
-                        updatePatientWards(patients33, patients63);
-                        if(btn) { btn.innerText = "最新の病棟情報を確認 (3C/6C)"; btn.disabled = false; }
-                        alert("3C・6C病棟の患者情報を取得・反映しました。");
-                    });
-                }, 500);
-            });
+            var btn = document.getElementById('wardFetchBtn');
+            if(btn) { btn.innerText = "確認中..."; btn.disabled = true; }
+            processInfoFetchQueue();
         }
     }
-    
-    function updatePatientWards(pat33, pat63) {
-        for(var k in patientData) {
-            if(patientData.hasOwnProperty(k)) {
-                var p = patientData[k];
-                var pId = zeroPadId(p.id);
-                if (pat33[pId]) {
-                    p.currentWard = "3C";
-                } else if (pat63[pId]) {
-                    p.currentWard = "6C";
-                } else {
-                    p.currentWard = "";
-                }
-            }
+
+    function processInfoFetchQueue() {
+        if(fetchQueue.length === 0) {
+            isFetchingAll = false;
+            var btn = document.getElementById('wardFetchBtn');
+            if(btn) { btn.innerText = "最新情報（病棟/科/医）を再取得"; btn.disabled = false; }
+            alert("基本情報の取得が完了しました。");
+            return;
         }
-        saveDataToFile();
-        renderTable();
+        var nextKey = fetchQueue.shift();
+        fetchSingleInfo(nextKey, processInfoFetchQueue, "情報確認中..."); 
     }
 
     function fetchMissingAges() {
         if(isFetchingAll) return;
+        
+        var filteredKeys = getFilteredKeys();
         fetchQueue = [];
-        
-        var searchInput = document.getElementById("searchInput").value.toUpperCase();
-        var checkboxes = document.getElementsByClassName('ward-cb');
-        var selectedWards = [];
-        for(var i=0; i<checkboxes.length; i++) {
-            if(checkboxes[i].checked) selectedWards.push(checkboxes[i].value);
-        }
-        
-        for (var key in patientData) {
-            if (!patientData.hasOwnProperty(key)) continue;
+        for (var i = 0; i < filteredKeys.length; i++) {
+            var key = filteredKeys[i];
             var p = patientData[key];
-            if ((p.tab || "screening") !== currentTab) continue;
-            
-            var searchText = (p.id + p.name).toUpperCase();
-            if (searchInput !== "" && searchText.indexOf(searchInput) === -1) continue;
-            
-            if (selectedWards.length > 0) {
-                var wardMatch = false;
-                for(var j=0; j<selectedWards.length; j++) {
-                    if (p.ward === selectedWards[j]) wardMatch = true;
-                }
-                if (!wardMatch) continue;
-            }
-            
-            if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
-            if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
-            if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
-            var safeDept = p.department || "(未登録)";
-            if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
-
             if (!p.age || p.ageGroup === "未取得") {
                 fetchQueue.push(key);
             }
@@ -1389,10 +1329,10 @@
             return;
         }
         var nextKey = fetchQueue.shift();
-        fetchSingleAge(nextKey, processAgeFetchQueue); 
+        fetchSingleInfo(nextKey, processAgeFetchQueue, "年齢取得中..."); 
     }
 
-    function fetchSingleAge(key, callback) {
+    function fetchSingleInfo(key, callback, labelText) {
         var p = patientData[key];
         if (!p || !p.id) {
             if (callback) callback();
@@ -1400,7 +1340,7 @@
         }
         
         var btn = document.getElementById('btn-' + key);
-        if(btn) { btn.innerText = "年齢取得中..."; btn.disabled = true; }
+        if(btn) { btn.innerText = labelText || "取得中..."; btn.disabled = true; }
 
         var userId = "16622";
         var paddedId = zeroPadId(p.id);
@@ -1445,40 +1385,75 @@
                 if (isDone) return;
                 try {
                     var doc = iframe.contentWindow.document;
-                    var allText = "";
-                    
-                    function collectText(currentDoc) {
-                        if (!currentDoc) return;
-                        try { if (currentDoc.body && currentDoc.body.innerText) allText += " " + currentDoc.body.innerText; } catch(e) {}
+                    function findPatientRow(currentDoc) {
+                        if (!currentDoc) return null;
+                        try {
+                            var trs = currentDoc.getElementsByTagName("tr");
+                            for(var i=0; i<trs.length; i++) {
+                                var tr = trs[i];
+                                var tds = tr.getElementsByTagName("td");
+                                if (tds.length >= 12) {
+                                    var idText = tds[2].innerText || tds[2].textContent || "";
+                                    if (idText.indexOf(paddedId) !== -1 || idText.indexOf(p.id) !== -1) {
+                                        return tds;
+                                    }
+                                }
+                            }
+                        } catch(e) {}
+                        
                         var frames = currentDoc.getElementsByTagName("frame");
                         var iframes = currentDoc.getElementsByTagName("iframe");
-                        for(var j=0; j<frames.length; j++) { try { collectText(frames[j].contentWindow.document); } catch(e){} }
-                        for(var k=0; k<iframes.length; k++) { try { collectText(iframes[k].contentWindow.document); } catch(e){} }
+                        for(var j=0; j<frames.length; j++) { try { var row = findPatientRow(frames[j].contentWindow.document); if (row) return row; } catch(e){} }
+                        for(var k=0; k<iframes.length; k++) { try { var row = findPatientRow(iframes[k].contentWindow.document); if (row) return row; } catch(e){} }
+                        return null;
                     }
-                    collectText(doc);
 
-                    var idx = allText.indexOf(paddedId);
-                    var searchText = idx !== -1 ? allText.substring(idx) : allText;
+                    var patientTds = findPatientRow(doc);
+                    var match = null;
                     
-                    var bdIdx = searchText.indexOf("生年月日");
-                    if (bdIdx !== -1) {
-                        searchText = searchText.substring(bdIdx);
-                    }
-                    
-                    var bdRegex = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
-                    var match = searchText.match(bdRegex);
-                    
-                    // If the first date found is very recent (e.g., this year), it might be an admission date. 
-                    // Let's try to find a plausible birthdate by scanning all dates if "生年月日" wasn't found.
-                    if (match && bdIdx === -1) {
-                        var regexAll = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/g;
-                        var mAll;
-                        var currentYear = new Date().getFullYear();
-                        while ((mAll = regexAll.exec(searchText)) !== null) {
-                            var yCheck = parseInt(mAll[1], 10);
-                            if (yCheck < currentYear - 15) { // Assuming patients are at least 15 years old for these drugs
-                                match = mAll;
-                                break;
+                    if (patientTds) {
+                        var bdText = patientTds[4].innerText || patientTds[4].textContent || "";
+                        match = bdText.match(/((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/);
+                        
+                        var wardText = (patientTds[8].innerText || patientTds[8].textContent || "").replace(/^\s+|\s+$/g, '').replace(/　/g, '');
+                        var deptText = (patientTds[10].innerText || patientTds[10].textContent || "").replace(/^\s+|\s+$/g, '').replace(/　/g, '');
+                        var docText = (patientTds[11].innerText || patientTds[11].textContent || "").replace(/^\s+|\s+$/g, '').replace(/　/g, '');
+                        
+                        if (wardText) p.currentWard = wardText;
+                        if (deptText) p.currentDept = deptText;
+                        if (docText) p.currentDoctor = docText;
+                    } else {
+                        var allText = "";
+                        function collectText(currentDoc) {
+                            if (!currentDoc) return;
+                            try { if (currentDoc.body && currentDoc.body.innerText) allText += " " + currentDoc.body.innerText; } catch(e) {}
+                            var frames = currentDoc.getElementsByTagName("frame");
+                            var iframes = currentDoc.getElementsByTagName("iframe");
+                            for(var j=0; j<frames.length; j++) { try { collectText(frames[j].contentWindow.document); } catch(e){} }
+                            for(var k=0; k<iframes.length; k++) { try { collectText(iframes[k].contentWindow.document); } catch(e){} }
+                        }
+                        collectText(doc);
+    
+                        var idx = allText.indexOf(paddedId);
+                        var searchText = idx !== -1 ? allText.substring(idx) : allText;
+                        
+                        var bdIdx = searchText.indexOf("生年月日");
+                        if (bdIdx !== -1) {
+                            searchText = searchText.substring(bdIdx);
+                        }
+                        
+                        match = searchText.match(/((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/);
+                        
+                        if (match && bdIdx === -1) {
+                            var regexAll = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/g;
+                            var mAll;
+                            var currentYear = new Date().getFullYear();
+                            while ((mAll = regexAll.exec(searchText)) !== null) {
+                                var yCheck = parseInt(mAll[1], 10);
+                                if (yCheck < currentYear - 15) { 
+                                    match = mAll;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1511,41 +1486,19 @@
 
     function fetchAllBloodDates() {
         if(isFetchingAll) return;
+        
+        var filteredKeys = getFilteredKeys();
         fetchQueue = [];
         
-        var searchInput = document.getElementById("searchInput").value.toUpperCase();
-        var checkboxes = document.getElementsByClassName('ward-cb');
-        var selectedWards = [];
-        for(var i=0; i<checkboxes.length; i++) {
-            if(checkboxes[i].checked) selectedWards.push(checkboxes[i].value);
-        }
+        var todayDate = new Date();
+        todayDate.setHours(0,0,0,0);
         
-        for (var key in patientData) {
-            if (!patientData.hasOwnProperty(key)) continue;
+        for (var i = 0; i < filteredKeys.length; i++) {
+            var key = filteredKeys[i];
             var p = patientData[key];
-            if ((p.tab || "screening") !== currentTab) continue;
             
-            var searchText = (p.id + p.name).toUpperCase();
-            if (searchInput !== "" && searchText.indexOf(searchInput) === -1) continue;
-
-            if (selectedWards.length > 0) {
-                var wardMatch = false;
-                for(var j=0; j<selectedWards.length; j++) {
-                    if (p.ward === selectedWards[j]) wardMatch = true;
-                }
-                if (!wardMatch) continue;
-            }
-
-            if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
-            if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
-            if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
-            var safeDept = p.department || "(未登録)";
-            if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
-
             var endDate = new Date(p.end);
             endDate.setHours(0,0,0,0);
-            var todayDate = new Date();
-            todayDate.setHours(0,0,0,0);
             
             if (!isNaN(endDate.getTime()) && endDate < todayDate) {
                 continue;
@@ -1645,27 +1598,75 @@
                     collectText(doc);
 
                     if (step === 1) {
-                        var paddedId = ("0000000" + p.id).slice(-7);
-                        var idx = allText.indexOf(paddedId);
-                        var searchText = idx !== -1 ? allText.substring(idx) : allText;
-                        
-                        var bdIdx = searchText.indexOf("生年月日");
-                        if (bdIdx !== -1) {
-                            searchText = searchText.substring(bdIdx);
+                        function findPatientRow(currentDoc) {
+                            if (!currentDoc) return null;
+                            try {
+                                var trs = currentDoc.getElementsByTagName("tr");
+                                for(var i=0; i<trs.length; i++) {
+                                    var tr = trs[i];
+                                    var tds = tr.getElementsByTagName("td");
+                                    if (tds.length >= 12) {
+                                        var idText = tds[2].innerText || tds[2].textContent || "";
+                                        if (idText.indexOf(paddedId) !== -1 || idText.indexOf(p.id) !== -1) {
+                                            return tds;
+                                        }
+                                    }
+                                }
+                            } catch(e) {}
+                            
+                            var frames = currentDoc.getElementsByTagName("frame");
+                            var iframes = currentDoc.getElementsByTagName("iframe");
+                            for(var j=0; j<frames.length; j++) { try { var row = findPatientRow(frames[j].contentWindow.document); if (row) return row; } catch(e){} }
+                            for(var k=0; k<iframes.length; k++) { try { var row = findPatientRow(iframes[k].contentWindow.document); if (row) return row; } catch(e){} }
+                            return null;
                         }
+
+                        var patientTds = findPatientRow(doc);
+                        var match = null;
                         
-                        var bdRegex = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/;
-                        var match = searchText.match(bdRegex);
-                        
-                        if (match && bdIdx === -1) {
-                            var regexAll = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/g;
-                            var mAll;
-                            var currentYear = new Date().getFullYear();
-                            while ((mAll = regexAll.exec(searchText)) !== null) {
-                                var yCheck = parseInt(mAll[1], 10);
-                                if (yCheck < currentYear - 15) { 
-                                    match = mAll;
-                                    break;
+                        if (patientTds) {
+                            var bdText = patientTds[4].innerText || patientTds[4].textContent || "";
+                            match = bdText.match(/((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/);
+                            
+                            var wardText = (patientTds[8].innerText || patientTds[8].textContent || "").replace(/^\s+|\s+$/g, '').replace(/　/g, '');
+                            var deptText = (patientTds[10].innerText || patientTds[10].textContent || "").replace(/^\s+|\s+$/g, '').replace(/　/g, '');
+                            var docText = (patientTds[11].innerText || patientTds[11].textContent || "").replace(/^\s+|\s+$/g, '').replace(/　/g, '');
+                            
+                            if (wardText) p.currentWard = wardText;
+                            if (deptText) p.currentDept = deptText;
+                            if (docText) p.currentDoctor = docText;
+                        } else {
+                            var allText = "";
+                            function collectText(currentDoc) {
+                                if (!currentDoc) return;
+                                try { if (currentDoc.body && currentDoc.body.innerText) allText += " " + currentDoc.body.innerText; } catch(e) {}
+                                var frames = currentDoc.getElementsByTagName("frame");
+                                var iframes = currentDoc.getElementsByTagName("iframe");
+                                for(var j=0; j<frames.length; j++) { try { collectText(frames[j].contentWindow.document); } catch(e){} }
+                                for(var k=0; k<iframes.length; k++) { try { collectText(iframes[k].contentWindow.document); } catch(e){} }
+                            }
+                            collectText(doc);
+                            
+                            var idx = allText.indexOf(paddedId);
+                            var searchText = idx !== -1 ? allText.substring(idx) : allText;
+                            
+                            var bdIdx = searchText.indexOf("生年月日");
+                            if (bdIdx !== -1) {
+                                searchText = searchText.substring(bdIdx);
+                            }
+                            
+                            match = searchText.match(/((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/);
+                            
+                            if (match && bdIdx === -1) {
+                                var regexAll = /((?:18|19|20)\d{2})[\/\年]\s*(\d{1,2})[\/\月]\s*(\d{1,2})/g;
+                                var mAll;
+                                var currentYear = new Date().getFullYear();
+                                while ((mAll = regexAll.exec(searchText)) !== null) {
+                                    var yCheck = parseInt(mAll[1], 10);
+                                    if (yCheck < currentYear - 15) { 
+                                        match = mAll;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -1795,7 +1796,9 @@
             for (var c = 0; c < crfColumns.length; c++) {
                 var colName = crfColumns[c];
                 var val = cData[colName] || "";
-                html += '<td><textarea class="remarks-input" style="min-height:45px; resize:vertical; font-size:11px;" title="' + escapeHtml(val) + '" ondblclick="expandTextarea(this)" oninput="this.title=this.value" onchange="updateCrfData(\'' + item.key + '\', \'' + escapeHtml(colName).replace(/'/g, "\\'") + '\', this.value)" placeholder="ダブルクリックで拡大">' + escapeHtml(val) + '</textarea></td>';
+                var lines = val.split(/\r\n|\r|\n/).length;
+                var calcHeight = Math.max(45, lines * 15 + 10);
+                html += '<td><textarea class="remarks-input" style="height:' + calcHeight + 'px;" title="' + escapeHtml(val) + '" ondblclick="expandTextarea(this)" oninput="this.style.height=\'auto\';this.style.height=(this.scrollHeight+2)+\'px\';this.title=this.value" onchange="updateCrfData(\'' + item.key + '\', \'' + escapeHtml(colName).replace(/'/g, "\\'") + '\', this.value)" placeholder="ダブルクリックで拡大">' + escapeHtml(val) + '</textarea></td>';
             }
             html += '</tr>';
         }
@@ -1966,7 +1969,12 @@
             ts.Write(csvContent);
             ts.Close();
             
-            alert("CRFデータをCSVで保存しました。\n保存先: " + filename);
+            try {
+                var wsh = new ActiveXObject("WScript.Shell");
+                wsh.Run('"' + filename + '"');
+            } catch (err) {
+                alert("CRFデータをCSVで保存しました。\n保存先: " + filename);
+            }
         } catch(e) {
             alert("CSV保存に失敗しました。\n\n詳細エラー: " + e.message);
         }
