@@ -838,7 +838,7 @@
             if(existingChecks[i].checked) checkedWards[existingChecks[i].value] = true;
         }
 
-        var predefinedOrder = ["3A", "NICU", "3C", "4A", "4B", "4C", "5A", "5B", "5C", "6A", "6B", "6C", "外来"];
+        var predefinedOrder = ["3A・3B", "NICU", "3C", "4B", "4C", "5A", "5B", "5C", "6A", "6B", "6C", "外来"];
         var otherWards = {};
         
         for (var key in patientData) {
@@ -1277,10 +1277,10 @@
             return;
         }
         
-        if (confirm("3Cおよび6C病棟の名簿を裏で確認し、そこに名前がある患者のみ最新の基本情報（病棟/診療科/主治医）を取得しますか？\n(※名簿にいない患者はスキップされます)")) {
+        if (confirm("全病棟(3A-6C)の全体名簿を裏で高速確認し、各患者が現在どの病棟にいるかを一括判定しますか？\n(※数秒〜十数秒かかります)")) {
             isFetchingAll = true;
             var btn = document.getElementById('wardFetchBtn');
-            if(btn) { btn.innerText = "名簿確認中..."; btn.disabled = true; }
+            if(btn) { btn.innerText = "名簿確認開始..."; btn.disabled = true; }
             
             var d = new Date();
             var y = d.getFullYear();
@@ -1288,10 +1288,54 @@
             var day = d.getDate();
             var todayStr = y + "%2F" + (m < 10 ? '0' + m : m) + "%2F" + (day < 10 ? '0' + day : day);
             var userId = "16622";
-            var url33 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?byoto_code=33&search_date=" + todayStr + "&ichiran_code=58&user_id=" + userId + "&section_code=&page_num=0&login_flg=";
-            var url63 = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?byoto_code=63&search_date=" + todayStr + "&ichiran_code=58&user_id=" + userId + "&section_code=&page_num=0&login_flg=";
             
-            function fetchWard(url, callback) {
+            var wardsMap = [
+                {code: 31, name: "3A・3B"}, {code: 32, name: "NICU"}, {code: 33, name: "3C"},
+                {code: 42, name: "4B"}, {code: 43, name: "4C"}, {code: 51, name: "5A"},
+                {code: 52, name: "5B"}, {code: 53, name: "5C"}, {code: 61, name: "6A"},
+                {code: 62, name: "6B"}, {code: 63, name: "6C"}
+            ];
+            
+            var patientWardMap = {};
+            var wardIndex = 0;
+            
+            function processNextWard() {
+                if (wardIndex >= wardsMap.length) {
+                    var needsSave = false;
+                    for (var i = 0; i < filteredKeys.length; i++) {
+                        var key = filteredKeys[i];
+                        var p = patientData[key];
+                        if (p.ward === "外来") continue;
+                        
+                        var pId = zeroPadId(p.id);
+                        if (patientWardMap[pId]) {
+                            p.currentWard = patientWardMap[pId];
+                            needsSave = true;
+                        } else {
+                            p.currentWard = "他病棟/退院";
+                            p.currentDept = "-";
+                            p.currentDoctor = "-";
+                            needsSave = true;
+                        }
+                    }
+                    
+                    isFetchingAll = false;
+                    if(btn) { btn.innerText = "最新情報（病棟/科/医）を再取得"; btn.disabled = false; }
+                    
+                    if (needsSave) {
+                        saveDataToFile();
+                        renderTable();
+                    }
+                    
+                    alert("全病棟の確認が完了しました。\n（※診療科・主治医の詳細は年齢や採血予定日の取得時に収集されます）");
+                    return;
+                }
+                
+                var wInfo = wardsMap[wardIndex];
+                if(btn) { btn.innerText = wInfo.name + "確認中..."; }
+                
+                var url = "http://10.5.171.42:8082/karte/kanja_ichiran/kanja_ichiran.php?byoto_code=" + wInfo.code + "&search_date=" + todayStr + "&ichiran_code=58&user_id=" + userId + "&section_code=&page_num=0&login_flg=";
+                
                 var iframe = document.createElement("iframe");
                 iframe.style.display = "none";
                 iframe.setAttribute("application", "yes");
@@ -1302,16 +1346,16 @@
                     if (!isDone) {
                         isDone = true;
                         document.body.removeChild(iframe);
-                        callback({});
+                        wardIndex++;
+                        processNextWard();
                     }
-                }, 15000);
+                }, 10000);
                 
                 iframe.onload = function() {
                     setTimeout(function() {
                         if (isDone) return;
                         isDone = true;
                         clearTimeout(fallbackTimer);
-                        var result = {};
                         try {
                             var doc = iframe.contentWindow.document;
                             var links = doc.getElementsByTagName("a");
@@ -1321,61 +1365,20 @@
                                     var idMatch = href.match(/kanja_id=(\d+)/);
                                     if(idMatch && idMatch[1]) {
                                         var paddedId = zeroPadId(idMatch[1]);
-                                        result[paddedId] = true;
+                                        patientWardMap[paddedId] = wInfo.name;
                                     }
                                 }
                             }
                         } catch(e) {}
                         document.body.removeChild(iframe);
-                        callback(result);
-                    }, 500);
+                        wardIndex++;
+                        setTimeout(processNextWard, 200);
+                    }, 200);
                 };
                 iframe.src = url;
             }
             
-            fetchWard(url33, function(res33) {
-                setTimeout(function() {
-                    fetchWard(url63, function(res63) {
-                        var activeIds = {};
-                        for(var k in res33) { if(res33.hasOwnProperty(k)) activeIds[k] = true; }
-                        for(var k in res63) { if(res63.hasOwnProperty(k)) activeIds[k] = true; }
-                        
-                        fetchQueue = [];
-                        var needsSave = false;
-                        for (var i = 0; i < filteredKeys.length; i++) {
-                            var key = filteredKeys[i];
-                            var p = patientData[key];
-                            if (p.ward === "外来") continue;
-                            
-                            var pId = zeroPadId(p.id);
-                            if (activeIds[pId]) {
-                                // 3Cまたは6Cに残っている患者は詳細（診療科・主治医）を取得する
-                                fetchQueue.push(key);
-                            } else {
-                                // 3C/6C名簿にいない＝他病棟へ移動または退院している
-                                p.currentWard = "他病棟/退院";
-                                p.currentDept = "-";
-                                p.currentDoctor = "-";
-                                needsSave = true;
-                            }
-                        }
-                        
-                        if (needsSave) {
-                            saveDataToFile();
-                            renderTable();
-                        }
-                        
-                        if (fetchQueue.length === 0) {
-                            isFetchingAll = false;
-                            if(btn) { btn.innerText = "最新情報（病棟/科/医）を再取得"; btn.disabled = false; }
-                            alert("3C・6C病棟の名簿に該当する患者はいませんでした。名簿にない患者は「他病棟/退院」として更新されました。");
-                        } else {
-                            if(btn) { btn.innerText = "詳細確認中..."; }
-                            processInfoFetchQueue();
-                        }
-                    });
-                }, 500);
-            });
+            processNextWard();
         }
     }
 
