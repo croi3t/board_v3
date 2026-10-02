@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>投与間隔・同効薬チェックツール</title>
+    <!-- 外部のデータベースファイル（rule_db.js）を読み込む -->
+    <script src="rule_db.js"></script>
+    
+    <!-- Excelファイル（.xls, .xlsx）を読み込むための外部プログラム -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        body { font-family: "游ゴシック", YuGothic, sans-serif; padding: 10px 20px; background-color: #f5f7fa; color: #333; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+        .container { background-color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 98%; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; flex-grow: 1; margin: auto; }
+        
+        h2 { font-size: 1.3rem; color: #005a9e; border-bottom: 2px solid #005a9e; padding-bottom: 5px; margin-top: 0; margin-bottom: 10px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+        
+        .main-tab-button { padding: 5px 15px; font-size: 12px; cursor: pointer; background-color: #eee; border: 1px solid #ccc; border-radius: 4px; color: #333; }
+        .main-tab-button.active { background-color: #0078d7; color: white; border-color: #005a9e; }
+        .tab-content { display: none; flex-direction: column; flex-grow: 1; overflow: hidden; }
+        .tab-content.active { display: flex; }
+        
+        .control-panel { display: flex; gap: 15px; margin-bottom: 5px; align-items: stretch; flex-shrink: 0; }
+        .input-group { display: flex; flex-direction: column; justify-content: flex-start; }
+        
+        .input-group > label { font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #005a9e; border-bottom: 1px dashed #005a9e; padding-bottom: 3px; display: flex; justify-content: space-between; align-items: flex-end; }
+        
+        input[type="date"], input[type="text"] { padding: 8px; border: 1px solid #a6c8ff; border-radius: 4px; font-size: 14px; height: 38px; box-sizing: border-box; background-color: #f0f8ff; transition: 0.3s; }
+        
+        /* テキストエリア（ドロップゾーン）のスタイル */
+        textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #a6c8ff; border-radius: 4px; font-size: 13px; white-space: pre; resize: none; background-color: #f0f8ff; transition: 0.3s; }
+        textarea.dragover { background-color: #e1f0fa !important; border: 2px dashed #005a9e !important; box-shadow: 0 0 8px rgba(0, 90, 158, 0.4); }
+        
+        input[type="date"]:focus, input[type="text"]:focus, textarea:focus { background-color: #ffffff; border-color: #005a9e; outline: none; box-shadow: 0 0 5px rgba(0, 90, 158, 0.3); }
+
+        #patientInput { height: 80px; }
+        #ruleInputText { flex-grow: 1; margin-bottom: 10px; }
+        
+        button.action-btn { padding: 0 20px; height: 38px; background-color: #0078d7; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        button.action-btn:hover { background-color: #005a9e; }
+        button.download-btn { background-color: #28a745; margin-top: 10px; height: auto; padding: 10px 20px; }
+        button.download-btn:hover { background-color: #218838; }
+        
+        .mini-btn { padding: 2px 8px; font-size: 11px; cursor: pointer; border: 1px solid #a6c8ff; background: #e1f0fa; border-radius: 3px; color: #005a9e; font-weight: normal; margin-left: 5px; }
+        .mini-btn:hover { background: #bbdefb; }
+
+        details { margin-bottom: 10px; background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
+        summary { font-weight: bold; cursor: pointer; padding: 2px 0; color: #005a9e; }
+        .legend-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .legend-table th, .legend-table td { border: 1px solid #ccc; padding: 4px; }
+        .legend-table th { width: 150px; text-align: center; font-weight: bold; }
+
+        .date-tabs { display: flex; gap: 5px; margin-top: 10px; margin-bottom: 0; overflow-x: auto; flex-shrink: 0; border-bottom: 1px solid #ccc; padding-left: 10px; }
+        .date-tab-button { padding: 8px 16px; background-color: #e1f0fa; border: 1px solid #ccc; border-bottom: none; border-radius: 6px 6px 0 0; cursor: pointer; font-weight: bold; color: #333; transition: 0.2s; }
+        .date-tab-button:hover { background-color: #d0e7f9; }
+        .date-tab-button.active { background-color: white; border-top: 3px solid #005a9e; border-left: 1px solid #ccc; border-right: 1px solid #ccc; color: #333; position: relative; top: 1px; z-index: 2; }
+        
+        .date-tab-sat { color: #1976d2; background-color: #e3f2fd; border-color: #bbdefb; }
+        .date-tab-sat:hover { background-color: #bbdefb; }
+        .date-tab-sat.active { border-top: 3px solid #1976d2; border-left: 1px solid #bbdefb; border-right: 1px solid #bbdefb; color: #1976d2; }
+        
+        .date-tab-sun { color: #d32f2f; background-color: #ffebee; border-color: #ffcdd2; }
+        .date-tab-sun:hover { background-color: #ffcdd2; }
+        .date-tab-sun.active { border-top: 3px solid #d32f2f; border-left: 1px solid #ffcdd2; border-right: 1px solid #ffcdd2; color: #d32f2f; }
+        
+        .table-wrapper { overflow-x: auto; overflow-y: auto; margin-top: 0; flex-grow: 1; border: 1px solid #ccc; border-top: none; background-color: white; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; margin: 0; }
+        th { background-color: #f2f2f2; position: sticky; top: 0; cursor: pointer; box-shadow: 0 1px 0px rgba(0,0,0,0.1); z-index: 1; padding: 8px 10px; border: 1px solid #ddd; text-align: left; }
+        th:hover { background-color: #e6e6e6; }
+        th::after { content: " \25B2\25BC"; font-size: 10px; color: #999; }
+        
+        td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; vertical-align: middle; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap; }
+        
+        th:nth-child(1), td:nth-child(1), th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5), th:nth-child(6), td:nth-child(6) { white-space: nowrap; width: 1%; }
+        th:nth-child(3), td:nth-child(3) { white-space: nowrap; min-width: 100px; }
+        th:nth-child(8), td:nth-child(8) { width: 35%; }
+
+        .color-blue { background-color: #ADD8E6; }
+        .color-yellow { background-color: #FFFF00; }
+        .color-orange { background-color: #FFA500; }
+        .color-pink { background-color: #FFC0CB; }
+        .color-gray { background-color: #D3D3D3; }
+        
+        #errorMsg { color: white; background-color: #dc3545; padding: 10px; margin-bottom: 10px; border-radius: 4px; display: none; font-weight: bold; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>
+        投与間隔・同効薬チェック
+        <div>
+            <button class="main-tab-button active" onclick="switchMainTab('checkTab')">チェック実行</button>
+            <button class="main-tab-button" onclick="switchMainTab('ruleTab')">データベースファイル作成</button>
+        </div>
+    </h2>
+
+    <div id="errorMsg">⚠️ データベースファイル（rule_db.js）が読み込めませんでした。「データベースファイル作成」タブから作成し、このツールと同じフォルダに保存してください。</div>
+
+    <div id="checkTab" class="tab-content active">
+        <details>
+            <summary>▼ 判定区分の説明を開く（クリック）</summary>
+            <table class="legend-table">
+                <tr class="color-blue"><th>適正</th><td>投与間隔が薬剤毎に設定された数値以上の場合。</td></tr>
+                <tr class="color-yellow"><th>許容</th><td>投与間隔が薬剤毎に設定された数値の許容範囲にある場合。</td></tr>
+                <tr class="color-yellow"><th>導入期/適応確認</th><td>投与間隔が導入期や適応によって複数設定されており、その中で最長の投与間隔は満たしていない場合。</td></tr>
+                <tr class="color-yellow"><th>初回か確認</th><td>投与間隔が計算できない場合。初回もしくは薬剤変更の可能性あり。</td></tr>
+                <tr class="color-pink"><th>同効薬投与あり:〇〇</th><td>上記“初回か確認”等の判定時に、前回投与時に同効薬が使用されていた場合。</td></tr>
+                <tr class="color-orange"><th>同月/同年内重複投与</th><td>月1回/年1回投与の薬剤が同月/同年に処方されている場合。</td></tr>
+                <tr class="color-orange"><th>不適</th><td>投与間隔が薬剤毎に設定された数値より小さい場合。</td></tr>
+                <tr class="color-orange"><th>初回のみ</th><td>ゴナックス120mg用の設定。</td></tr>
+                <tr class="color-gray"><th>判定不能</th><td>薬剤の投与間隔が設定されていない場合。</td></tr>
+            </table>
+        </details>
+        
+        <div class="control-panel">
+            <div class="input-group" style="width: 55%; flex-grow: 1;">
+                <label>
+                    <span>1. 処方データを貼り付け、またはファイルをドロップ</span>
+                    <span>
+                        <button type="button" class="mini-btn" onclick="exportData()">💾 ファイルへ保存</button>
+                        <button type="button" class="mini-btn" onclick="document.getElementById('importFile').click()">📂 ファイルから復元</button>
+                        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)">
+                    </span>
+                </label>
+                <div style="display: flex; gap: 10px;">
+                    <textarea id="patientInput" placeholder="NO&#9;薬品&#9;用量&#9;単位&#9;発行日&#9;患者ＩＤ&#9;患者氏名&#9;診療科&#9;担当医師&#9;病棟&#10;&#10;※ここにデータを貼り付けるか、CSVやExcelファイルを直接ドロップしてください"></textarea>
+                    <button class="action-btn" onclick="runCheck()" style="height: 80px; min-width: 80px;">判定<br>実行</button>
+                </div>
+            </div>
+
+            <div class="input-group" style="width: 15%; min-width: 150px;">
+                <label>2. 基準日 (任意)</label>
+                <input type="date" id="targetDate">
+            </div>
+
+            <div class="input-group" style="width: 25%; min-width: 200px;">
+                <label>3. 結果の絞り込み</label>
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="表の中を検索...">
+            </div>
+        </div>
+
+        <div id="dateTabsContainer" class="date-tabs"></div>
+
+        <div class="table-wrapper">
+            <table id="resultTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">病棟</th>
+                        <th onclick="sortTable(1)">患者ID</th>
+                        <th onclick="sortTable(2)">患者名</th>
+                        <th onclick="sortTable(3)">薬品</th>
+                        <th onclick="sortTable(4)">発行日</th>
+                        <th onclick="sortTable(5)">間隔(日) *:同効薬</th>
+                        <th onclick="sortTable(6)">投与可否</th>
+                        <th onclick="sortTable(7)">用法</th>
+                        <th onclick="sortTable(8)">薬効グループ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="ruleTab" class="tab-content">
+        <div style="margin-bottom: 10px; background-color: #fff9c4; padding: 15px; border-radius: 4px; border: 1px solid #ffe082;">
+            <h3 style="margin-top: 0; color: #b78d00;">ルールデータベースの更新手順</h3>
+            <ol style="margin-bottom: 0;">
+                <li>JUST calcで管理しているルール一覧（見出し行含む）をコピーし、下の枠に貼り付けます。</li>
+                <li>「<strong>rule_db.js をダウンロードして更新</strong>」ボタンを押します。</li>
+                <li>ダウンロードされた <code>rule_db.js</code> ファイルを、<strong>このHTMLツールと同じフォルダに上書き保存</strong>してください。</li>
+                <li>ページを再読み込み（F5キー）すると、新しいルールが適用されます。</li>
+            </ol>
+            <button class="action-btn download-btn" onclick="downloadJS()">⬇ rule_db.js をダウンロードして更新</button>
+        </div>
+        <textarea id="ruleInputText" placeholder="ここにJUST calcのルール設定データを貼り付けてください..."></textarea>
+    </div>
+</div>
+
+<script>
+let checkResultsByDate = {};
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof RULE_DB === 'undefined') {
+        document.getElementById("errorMsg").style.display = "block";
+    }
+
+    document.getElementById("targetDate").value = "";
+    localStorage.removeItem('savedTargetDate'); 
+
+    const savedData = localStorage.getItem('savedPatientData');
+    const savedDateStr = localStorage.getItem('savedPatientDataDate');
+    
+    if (savedData) {
+        document.getElementById("patientInput").value = savedData;
+        checkOldDataAlert(savedDateStr);
+        runCheck();
+    }
+});
+
+// ==========================================
+// ドラッグ＆ドロップによるファイル読み込み機能
+// ==========================================
+const patientInput = document.getElementById('patientInput');
+
+patientInput.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    patientInput.classList.add('dragover');
+});
+
+patientInput.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    patientInput.classList.remove('dragover');
+});
+
+patientInput.addEventListener('drop', (e) => {
+    e.preventDefault();
+    patientInput.classList.remove('dragover');
+    
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+    
+    const file = files[0];
+    const fileName = file.name.toLowerCase();
+    
+    // CSVファイルの場合
+    if (fileName.endsWith('.csv')) {
+        const reader = new FileReader();
+        // 病院システムの出力はShift_JISが多いので指定
+        reader.onload = function(evt) {
+            patientInput.value = evt.target.result;
+            runCheck();
+        };
+        reader.readAsText(file, 'Shift_JIS');
+        
+    // Excelファイル（xls, xlsx）の場合
+    } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+        if (typeof XLSX === 'undefined') {
+            alert('Excel解析用の外部プログラムが読み込まれていません。\nインターネット接続を確認するか、CSV形式のファイルをドロップしてください。');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const tsv = XLSX.utils.sheet_to_csv(worksheet, {FS: '\t'});
+                patientInput.value = tsv;
+                runCheck();
+            } catch (error) {
+                alert('Excelファイルの読み込みに失敗しました。ファイルが壊れているか、パスワードで保護されている可能性があります。');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        alert('CSVファイル、またはExcelファイル（.xls, .xlsx）をドロップしてください。');
+    }
+});
+
+function checkOldDataAlert(dateString) {
+    if (!dateString) return;
+    const savedDate = new Date(dateString);
+    const now = new Date();
+    const diffDays = (now - savedDate) / (1000 * 60 * 60 * 24);
+    
+    if (diffDays >= 7) {
+        alert(`⚠️ 注意: 読み込まれた処方データは ${Math.floor(diffDays)}日前のものです（保存日: ${savedDate.toLocaleDateString()}）。\n最新のデータを取り込んでいないか確認してください。`);
+    }
+}
+
+function exportData() {
+    const text = document.getElementById("patientInput").value.trim();
+    if (!text) {
+        alert("保存する処方データがありません。");
+        return;
+    }
+    const dataObj = { data: text, savedDate: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(dataObj)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const d = new Date();
+    a.download = `処方データバックアップ_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const dataObj = JSON.parse(e.target.result);
+            if (dataObj && dataObj.data) {
+                document.getElementById("patientInput").value = dataObj.data;
+                checkOldDataAlert(dataObj.savedDate);
+                runCheck();
+            } else {
+                alert("ファイルの形式が正しくありません。");
+            }
+        } catch(err) {
+            alert("ファイルの読み込みに失敗しました。");
+        }
+        event.target.value = ""; 
+    };
+    reader.readAsText(file);
+}
+
+function switchMainTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.main-tab-button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.currentTarget.classList.add('active');
+}
+
+function downloadJS() {
+    const text = document.getElementById("ruleInputText").value.trim();
+    if (!text) { alert("データが貼り付けられていません。"); return; }
+    const safeText = text.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+    const jsContent = `var RULE_DB = \`${safeText}\`;`;
+    const blob = new Blob([jsContent], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rule_db.js";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// 自動区切り文字判定付きパーサー (カンマ/タブ両対応)
+function parseData(str) {
+    let result = [];
+    let row = [];
+    let cell = '';
+    let inQuotes = false;
+    
+    const firstLine = str.split('\n')[0] || "";
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const delimiter = tabCount >= commaCount ? '\t' : ',';
+
+    for (let i = 0; i < str.length; i++) {
+        let char = str[i];
+        let nextChar = str[i + 1];
+
+        if (char === '"' && inQuotes && nextChar === '"') {
+            cell += '"'; 
+            i++; 
+        } else if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === delimiter && !inQuotes) {
+            row.push(cell); cell = '';
+        } else if (char === '\n' && !inQuotes) {
+            row.push(cell); result.push(row); row = []; cell = '';
+        } else if (char === '\r' && nextChar === '\n' && !inQuotes) {
+            row.push(cell); result.push(row); row = []; cell = ''; i++;
+        } else {
+            if (char !== '\r' || inQuotes) cell += char;
+        }
+    }
+    if (cell || row.length) {
+        row.push(cell); result.push(row);
+    }
+    return result;
+}
+
+// ==========================================
+// チェック実行ロジック
+// ==========================================
+function runCheck() {
+    if (typeof RULE_DB === 'undefined') {
+        alert("データベースファイル（rule_db.js）が読み込まれていません。\n「データベースファイル作成」タブからファイルを作成してください。");
+        return;
+    }
+
+    const patientText = document.getElementById('patientInput').value.trim();
+    if (!patientText) {
+        alert("処方データが入力されていません。\nテキスト枠にデータを貼り付けるか、ファイルをドロップしてください。");
+        return;
+    }
+
+    localStorage.setItem('savedPatientData', patientText);
+    localStorage.setItem('savedPatientDataDate', new Date().toISOString());
+
+    const rules = parseRules(RULE_DB);
+    const allPrescriptions = parsePrescriptions(patientText);
+
+    if (allPrescriptions.length === 0) {
+        alert("有効な処方データが読み込めませんでした。\n\n【考えられる原因】\n・データの列数が足りない（「NO」から始まる10列が必要です）\n・日付の形式が読み取れない");
+        return;
+    }
+
+    const targetDateStr = document.getElementById("targetDate").value;
+    let targetDateObj = null;
+    if (targetDateStr) {
+        targetDateObj = new Date(targetDateStr);
+        targetDateObj.setHours(0,0,0,0);
+    }
+
+    let validPrescriptions = allPrescriptions;
+    if (targetDateObj) {
+        validPrescriptions = allPrescriptions.filter(p => p.date.getTime() <= targetDateObj.getTime());
+    }
+
+    const uniqueTimes = [...new Set(validPrescriptions.map(p => p.date.getTime()))];
+    uniqueTimes.sort((a, b) => b - a);
+    
+    const top7Times = uniqueTimes.slice(0, 7).reverse();
+
+    if (top7Times.length === 0) {
+        alert("有効な日付データが見つかりません。");
+        const tabsContainer = document.getElementById('dateTabsContainer');
+        tabsContainer.innerHTML = '';
+        renderResults([]);
+        return;
+    }
+
+    checkResultsByDate = {};
+    const tabsContainer = document.getElementById('dateTabsContainer');
+    tabsContainer.innerHTML = '';
+
+    const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+    top7Times.forEach((time, index) => {
+        const dObj = new Date(time);
+        const yyyy = dObj.getFullYear();
+        const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dObj.getDate()).padStart(2, '0');
+        const dayOfWeek = dObj.getDay();
+        const dateStr = `${yyyy}/${mm}/${dd}(${weekDays[dayOfWeek]})`; 
+        
+        const historyValid = validPrescriptions.filter(p => p.date.getTime() <= time);
+        const history = buildHistory(historyValid, rules);
+        const results = evaluateIntervals(history, rules, dObj);
+        
+        checkResultsByDate[dateStr] = results;
+
+        const btn = document.createElement('button');
+        
+        let baseClass = 'date-tab-button';
+        if (dayOfWeek === 0) baseClass += ' date-tab-sun'; 
+        if (dayOfWeek === 6) baseClass += ' date-tab-sat'; 
+        if (index === top7Times.length - 1) baseClass += ' active'; 
+        
+        btn.className = baseClass;
+        btn.textContent = dateStr;
+        btn.onclick = () => {
+            document.querySelectorAll('.date-tab-button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderResults(checkResultsByDate[dateStr]);
+        };
+        tabsContainer.appendChild(btn);
+    });
+
+    const lastDateStr = tabsContainer.lastChild.textContent;
+    renderResults(checkResultsByDate[lastDateStr]);
+}
+
+function parseRules(text) {
+    const rows = parseData(text);
+    const rulesObj = {};
+    for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i];
+        if (cols.length >= 5) {
+            const drugName = cols[0] ? cols[0].trim() : "";
+            if (!drugName) continue;
+            rulesObj[drugName] = {
+                normalizedName: cols[1] ? cols[1].trim() : drugName,
+                group: cols[2] ? cols[2].trim() : "",
+                type: cols[3] ? cols[3].trim() : "",
+                param: cols[4] ? parseInt(cols[4].trim(), 10) : 0,
+                comment: cols[5] ? cols[5].trim() : ""
+            };
+        }
+    }
+    return rulesObj;
+}
+
+function parsePrescriptions(text) {
+    const rows = parseData(text);
+    const result = [];
+    
+    rows.forEach((cols) => {
+        if (cols.length < 6 || !cols[0] || cols[0].trim() === 'NO') return;
+
+        const issueDate = new Date(cols[4].trim());
+        issueDate.setHours(0,0,0,0);
+        if(isNaN(issueDate.getTime())) return;
+
+        result.push({
+            drug: cols[1] ? cols[1].trim() : "",
+            date: issueDate,
+            id: cols[5] ? cols[5].trim() : "",
+            name: cols[6] ? cols[6].trim() : "",
+            ward: cols[9] ? cols[9].trim() : ""
+        });
+    });
+    return result;
+}
+
+function buildHistory(prescriptions, rules) {
+    const dict = {};
+    prescriptions.forEach(p => {
+        const rule = rules[p.drug] || {};
+        const groupKey = rule.group ? rule.group : (rule.normalizedName || p.drug);
+        const key = p.id + '|' + groupKey;
+        
+        if (!dict[key]) dict[key] = [];
+        dict[key].push(p);
+    });
+    return dict;
+}
+
+function evaluateIntervals(history, rules, targetDateObj) {
+    const results = [];
+
+    for (const key in history) {
+        let patientPrescriptions = history[key];
+        
+        const uniquePrescriptions = [];
+        const seenDates = new Set();
+        patientPrescriptions.forEach(p => {
+            const time = p.date.getTime();
+            if (!seenDates.has(time)) {
+                seenDates.add(time);
+                uniquePrescriptions.push(p);
+            }
+        });
+        
+        uniquePrescriptions.sort((a, b) => a.date - b.date);
+
+        const current = uniquePrescriptions[uniquePrescriptions.length - 1];
+        if (current.date.getTime() !== targetDateObj.getTime()) continue;
+
+        let status = "適正";
+        let diffDays = "-";
+        let diffStr = "-";
+        let cssClass = "color-blue";
+        let tooltip = "";
+        const rule = rules[current.drug] || { type: '', param: 0, comment: '', group: '' };
+
+        if (uniquePrescriptions.length === 1) {
+            if (rule.type === 'singleUse') {
+                status = "初回のみ"; cssClass = "color-orange"; tooltip = "ゴナックス120mg用の設定。";
+            } else if (rule.type !== '') {
+                status = "初回か確認"; cssClass = "color-yellow"; tooltip = "投与間隔が計算できない場合。初回もしくは薬剤変更の可能性あり。";
+            } else {
+                status = "判定不能"; cssClass = "color-gray"; tooltip = "薬剤の投与間隔が設定されていない場合。";
+            }
+        } else {
+            const prev = uniquePrescriptions[uniquePrescriptions.length - 2];
+            const diffTime = current.date.getTime() - prev.date.getTime();
+            diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            
+            let isSameEffect = false;
+            let pastDrugs = new Set();
+            
+            // ▼ 修正箇所：直前（前回）の投与データと比較して異なる薬剤だった場合のみフラグを立てる
+            if (prev.drug !== current.drug) {
+                isSameEffect = true;
+                pastDrugs.add(prev.drug);
+            }
+
+            const prevDateStr = `${prev.date.getFullYear()}/${(prev.date.getMonth()+1).toString().padStart(2, '0')}/${prev.date.getDate().toString().padStart(2, '0')}`;
+            diffStr = isSameEffect ? `*${diffDays}(${prevDateStr})` : `${diffDays}(${prevDateStr})`;
+
+            if (!rule.type) {
+                status = "判定不能"; cssClass = "color-gray"; tooltip = "薬剤の投与間隔が設定されていない場合。";
+            } else {
+                switch (rule.type) {
+                    case 'range':
+                        if (diffDays >= rule.param) {
+                            status = "適正"; cssClass = "color-blue"; tooltip = "投与間隔が薬剤毎に設定された数値以上の場合。";
+                        } else if (Math.abs(diffDays - rule.param) <= 2) {
+                            status = "許容"; cssClass = "color-yellow"; tooltip = "投与間隔が薬剤毎に設定された数値の許容範囲にある場合。";
+                        } else {
+                            status = "不適"; cssClass = "color-orange"; tooltip = "投与間隔が薬剤毎に設定された数値より小さい場合。";
+                        }
+                        break;
+                    case 'minIntervalWithNote':
+                        if (diffDays >= rule.param) {
+                            status = "適正"; cssClass = "color-blue"; tooltip = "投与間隔が薬剤毎に設定された数値以上の場合。";
+                        } else if (Math.abs(diffDays - rule.param) <= 2) {
+                            status = "許容"; cssClass = "color-yellow"; tooltip = "投与間隔が薬剤毎に設定された数値の許容範囲にある場合。";
+                        } else {
+                            status = "導入期/適応確認"; cssClass = "color-yellow"; tooltip = "投与間隔が導入期や適応によって複数設定されており、その中で最長の投与間隔は満たしていない場合。";
+                        }
+                        break;
+                    case 'monthlyCheck':
+                        if (current.date.getFullYear() === prev.date.getFullYear() && current.date.getMonth() === prev.date.getMonth()) {
+                            status = "同月内重複投与"; cssClass = "color-orange"; tooltip = "月1回/年1回投与の薬剤が同月に処方されている場合。";
+                        } else {
+                            if (diffDays >= rule.param) {
+                                status = "適正"; cssClass = "color-blue"; tooltip = "投与間隔が薬剤毎に設定された数値以上の場合。";
+                            } else if (Math.abs(diffDays - rule.param) <= 7) {
+                                status = "許容"; cssClass = "color-yellow"; tooltip = "投与間隔が薬剤毎に設定された数値の許容範囲にある場合。";
+                            } else {
+                                status = "間隔注意"; cssClass = "color-orange"; tooltip = "投与間隔が薬剤毎に設定された数値より小さい場合。";
+                            }
+                        }
+                        break;
+                    case 'yearlyCheck':
+                        if (current.date.getFullYear() === prev.date.getFullYear()) {
+                            status = "同年内重複投与"; cssClass = "color-orange"; tooltip = "月1回/年1回投与の薬剤が同年に処方されている場合。";
+                        } else {
+                            if (diffDays >= rule.param) {
+                                status = "適正"; cssClass = "color-blue"; tooltip = "投与間隔が薬剤毎に設定された数値以上の場合。";
+                            } else if (Math.abs(diffDays - rule.param) <= 30) {
+                                status = "許容"; cssClass = "color-yellow"; tooltip = "投与間隔が薬剤毎に設定された数値の許容範囲にある場合。";
+                            } else {
+                                status = "間隔注意"; cssClass = "color-orange"; tooltip = "投与間隔が薬剤毎に設定された数値より小さい場合。";
+                            }
+                        }
+                        break;
+                    case 'singleUse':
+                        status = "不適"; cssClass = "color-orange"; tooltip = "初回のみ投与可能な薬剤が複数回処方されています。";
+                        break;
+                }
+            }
+
+            if (isSameEffect && (status === "適正" || status === "不適" || status === "初回か確認")) {
+                const pastList = Array.from(pastDrugs).join("、");
+                status = `同効薬投与あり:${pastList}`;
+                cssClass = "color-pink";
+                tooltip = "前回投与時に同効薬（異なる薬剤）の使用があります。";
+            }
+        }
+
+        const formattedDate = `${current.date.getFullYear()}/${(current.date.getMonth()+1).toString().padStart(2, '0')}/${current.date.getDate().toString().padStart(2, '0')}`;
+
+        results.push({
+            ward: current.ward,
+            id: current.id,
+            name: current.name,
+            drug: current.drug,
+            date: formattedDate,
+            diff: diffStr,
+            status: status,
+            comment: rule.comment,
+            group: rule.group,
+            cssClass: cssClass,
+            tooltip: tooltip
+        });
+    }
+
+    results.sort((a, b) => {
+        if (a.id !== b.id) return a.id.localeCompare(b.id);
+        return new Date(b.date) - new Date(a.date);
+    });
+
+    return results;
+}
+
+function renderResults(results) {
+    const tbody = document.querySelector('#resultTable tbody');
+    tbody.innerHTML = ''; 
+
+    results.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = r.cssClass; 
+        
+        tr.innerHTML = `
+            <td>${r.ward}</td>
+            <td>${r.id}</td>
+            <td>${r.name}</td>
+            <td>${r.drug}</td>
+            <td>${r.date}</td>
+            <td>${r.diff}</td>
+            <td title="${r.tooltip}" style="cursor:help;"><strong>${r.status}</strong></td>
+            <td>${r.comment}</td>
+            <td>${r.group}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+let sortDirection = false;
+function sortTable(colIndex) {
+    const table = document.getElementById("resultTable");
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    sortDirection = !sortDirection;
+
+    rows.sort((a, b) => {
+        const aText = a.cells[colIndex].textContent.trim();
+        const bText = b.cells[colIndex].textContent.trim();
+        const aNum = parseFloat(aText.replace(/[^0-9.-]+/g,""));
+        const bNum = parseFloat(bText.replace(/[^0-9.-]+/g,""));
+
+        if (!isNaN(aNum) && !isNaN(bNum) && aText.match(/^[0-9]/)) {
+            return sortDirection ? aNum - bNum : bNum - aNum;
+        }
+        return sortDirection ? aText.localeCompare(bText) : bText.localeCompare(aText);
+    });
+    tbody.append(...rows);
+}
+
+function filterTable() {
+    const input = document.getElementById("searchInput").value.toLowerCase();
+    const rows = document.querySelectorAll("#resultTable tbody tr");
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(input) ? "" : "none";
+    });
+}
+</script>
+</body>
+</html>
