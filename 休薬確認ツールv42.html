@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>術前休薬確認ツール Ver41.2</title>
+    <style>
+        /* --- 基本設定 --- */
+        body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        * { box-sizing: border-box; }
+        .d-none { display: none !important; }
+            .d-print-none { display: none !important; }
+        .container-main { max-width: 1800px; margin: 0 auto; background: white; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-radius: 4px; position: relative; }
+        .h-fixed-match { height: 110px !important; }
+        .btn { display: inline-block; font-weight: 400; text-align: center; vertical-align: middle; cursor: pointer; border: 1px solid transparent; padding: 0.375rem 0.75rem; font-size: 1rem; border-radius: 0.25rem; transition: all 0.15s; }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+        .btn-primary { color: #fff; background-color: #0d6efd; border-color: #0d6efd; }
+        .btn-primary:hover { background-color: #0b5ed7; }
+        .btn-secondary { color: #fff; background-color: #6c757d; border-color: #6c757d; }
+        .btn-success { color: #fff; background-color: #198754; border-color: #198754; }
+        .btn-warning { color: #000; background-color: #ffc107; border-color: #ffc107; }
+        .btn-danger { color: #fff; background-color: #dc3545; border-color: #dc3545; }
+        .btn-outline-secondary { color: #6c757d; border-color: #6c757d; background: white; }
+        .form-control { display: block; width: 100%; padding: 0.375rem 0.75rem; font-size: 1rem; border: 1px solid #ced4da; border-radius: 0.25rem; }
+        textarea.form-control { resize: vertical; min-height: 110px; }
+        input[type="date"] { position: relative; padding-right: 30px; font-size: 18px; padding-top: 5px; padding-bottom: 5px; }
+        .alert { position: relative; padding: 1rem 1rem; margin-bottom: 1rem; border: 1px solid transparent; border-radius: 0.25rem; }
+        .alert-warning { color: #664d03; background-color: #fff3cd; border-color: #ffecb5; }
+        .row { display: flex; flex-wrap: wrap; margin-right: -0.75rem; margin-left: -0.75rem; }
+        .col-md-3 { width: 25%; padding: 0 0.75rem; } .col-md-4 { width: 33.3333%; padding: 0 0.75rem; } .col-md-5 { width: 41.6667%; padding: 0 0.75rem; } .col-md-6 { width: 50%; padding: 0 0.75rem; }
+        .d-flex { display: flex; } .gap-2 { gap: 0.5rem; }
+        .justify-content-between { justify-content: space-between; } .align-items-center { align-items: center; } .flex-fill { flex: 1 1 auto; }
+        .text-center { text-align: center; } .text-end { text-align: right; } .fw-bold { font-weight: bold; } .small { font-size: 0.875rem; }
+        .text-muted { color: #6c757d; } .text-primary { color: #0d6efd; } .text-danger { color: #dc3545; }
+        .mt-1 { margin-top: 0.25rem; } .mb-2 { margin-bottom: 0.5rem; } .mb-3 { margin-bottom: 1rem; } .mt-3 { margin-top: 1rem; }
+        .border-top { border-top: 1px solid #dee2e6; } .border-bottom { border-bottom: 1px solid #dee2e6; }
+        
+        /* Tabs */
+        .sticky-tabs { position: -webkit-sticky; position: sticky; top: 0; z-index: 900; background-color: #f4f6f9; padding-top: 10px; margin-bottom: 20px; border-bottom: 1px solid #dee2e6; }
+        .nav-tabs { display: flex; list-style: none; padding-left: 0; margin-bottom: 0; border-bottom: 1px solid #dee2e6; }
+        .nav-item { margin-bottom: -1px; }
+        .nav-link { display: block; padding: 0.5rem 1rem; text-decoration: none; background-color: #e9ecef; border: 1px solid #dee2e6; margin-right: 4px; color: #555; font-weight: 500; border-top-left-radius: 0.25rem; border-top-right-radius: 0.25rem; cursor: pointer; }
+        .nav-link.active { color: #0d6efd; background-color: #fff; border-color: #dee2e6 #dee2e6 #fff; font-weight: bold; }
+        .tab-content > .tab-pane { display: none; } .tab-content > .tab-pane.show { display: block; }
+
+        /* Table */
+        .table { width: 100%; margin-bottom: 1rem; vertical-align: top; border-collapse: collapse; }
+        .table-bordered th, .table-bordered td { border: 1px solid #dee2e6; }
+        .table-custom { font-size: 15px; }
+        .table-custom th { background-color: #2c3e50 !important; color: #ffffff !important; text-align: center; font-weight: 600; padding: 8px; white-space: nowrap; }
+        .table-custom td { padding: 6px 8px; line-height: 1.3; vertical-align: middle; }
+        tr.row-alert td { background-color: #ffe6e6 !important; color: #b00; font-weight: bold; }
+        tr.row-gray td { background-color: #f2f2f2 !important; color: #666; }
+        .citation-list { padding-left: 0; list-style: none; margin-bottom: 0; font-size: 0.85rem; }
+
+        /* Protocol CSS */
+        #ac-wrapper .date-section { background-color: #e3f2fd; border: 1px solid #bbdefb; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        #ac-wrapper .selection-area { display: flex; gap: 30px; margin-bottom: 30px; }
+        #ac-wrapper .step-box { flex: 1; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd; height: 100%; }
+        #ac-wrapper h2 { font-size: 1.1rem; color: #2980b9; margin-top: 0; border-left: 5px solid #2980b9; padding-left: 10px; }
+        #ac-wrapper button.custom-btn { padding: 12px; font-size: 0.95rem; text-align: left; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 8px; color: #333; }
+        #ac-wrapper button.custom-btn:hover { background-color: #eaf2f8; border-color: #3498db; }
+        #ac-wrapper button.custom-btn.selected { background-color: #3498db; color: white; border-color: #2980b9; font-weight: bold; }
+        #ac-result-area { display: none; border-top: 2px dashed #bdc3c7; padding-top: 30px; margin-bottom: 50px; }
+        #ac-wrapper .comparison-container { display: flex; gap: 20px; }
+        #ac-wrapper .risk-col { flex: 1; padding: 20px; border-radius: 6px; border: 2px solid transparent; display: flex; flex-direction: column; }
+        #ac-wrapper .risk-high { background-color: #fff5f5; border-color: #e74c3c; }
+        #ac-wrapper .risk-low { background-color: #f0f9ff; border-color: #3498db; }
+        #ac-wrapper .risk-title { font-weight: bold; font-size: 1.2rem; margin-bottom: 10px; text-align: center; padding: 5px; border-radius: 4px; color: white; }
+        #ac-wrapper .risk-high .risk-title { background-color: #c0392b; }
+        #ac-wrapper .risk-low .risk-title { background-color: #2980b9; }
+        #ac-wrapper .definition-box { font-size: 0.85rem; background: #fff; padding: 10px; border: 1px solid #ddd; margin-bottom: 15px; color: #555; }
+        #ac-wrapper .action-box { font-size: 1.1rem; font-weight: bold; padding: 15px; background: #fff; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-grow: 1; }
+        #ac-wrapper .schedule-info { margin-top: 15px; padding-top: 15px; border-top: 1px dotted #ccc; font-size: 1.2rem; color: #c0392b; font-weight: bold; text-align: center; }
+        #ac-wrapper .footer-info { margin-top: 20px; padding: 15px; background-color: #fff8e1; border: 1px solid #ffe082; border-radius: 5px; }
+        #ac-wrapper .footer-title { font-weight: bold; color: #f57c00; margin-bottom: 5px; }
+        #ac-wrapper details { margin-top: 40px; border: 1px solid #ccc; background: #fff; }
+        #ac-wrapper summary { background: #eee; padding: 15px; cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+        #ac-wrapper table.ref-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; line-height: 1.5; }
+        #ac-wrapper table.ref-table th, #ac-wrapper table.ref-table td { border: 1px solid #888; padding: 6px 5px; vertical-align: top; }
+        #ac-wrapper .bg-header { background-color: #343a40; color: #fff; text-align: center; }
+        #ac-wrapper .bg-warfarin { background-color: #fff3cd; } #ac-wrapper .bg-doac { background-color: #d1e7dd; } #ac-wrapper .bg-platelet { background-color: #fff9c4; }
+        #ac-wrapper .txt-center { text-align: center; } #ac-wrapper .txt-bold { font-weight: bold; }
+        #ac-wrapper .risk-list { font-size: 100%; color: #333; margin-top: 5px; text-align: left; line-height: 1.4; }
+        #ac-wrapper .hanging-item { padding-left: 1em; text-indent: -1em; margin-bottom: 4px; }
+        #ac-wrapper .heparin-note { margin-top: 8px; padding-top:5px; border-top:1px dashed #999; color: #c0392b; font-size:0.8rem;}
+
+        /* Timeline & Calendar */
+        .timeline-wrapper { display: flex; gap: 20px; align-items: flex-start; }
+        .timeline-container { flex: 0 0 450px; }
+        .calendar-container { flex: 1; min-width: 0; }
+        .timeline-table { width: 100%; border-collapse: collapse; font-size: 1.2rem; }
+        .timeline-table th, .timeline-table td { border: 1px solid #ccc; padding: 12px 15px; vertical-align: middle; }
+        .timeline-table th { background-color: #2c3e50; color: white; text-align: center; }
+        .timeline-date-col { width: 30%; text-align: center; font-weight: bold; white-space: nowrap; background-color: #f8f9fa; }
+        .timeline-row-today { background-color: #ffe6e6; border: 2px solid #dc3545; }
+        .timeline-row-today .timeline-date-col { color: #dc3545; font-size: 1.3rem; }
+        .timeline-row-today td { font-weight: bold; color: #dc3545; }
+        .cal-wrapper { display: flex; gap: 15px; flex-wrap: wrap; }
+        .cal-month { border: 1px solid #ddd; background: #fff; padding: 10px; border-radius: 4px; min-width: 250px; flex: 1; }
+        .cal-header { text-align: center; font-weight: bold; margin-bottom: 8px; font-size: 1.1rem; color: #2c3e50; }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cal-day-header { text-align: center; font-size: 0.85rem; font-weight: bold; background: #f0f0f0; padding: 4px 0; }
+        .cal-cell { border: 1px solid #eee; text-align: center; padding: 6px 2px; min-height: 40px; font-size: 0.9rem; position: relative; }
+        .cal-today { background-color: #ffe6e6; font-weight: bold; border-color: #dc3545; }
+        .cal-surgery { background-color: #dc3545; color: white; font-weight: bold; border-radius: 4px; }
+        .cal-mark { background-color: #d1e7dd; color: #0f5132; font-weight: bold; border-radius: 4px; cursor: help; }
+        .cal-mark-desc { font-size: 0.7rem; display: block; margin-top: 2px; line-height: 1; opacity: 0.8; }
+
+        /* Admin Tab Styles */
+        #drop-zone { border: 2px dashed #0d6efd; border-radius: 8px; padding: 40px; text-align: center; background-color: #f8f9fa; cursor: pointer; transition: 0.3s; margin-bottom: 20px; }
+        #drop-zone.dragover { background-color: #e9ecef; border-color: #198754; }
+        .admin-section { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff; }
+        .admin-table-container { height: 300px; overflow-y: auto; border: 1px solid #dee2e6; }
+        .admin-table-container th { position: sticky; top: 0; z-index: 10; }
+
+        #printResultTable, .print-header { display: none; }
+        @media print {
+            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .no-print, .nav-tabs, .btn, .form-control, .alert, .sticky-tabs { display: none !important; }
+            .container-main { box-shadow: none; margin: 0; padding: 0; width: 100%; max-width: 100%; }
+            .print-header { display: flex !important; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 5px; }
+            .tab-pane { display: none !important; } .tab-pane.show { display: block !important; }
+            #resultTable { display: none !important; } #printResultTable { display: table !important; width: 100%; }
+            .d-print-block { display: block !important; }
+            details { display: block !important; page-break-before: always; page-break-after: always; zoom: 0.8; }
+            #ac-wrapper .selection-area, #ac-wrapper .date-section, #ac-wrapper details summary { display: none; }
+            @page { margin: 5mm; size: auto; }
+        }
+    
+        /* Admin sub-tabs CSS */
+        .admin-nav-tabs { display: flex; list-style: none; padding-left: 0; margin-bottom: 0; border-bottom: 1px solid #dee2e6; }
+        .admin-nav-link { display: block; padding: 0.5rem 1rem; text-decoration: none; background-color: #e9ecef; border: 1px solid #dee2e6; margin-right: 4px; color: #555; font-weight: 500; border-top-left-radius: 0.25rem; border-top-right-radius: 0.25rem; cursor: pointer; }
+        .admin-nav-link.active { color: #0d6efd; background-color: #fff; border-color: #dee2e6 #dee2e6 #fff; font-weight: bold; }
+        .admin-tab-pane { display: none; }
+        .admin-tab-pane.active { display: block; }
+
+        /* 追加: エディタ行幅縮小 */
+        #editorMasterTable td, #editorMasterTable th,
+        #editorExclTable td, #editorExclTable th,
+        #editorRefTable td, #editorRefTable th {
+            padding: 2px 5px !important;
+            font-size: 0.85em;
+            vertical-align: middle;
+        }
+        #bulkPasteArea {
+            font-size: 0.85em;
+            line-height: 1.2;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: auto;
+        }
+
+    
+        .drug-list { display: inline-block; vertical-align: top; margin-left: 10px; text-align: left; }
+        .drug-item { display: block; font-size: 0.9em; margin-bottom: 2px; }
+
+            #csvPasteArea { font-size: 0.85em; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+    
+        </style>
+
+</head>
+<body>
+
+<div class="container-main">
+    <div class="d-flex justify-content-between align-items-center no-print mb-3">
+        <h3 class="fw-bold m-0" style="font-size:18px;">🏥 術前休薬確認ツール <span id="verDisplay"></span></h3>
+        <div>
+            <button class="btn btn-info btn-sm me-2 text-white" onclick="switchTab('help-tab')" style="background-color: #17a2b8; border-color: #17a2b8;">❓ 使い方</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.location.reload()">リセット</button>
+        </div>
+    </div>
+
+    <div class="alert alert-warning border border-warning small no-print">
+        <strong>【ご注意】</strong> 本表は汎用薬を抜粋したものです。これ以外にも留意すべき薬剤があります。あくまでも一目安としてご利用ください。
+    </div>
+
+    <div class="sticky-tabs no-print">
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><a class="nav-link active" data-target="check-tab" onclick="switchTab('check-tab')">① 判定・リスト作成</a></li>
+            <li class="nav-item"><a class="nav-link" data-target="schedule-tab" onclick="switchTab('schedule-tab')">② 休薬日確認</a></li>
+            <li class="nav-item"><a class="nav-link" data-target="master-tab" onclick="switchTab('master-tab')">③ 薬剤一覧検索</a></li>
+            <li class="nav-item"><a class="nav-link" data-target="anticoagulant-tab" onclick="switchTab('anticoagulant-tab')">④ 抗凝固・抗血小板薬プロトコル</a></li>
+            <li class="nav-item" style="margin-left: auto;" id="nav-admin-login"><a class="nav-link text-primary" data-target="admin-login-tab" onclick="switchTab('admin-login-tab')">⚙ 管理設定</a></li>
+            <li class="nav-item admin-sub-tab" style="display:none;"><a class="nav-link text-success" data-target="admin-csv-tab" onclick="switchTab('admin-csv-tab')">📥 CSV読込</a></li>
+            <li class="nav-item admin-sub-tab" style="display:none;"><a class="nav-link text-success" data-target="admin-master-tab" onclick="switchTab('admin-master-tab')">📚 マスタ</a></li>
+            <li class="nav-item admin-sub-tab" style="display:none;"><a class="nav-link text-success" data-target="admin-exclude-tab" onclick="switchTab('admin-exclude-tab')">🚫 除外リスト</a></li>
+            <li class="nav-item admin-sub-tab" style="display:none;"><a class="nav-link text-success" data-target="admin-download-tab" onclick="switchTab('admin-download-tab')">💾 最新版作成</a></li>
+            <li class="nav-item admin-sub-tab" style="display:none;"><a class="nav-link text-success" data-target="admin-ref-tab" onclick="switchTab('admin-ref-tab')">📖 参考文献</a></li>
+            <li class="nav-item admin-sub-tab" style="display:none;"><a class="nav-link text-success" data-target="admin-help-tab" onclick="switchTab('admin-help-tab')">🛠 管理者ヘルプ</a></li>
+        </ul>
+    </div>
+
+    <div class="tab-content">
+        <!-- ❓ 使い方ヘルプ -->
+        <div id="help-tab" class="tab-pane">
+            <div class="card mb-4 border-info">
+                <div class="card-header bg-info text-white fw-bold">
+                    💡 術前休薬確認ツールの使い方（一般利用）
+                </div>
+                <div class="card-body">
+                    <h5 class="fw-bold border-bottom pb-2 text-primary">① 判定・リスト作成</h5>
+                    <p class="small mb-1"><strong>【入力とボタン】</strong></p>
+                    <ul class="small mb-2">
+                        <li><strong>テキストエリア：</strong> 電子カルテからコピーした処方テキスト（持参薬一覧など）を貼り付けます。</li>
+                        <li><strong>手術予定日：</strong> 日付を入力すると、休薬日数が「〇月〇日」という具体的な日付で計算されます。（未入力でも判定可能です）</li>
+                        <li><strong>「判定実行」ボタン：</strong> 貼り付けたテキストを解析し、休薬が必要なお薬だけを自動抽出します。</li>
+                    </ul>
+                    <p class="small mb-1"><strong>【表示と操作】</strong></p>
+                    <ul class="small mb-4">
+                        <li><strong>判定結果テーブル：</strong> 抽出された薬剤、休薬期間、具体的な休薬開始日、理由などが一覧表示されます。</li>
+                        <li><strong>直接編集（黄色い点線枠）：</strong> 「推奨休薬期間・開始日」の列をクリックすると、直接文字や日付を手打ちで修正できます。</li>
+                        <li><strong>行の操作（右端ボタン）：</strong> 抽出漏れによる不要なゴミ行が出た場合は「✖」で削除、「↺」で自動計算された日付にリセットできます。</li>
+                        <li><strong>「印刷 (PDF保存)」ボタン：</strong> 患者さんにお渡しできる綺麗なレイアウトの表を印刷（またはPDF化）します。</li>
+                    </ul>
+                    
+                    <h5 class="fw-bold border-bottom pb-2 mt-4 text-primary">② 休薬日確認</h5>
+                    <p class="small mb-1"><strong>【入力とボタン】</strong></p>
+                    <ul class="small mb-2">
+                        <li><strong>手術予定日：</strong> カレンダーの基準となる日付を入力します。</li>
+                        <li><strong>「カレンダー作成」ボタン：</strong> 入力した日付をもとにスケジュール表を作成します。</li>
+                    </ul>
+                    <p class="small mb-4"><strong>【表示と操作】</strong></p>
+                    <ul class="small mb-4">
+                        <li><strong>タイムライン＆カレンダー：</strong> 手術日から逆算した「1週間前」「3日前」などが具体的に何月何日になるのかが視覚的にハイライト表示されます。休薬スケジュールの組み立てや患者さんへの説明に便利です。</li>
+                    </ul>
+        
+                    <h5 class="fw-bold border-bottom pb-2 mt-4 text-primary">③ 薬剤一覧検索</h5>
+                    <p class="small mb-1"><strong>【入力と表示】</strong></p>
+                    <ul class="small mb-4">
+                        <li><strong>検索ボックス：</strong> 薬の名前（商品名・一般名）や分類を入力すると、登録されているマスタ（辞書）の中から該当するお薬が瞬時に絞り込み表示されます。休薬期間や理由をサッと調べたい時に使用します。</li>
+                    </ul>
+        
+                    <h5 class="fw-bold border-bottom pb-2 mt-4 text-primary">④ 抗凝固・抗血小板薬プロトコル</h5>
+                    <p class="small mb-1"><strong>【表示と操作】</strong></p>
+                    <ul class="small mb-4">
+                        <li>抗凝固薬などの複雑な休薬プロトコル（手順書）のPDF画像を閲覧できます。上部のサブタブ（例：DOAC、ワルファリン等）をクリックして表示を切り替えます。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ① 判定・リスト作成 -->
+        <div id="check-tab" class="tab-pane show active">
+            <div class="row g-2 mb-3 no-print">
+                <div class="col-md-5">
+                    <textarea id="rawInput" class="form-control" placeholder="電子カルテ等の薬剤リストをここに貼り付けてください"></textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold">手術予定日</label>
+                    <input type="date" id="surgeryDate" class="form-control" onchange="processData()">
+                    <div class="text-primary small mt-1">※手術日未入力でも判定可能。入力で期間を表示。</div>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button class="btn btn-primary fw-bold flex-fill h-fixed-match" style="font-size:1.2rem;" onclick="processData()">判定実行</button>
+                    <button class="btn btn-success fw-bold flex-fill h-fixed-match" style="font-size:1.2rem;" onclick="window.print()">印 刷</button>
+                </div>
+            </div>
+            
+            <div class="print-header">
+                <div style="font-size: 16pt; font-weight: bold;">術前休薬チェックシート</div>
+                <div id="printDateDisplay_Check" style="font-size: 12pt; font-weight: bold;">手術予定日：未設定</div>
+            </div>
+            
+            <table class="table table-bordered table-custom no-print-force" id="resultTable">
+                <thead><tr><th style="width: 18%;">薬剤名(判定)</th><th style="width: 13%;">分類</th><th style="width: 13%;">休薬期間</th><th style="width: 20%;" class="col-calc">推奨休薬期間・開始日</th><th style="width: 25%;">休薬理由</th><th style="width: 5%;">引用</th><th style="width: 6%; text-align:center;">操作</th></tr></thead>
+                <tbody><tr><td colspan="7" class="text-center text-muted py-4">データを入力して「判定実行」を押してください</td></tr></tbody>
+            </table>
+            <div id="citationList" class="citation-list d-print-none small text-muted mt-3"><ul class="citation-list"><li class="citation-item">[1] 糖尿病治療におけるSGLT2阻害薬の適正使用に関する Recommendation</li><li class="citation-item">[2] 手術などを行う際の抗凝固薬・抗血小板薬取り扱いの参考目安(院内ポータル)</li><li class="citation-item">[3] 添付文書</li><li class="citation-item">[4] 骨吸収抑制薬関連顎骨壊死の病態と管理 : 顎骨壊死検討委員会ポジションペーパー 2016</li><li class="citation-item">[5] NCCNガイドライン：結腸癌ガイドライン・直腸癌ガイドライン</li><li class="citation-item">[6] 医薬品適正使用ガイド</li><li class="citation-item">[7] 医薬品インタビューフォーム</li><li class="citation-item">[8] 製薬企業ホームページ</li><li class="citation-item">[9] 当院代謝内分泌内科より</li><li class="citation-item">[10] 心不全治療におけるSGLT2阻害薬の適正使用に関するRecommendation</li><li class="citation-item">[11] 赤木晋介（編）, 周術期の安全な薬剤管理を考える会（執筆）. 術前休薬クイックリファレンス.</li></ul></div>
+            
+            <table class="table table-bordered table-custom" id="printResultTable">
+                <thead><tr><th style="width: 20%;">薬剤名(判定)</th><th style="width: 15%;">分類</th><th style="width: 15%;">休薬期間</th><th style="width: 20%;" class="col-calc">推奨休薬期間・開始日</th><th style="width: 25%;">休薬理由</th><th style="width: 5%;">引用</th></tr></thead>
+                <tbody></tbody>
+            </table>
+
+            <hr class="mt-4">
+            
+            <!-- 印刷用引用枠 -->
+            <div id="printCitationList" class="citation-list d-none d-print-block mt-3" style="font-size: 0.85em;"><ul class="citation-list"><li class="citation-item">[1] 糖尿病治療におけるSGLT2阻害薬の適正使用に関する Recommendation</li><li class="citation-item">[2] 手術などを行う際の抗凝固薬・抗血小板薬取り扱いの参考目安(院内ポータル)</li><li class="citation-item">[3] 添付文書</li><li class="citation-item">[4] 骨吸収抑制薬関連顎骨壊死の病態と管理 : 顎骨壊死検討委員会ポジションペーパー 2016</li><li class="citation-item">[5] NCCNガイドライン：結腸癌ガイドライン・直腸癌ガイドライン</li><li class="citation-item">[6] 医薬品適正使用ガイド</li><li class="citation-item">[7] 医薬品インタビューフォーム</li><li class="citation-item">[8] 製薬企業ホームページ</li><li class="citation-item">[9] 当院代謝内分泌内科より</li><li class="citation-item">[10] 心不全治療におけるSGLT2阻害薬の適正使用に関するRecommendation</li><li class="citation-item">[11] 赤木晋介（編）, 周術期の安全な薬剤管理を考える会（執筆）. 術前休薬クイックリファレンス.</li></ul></div>
+        </div>
+
+        <!-- ② 休薬日確認 -->
+        <div id="schedule-tab" class="tab-pane">
+            <div class="print-header">
+                <div style="font-size: 16pt; font-weight: bold;">休薬日確認カレンダー</div>
+                <div id="printScheduleDateDisplay" style="font-size: 12pt; font-weight: bold;">手術予定日：未設定</div>
+            </div>
+            <div class="row align-items-center mb-3 no-print justify-content-center">
+                <div class="col-auto"><label class="fw-bold">手術予定日：</label></div>
+                <div class="col-auto"><input type="date" id="scheduleDateInput" class="form-control" onchange="calcScheduleTab()"></div>
+                <div class="col-auto"><button class="btn btn-success" onclick="window.print()">このページを印刷</button></div>
+            </div>
+            <div id="scheduleResultArea" class="table-custom"></div>
+        </div>
+
+        <!-- ③ 薬剤一覧検索 -->
+        <div id="master-tab" class="tab-pane">
+            <div class="mb-2"><input type="text" id="masterSearch" class="form-control" placeholder="薬剤名を入力（ひらがな・カナ検索可、スペース区切りで複数可）" onkeyup="filterMasterTable()"></div>
+            <div style="height: 75vh; overflow-y: auto;">
+                <table class="table table-bordered table-custom">
+                    <thead style="position: sticky; top: 0; z-index: 10;"><tr><th style="width: 10%;">分類</th><th style="width: 10%;">分類2</th><th style="width: 15%;">商品名</th><th style="width: 15%;">一般名</th><th style="width: 10%;">休薬期間</th><th style="width: 10%;">引用</th><th style="width: 30%;">休薬理由</th></tr></thead>
+                    <tbody id="masterTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ④ 抗凝固・抗血小板薬プロトコル -->
+        <div id="anticoagulant-tab" class="tab-pane">
+            <div id="ac-wrapper">
+                <div class="date-section no-print" style="margin-top:20px;">
+                    <label class="date-label">📅 手術予定日：</label>
+                    <input type="date" id="ac-surgery-date" onchange="updateACDisplay()">
+                    <span style="font-size:0.9rem; margin-left:10px; color:#666;">（入力すると休薬開始日を自動計算します）</span>
+                </div>
+                <div class="selection-area no-print">
+                    <div class="step-box">
+                        <h2>1. 薬剤を選択</h2>
+                        <div class="btn-group-custom" id="drug-buttons">
+                            <button class="custom-btn" onclick="setACDrug('warfarin', this)">ワーファリン</button>
+                            <button class="custom-btn" onclick="setACDrug('doac_pe', this)">DOAC：プラザキサ / エリキュース</button>
+                            <button class="custom-btn" onclick="setACDrug('doac_il', this)">DOAC：イグザレルト / リクシアナ</button>
+                            <button class="custom-btn" onclick="setACDrug('platelet_main', this)">抗血小板薬：バイアスピリン/パナルジン/クロピドグレル(プラビックス)/エフィエント</button>
+                            <button class="custom-btn" onclick="setACDrug('platelet_cilo', this)">抗血小板薬：シロスタゾール</button>
+                        </div>
+                    </div>
+                    <div class="step-box">
+                        <h2>2. 手術・処置を選択</h2>
+                        <div class="btn-group-custom" id="surgery-buttons">
+                            <button class="custom-btn" onclick="setACSurgery('dental', this)">抜歯・白内障（局所麻酔）</button>
+                            <button class="custom-btn" onclick="setACSurgery('minor', this)">体表の小手術（圧迫等容易）</button>
+                            <button class="custom-btn" onclick="setACSurgery('major', this)">圧迫が困難な場合、大手術</button>
+                            <button class="custom-btn" onclick="setACSurgery('spinal', this)">脊髄・硬膜外麻酔 / カテーテル抜去</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="ac-result-area" style="display:none;">
+                    <h3 style="text-align:center; margin-bottom:20px;">推奨される対応（病態リスク別）</h3>
+                    <div class="comparison-container">
+                        <div class="risk-col risk-high">
+                            <div class="risk-title">高リスク病態</div>
+                            <div class="definition-box" id="high-risk-def"></div>
+                            <div class="action-box">
+                                <div id="high-risk-action"></div>
+                                <div id="high-schedule" class="schedule-info" style="display:none;"></div>
+                            </div>
+                        </div>
+                        <div class="risk-col risk-low">
+                            <div class="risk-title">低リスク病態</div>
+                            <div class="definition-box" id="low-risk-def"></div>
+                            <div class="action-box">
+                                <div id="low-risk-action"></div>
+                                <div id="low-schedule" class="schedule-info" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-end no-print mb-3 mt-3"><button class="btn btn-success" onclick="window.print()">このページを印刷</button></div>
+                
+                <details open class="no-print">
+                    <summary>（参考）休薬・置換プロトコル全図表</summary>
+                    <div class="table-container">
+                        <table class="ref-table">
+                            <thead><tr class="bg-header"><th class="col-drug">薬剤</th><th class="col-risk">リスク分類・定義</th><th class="col-surg-sm">抜歯・白内障</th><th class="col-surg-sm">体表の小手術<br>(圧迫が容易)</th><th class="col-surg-lg">圧迫困難な場合<br>大手術</th><th class="col-surg-lg">脊髄・硬膜外麻酔<br>カテーテル抜去</th></tr></thead>
+                            <tbody>
+                                <tr class="bg-warfarin"><td rowspan="2" class="txt-center txt-bold no-wrap">ワーファリン</td><td><span class="txt-bold">高リスク病態</span><div class="risk-list"><div class="hanging-item">・心原性脳塞栓症の既往</div><div class="hanging-item">・弁膜症を合併する心房細動</div><div class="hanging-item">・弁膜症ではないが脳卒中の高リスク心房細動</div><div class="hanging-item">・機械弁置換術後の血栓塞栓症の既往</div><div class="hanging-item">・僧帽弁の機械弁置換術後</div><div class="hanging-item">・抗リン脂質抗体症候群</div><div class="hanging-item">・深部静脈血栓症・肺塞栓症</div></div></td><td rowspan="2" class="txt-center"><span class="txt-bold">継続下での施行推奨</span><br>(治療域内確認)<br><br>※カテーテル留置はやむを得ない場合、留置中はINR&lt;3.0</td><td rowspan="2" class="txt-center"><span class="txt-bold">休薬なし</span><br>(治療域内確認)</td><td><span class="txt-bold no-wrap">【休薬】3～5日</span><div class="heparin-note">中止翌日よりヘパリン置換</div></td><td><span class="txt-bold no-wrap">【休薬】5日</span><div class="heparin-note">中止翌日よりヘパリン置換</div><br>穿刺前: PT-INR&lt;1.2<br>抜去時: INR&lt;1.5</td></tr>
+                                <tr class="bg-warfarin"><td><span class="txt-bold">低リスク病態</span><div class="risk-list"><div class="hanging-item">左記以外</div></div></td><td><span class="txt-bold no-wrap">【休薬】3～5日</span></td><td>穿刺前: PT-INR&lt;1.2を確認<br>(低リスク群では休薬なし)</td></tr>
+                                <tr class="bg-doac"><td rowspan="2" class="txt-center txt-bold"><span class="no-wrap">DOAC</span><span class="drug-list no-wrap"><span class="drug-item">プラザキサ</span><span class="drug-item">イグザレルト</span><span class="drug-item">エリキュース</span><span class="drug-item">リクシアナ</span></span></td><td><span class="txt-bold">高リスク病態</span><div class="risk-list"><div class="hanging-item">ワーファリンに準ずる</div></div></td><td rowspan="2" class="txt-center"><span class="txt-bold">継続下での施行推奨</span></td><td rowspan="2"><span class="txt-bold no-wrap">【休薬】1日</span><br><span style="font-size:0.75rem">※プラザキサ: 継続下で施行するが、trough aPTT>80秒の場合は緊急性のない手術は避ける</span></td><td><span class="txt-bold no-wrap">【休薬】</span><br>●プラザキサ・エリキュース: <span class="txt-bold">2日</span><br>●イグザレルト・リクシアナ: <span class="txt-bold">1日</span><div class="heparin-note">プラザキサ・エリキュース: 最終投与12時間後よりヘパリン置換<br>イグザレルト・リクシアナ: 最終投与24時間後よりヘパリン置換</div></td><td><span class="txt-bold no-wrap">【休薬】</span><br>●プラザキサ: 4日(CCr≧60)～5日(30&lt;CCr&lt;60)<br>●エリキュース: 3日<br>●イグザレルト・リクシアナ: 2日<div class="heparin-note">(置換開始時期は左記と同様)<br>抜去: APTT正常対照1.5倍未満</div></td></tr>
+                                <tr class="bg-doac"><td><span class="txt-bold">低リスク病態</span><div class="risk-list"><div class="hanging-item">ワーファリンに準ずる</div></div></td><td class="txt-center"><span class="txt-bold">同上</span></td><td>低リスク群では出血時に圧迫による止血対応が可能であることから、仮に休薬する場合には休薬期間を半減期の2倍程度に留めることが合理的である</td></tr>
+                                <tr class="bg-platelet"><td rowspan="2" class="txt-center txt-bold"><span class="no-wrap">抗血小板薬</span><span class="drug-list no-wrap"><span class="drug-item">バイアスピリン</span><span class="drug-item">パナルジン</span><span class="drug-item">クロピドグレル</span><span class="drug-item">エフィエント</span><span class="drug-item">シロスタゾール</span></span></td><td><span class="txt-bold">高リスク病態</span><div class="risk-list"><div class="hanging-item">・冠動脈ステント留置後2ヶ月以内</div><div class="hanging-item">・冠動脈薬剤溶出性ステント留置後12ヶ月以内</div><div class="hanging-item">・脳血行再建術後2ヶ月以内</div><div class="hanging-item">・主幹動脈に50%以上の狭窄を伴う脳梗塞又は一過性脳虚血発作</div><div class="hanging-item">・最近発症した虚血性脳卒中又は一過性脳虚血発作</div><div class="hanging-item">・閉塞性動脈硬化症でFontaine3度(安静時疼痛)以上</div><div class="hanging-item">・頸動脈エコー/頭頸部MRIで休薬危険所見</div></div></td><td rowspan="2" class="txt-center"><span class="txt-bold">継続下での施行を原則とする</span></td><td rowspan="2" class="txt-center"><span class="txt-bold">継続下での施行を原則とする</span></td><td><span class="txt-bold no-wrap">【休薬】</span><br>●主要薬: <span class="txt-bold">7日</span><br>●シロスタゾール: <span class="txt-bold">2日</span><div class="heparin-note">中止翌日よりヘパリン置換</div></td><td><span class="txt-bold no-wrap">【休薬】</span><br>（同左）<div class="heparin-note">(必要に応じて、)<br>中止翌日よりヘパリン置換<br>抜去: APTT正常対照1.5倍未満</div></td></tr>
+                                <tr class="bg-platelet"><td><span class="txt-bold">低リスク病態</span><div class="risk-list"><div class="hanging-item">左記以外</div></div></td><td><span class="txt-bold no-wrap">【休薬】同上</span><br><div class="heparin-note">場合によって、中止翌日よりヘパリン置換</div></td><td class="txt-center">低リスク群では休薬なし</td></tr>
+                            </tbody>
+                        </table>
+                        <div class="bottom-notes"><div class="note-block"><div class="note-title">ヘパリン置換を行った場合のヘパリン中止時期</div><div><strong>ワーファリン：</strong>ワーファリン再開1〜2日後に中止（中止時効果確認）。（再開5日目以降、至適INR回復の確認を行う）</div><div style="margin-top:5px;"><strong>DOAC：</strong><br>・持続静注時（未分画ヘパリン）：DOAC投与開始時に中止。<br>・皮下注時（クレキサン等）：<br>&nbsp;&nbsp;プラザキサは次回皮下注製剤投与2時間前に投与開始、次回皮下注製剤の投与中止。<br>&nbsp;&nbsp;イグザレルトは次回皮下注製剤投与0〜2時間前に投与開始。<br>&nbsp;&nbsp;エリキュース/リクシアナは次回皮下注製剤投与時間に投与開始。</div><div style="margin-top:5px;"><strong>抗血小板剤：</strong>再開3〜4日後に中止</div></div><div style="text-align:right; margin-top:10px; color:#666;">出典：2013.06 薬事委員会作成 / 2018.10 改訂</div></div>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- ⚙️ 管理設定タブ -->
+        
+        <!-- Admin Login Tab -->
+        <div id="admin-login-tab" class="tab-pane">
+            <div id="admin-login" style="max-width: 400px; margin: 50px auto; text-align: center; border: 1px solid #ccc; padding: 30px; border-radius: 8px; background: #fff;">
+                <h3 style="margin-bottom: 20px; color: #333;">⚙ 管理者ログイン</h3>
+                <p class="small text-muted mb-3">マスタデータや除外リストの編集を行うにはパスワードを入力してください。</p>
+                <input type="password" id="admin-password" class="form-control mb-3" placeholder="パスワードを入力" onkeypress="if(event.key === 'Enter') checkPassword()">
+                <button class="btn btn-primary w-100" onclick="checkPassword()">認証</button>
+            </div>
+        </div>
+
+        <!-- Admin CSV Tab -->
+        <div id="admin-csv-tab" class="tab-pane">
+            <div class="admin-section" style="border: 1px solid #0d6efd; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #f8faff;">
+                <h4 style="color: #0d6efd; margin-top:0;">📥 1. 新規薬剤の抽出（CSV読み込み）</h4>
+                <p class="small">電子カルテから出力した「処方検索結果」のCSVファイルをドラッグ＆ドロップしてください。</p>
+                
+                <div id="drop-zone">
+                    <div style="font-size: 24px; margin-bottom: 10px;">📄</div>
+                <strong>ここにCSVファイルをドラッグ＆ドロップ</strong><br>
+                    <span class="small text-muted">またはクリックしてファイルを選択</span>
+                    <input type="file" id="csvFileInput" accept=".csv,.tsv,.txt" style="display: none;">
+                </div>
+                
+                <hr>
+                <div class="mt-4">
+                    <h5 style="color: #0d6efd;">📝 または、Excelのデータを直接貼り付け</h5>
+                    <textarea id="csvPasteArea" class="form-control mb-2" rows="5" placeholder="Excelの表（見出し行を含む）をコピーして、ここに直接貼り付けてください。&#10;※「名称」または「薬品名称」および「成分」という見出しが必要です。"></textarea>
+                    <button class="btn btn-primary w-100 fw-bold" onclick="handleCSVPaste()">ペーストされたデータで抽出を実行</button>
+                </div>
+
+                    <table class="table table-bordered table-custom" id="extractResultTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 10%;">判定</th>
+                            <th style="width: 15%;">薬品名称</th>
+                            <th style="width: 15%;">成分名</th>
+                            <th style="width: 25%;">部分一致した既存薬・除外薬</th>
+                            <th style="width: 15%;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" class="text-center text-muted py-4">CSVを読み込むとここに新規候補が表示されます</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Admin Master Tab -->
+        <div id="admin-master-tab" class="tab-pane">
+            <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
+                <h4 style="margin-top:0;">📚 2. 休薬マスタ（一覧）エディタ</h4>
+                <div class="card mt-2 mb-3 p-2 bg-light">
+                    <h6 class="m-0 mb-2 text-primary" style="font-size:0.9em;">📥 複数行一括追加 (Excelからペースト)</h6>
+                    <textarea id="bulkPasteArea" class="form-control mb-2" rows="3" placeholder="分類&#9;分類2&#9;商品名&#9;一般名&#9;休薬期間&#9;引用&#9;休薬理由 (タブ区切り)"></textarea>
+                    <button class="btn btn-outline-primary btn-sm w-100" onclick="bulkAddMaster()">一括追加を実行</button>
+                </div>
+
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" id="addM_Class" class="form-control" placeholder="分類" style="width:12%">
+                    <input type="text" id="addM_Class2" class="form-control" placeholder="分類2" style="width:12%">
+                    <input type="text" id="addM_Prod" class="form-control" placeholder="商品名" style="width:15%">
+                    <input type="text" id="addM_Gene" class="form-control" placeholder="一般名" style="width:15%">
+                    <input type="text" id="addM_Period" class="form-control" placeholder="休薬期間" style="width:12%">
+                    <input type="text" id="addM_Ref" class="form-control" placeholder="引用" style="width:8%">
+                    <input type="text" id="addM_Reason" class="form-control" placeholder="休薬理由" style="width:16%">
+                    <button class="btn btn-primary btn-sm" onclick="addMasterRow()" style="width:10%">追加</button>
+                </div>
+                <div class="admin-table-container" style="height: 75vh; overflow-y: auto;">
+                    <table class="table table-bordered table-custom" id="editorMasterTable">
+                        <thead><tr><th>分類</th><th>分類2</th><th>商品名</th><th>一般名</th><th>休薬期間</th><th>引用</th><th>休薬理由</th><th>操作</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Exclude Tab -->
+        <div id="admin-exclude-tab" class="tab-pane">
+            <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
+                <h4 style="margin-top:0;">🚫 3. 除外リスト エディタ</h4>
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" id="addE_Word" class="form-control" placeholder="除外キーワードを入力" style="width:60%">
+                    <input type="text" id="addE_Remark" class="form-control" placeholder="備考 (追加時期など)" style="width:30%">
+                    <button class="btn btn-primary btn-sm" onclick="addExclRow()" style="width:10%">追加</button>
+                </div>
+                <div class="admin-table-container" style="height: 75vh; overflow-y: auto;">
+                    <table class="table table-bordered table-custom" id="editorExclTable">
+                        <thead><tr><th>除外キーワード</th><th>備考</th><th>操作</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Download Tab -->
+        <div id="admin-download-tab" class="tab-pane">
+            <div class="admin-section" style="text-align: center; border: 1px solid #198754; padding: 15px; border-radius: 8px; background-color: #f8fff9;">
+                <h4 style="color: #198754; margin-top:0;">💾 4. 変更を確定してツールを更新</h4>
+                <p class="small">編集した最新のデータを埋め込んだ新しいファイルをダウンロードします。<br>ダウンロードしたファイルを共有フォルダに上書きしてください。</p>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
+                    <label class="fw-bold">新バージョン番号:</label>
+                    <input type="text" id="genVersionInput" value="43" class="form-control" style="width: 100px; text-align: center;">
+                    <button class="btn btn-success" style="font-size: 1.2rem; padding: 10px 30px;" onclick="downloadUpdatedTool()">⬇️ 最新版ツールをダウンロード</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Reference Tab -->
+        <div id="admin-ref-tab" class="tab-pane">
+            <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
+                <h4 style="margin-top:0;">📖 5. 参考文献 エディタ</h4>
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" id="addR_Name" class="form-control" placeholder="文献名" style="width:75%">
+                    <button class="btn btn-primary btn-sm" onclick="addRefRow()" style="width:10%">追加</button>
+                </div>
+                <div class="admin-table-container" style="height: 75vh; overflow-y: auto;">
+                    <table class="table table-bordered table-custom" id="editorRefTable">
+                        <thead><tr><th>番号</th><th>文献名</th><th>操作</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理者ヘルプ -->
+        <div id="admin-help-tab" class="tab-pane">
+            <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
+                <h4 style="margin-top:0; color:#198754;">🛠 管理者用ヘルプ・マニュアル</h4>
+                
+                <h5 class="fw-bold mt-4 border-bottom pb-1">📥 CSV読込</h5>
+                <p class="small">
+                    部門システム等から出力したCSVファイルを使って、マスタへ新規の薬を一括抽出します。<br>
+                    <strong>使い方:</strong> 点線枠内にCSVファイル（またはTXT/TSVファイル）をドラッグ＆ドロップするか、エクセルからコピーしたテキストを貼り付けます。<br>
+                    <strong>条件:</strong> ヘッダー行に「名称」という文字が含まれている必要があります。自動でマスタと照合され、未登録の薬だけが候補としてリストアップされます。各行で分類等を入力し「登録する」を押すとマスタへ反映されます。
+                </p>
+
+                <h5 class="fw-bold mt-4 border-bottom pb-1">📚 マスタ（薬剤辞書）</h5>
+                <p class="small">
+                    判定の要となるお薬辞書です。<br>
+                    <strong>使い方:</strong> セル（枠）をクリックすると直接文字を打ち換えて編集できます。上部の入力欄から「追加」ボタンで新しい薬を手動登録できます。右端の「↑」「↓」で並び替え、「✖」で削除が可能です。
+                </p>
+
+                <h5 class="fw-bold mt-4 border-bottom pb-1">🚫 除外リスト</h5>
+                <p class="small">
+                    処方テキストにこのキーワードが含まれていた場合、抽出から除外する（無視する）ためのリストです。<br>
+                    <strong>使い方:</strong> マスタと同様に直接編集・追加・削除が可能です。
+                </p>
+
+                <h5 class="fw-bold mt-4 border-bottom pb-1">📖 参考文献</h5>
+                <p class="small">
+                    ①タブでリストを作成した際、一緒に印刷される参考文献の一覧です。<br>
+                    <strong>使い方:</strong> マスタと同様に直接編集・追加・削除が可能です。
+                </p>
+
+                <div class="alert alert-danger mt-4">
+                    <h5 class="fw-bold border-bottom pb-1 border-danger text-danger">💾 最新版作成（※超重要）</h5>
+                    <p class="small mb-0">
+                        管理画面でマスタやCSVから追加・編集したデータは、<strong>ブラウザを閉じるとすべて消えてしまいます。</strong><br>
+                        編集を終えたら、<strong>必ず「最新版作成」タブを開き、「最新版ツール作成（ダウンロード）」ボタンをクリックしてください。</strong><br>
+                        ダウンロードされた新しい「休薬確認ツール.html」を、これまでのファイルに上書き保存することで、はじめて更新データが永続的に保存されます。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+        
+    </div>
+
+</div>
+
+<script>
+// =========================================================
+// 1. 内部データベース
+// ★ここに過去のフルデータを貼り付けて「ダウンロード」すると本番環境が完成します
+// =========================================================
+const DATA_UPDATED = "Ver41.2 (2026.09.02)";
+
+// DATA_MARKER_START
+const rawMasterData = `
+分類	分類2	商品名	一般名	休薬期間	引用	休薬理由
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	カルケンス	アカラブルチニブ	前後3日間	6	出血リスク
+糖尿病薬	α-グリコシダーゼ阻害薬	グルコバイ	アカルボース	当日		インスリンによる血糖管理が望まれるため
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	インライタ	アキシチニブ	24時間以上	7	創傷治癒遅延
+降圧薬	ARB	アジルバ	アジルサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	ザクラス	アジルサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	ジルムロ	アジルサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+抗血小板薬	抗血小板薬	バイアスピリン	アスピリン	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	バファリン	アスピリン・ダイアルミネート	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	キャブピリン	アスピリン・ボノプラザン	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	タケルダ	アスピリン・ランソプラゾール	院内プロトコル(別紙)参照	2	出血リスク
+糖尿病薬	SU薬	ジメリン	アセトヘキサミド	当日		インスリンによる血糖管理が望まれるため
+利尿薬	ループ系	ダイアート	アゾセミド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+降圧薬	β受容体遮断薬	アルセノール	アテノロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	β受容体遮断薬	テノーミン	アテノロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+アナフィラキシー補助治療剤	アドレナリン製剤	ネフィー	アドレナリン	院内推奨期間無し	3	鼻の手術歴あれば投与を避ける(点鼻製剤)
+糖尿病薬	DPP-4阻害薬	スイニー	アナグリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	ビグアナイド薬/DPP-4阻害薬	メトアナ	アナグリプチン・メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+抗凝固薬	抗凝固薬	エリキュース	アピキサバン	院内プロトコル(別紙)参照	2	出血リスク
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	アヘン末	アヘン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	アヘン・トコン	アヘン・トコン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	ドーフル	アヘン・トコン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	パンオピン	アヘンアルカロイド	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+抗不整脈薬	Kチャネル阻害	アンカロン	アミオダロン	院内推奨期間なし	3	手術患者には慎重投与
+診断用剤 	診断用剤 	アラグリオ	アミノレブリン酸	院内推奨期間なし	3	手術後４８時間は強い光への眼・皮膚の曝露を回避
+診断用剤 	診断用剤 	アラベル	アミノレブリン酸	院内推奨期間なし	3	手術後４８時間は強い光への眼・皮膚の曝露を回避
+降圧薬	β受容体遮断薬	ローガン	アモスラロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	ACE阻害薬	セタプリル	アラセプリル	24時間前	3	術中血圧低下のリスク
+皮膚潰瘍治療剤	プロスタグランジンE1製剤	プロスタンディン軟膏	アルプロスタジル　アルファデクス	院内推奨期間なし	3	出血リスク
+骨粗鬆症治療薬	ビスホスホネート薬	フォサマック	アレンドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+骨粗鬆症治療薬	ビスホスホネート薬	ボナロン	アレンドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+糖尿病薬	DPP-4阻害薬	ネシーナ	アログリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	チアゾリジン薬/DPP-4阻害薬	リオベル	アログリプチン・ピオグリタゾン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	ビグアナイド薬/DPP-4阻害薬	イニシンク	アログリプチン・メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+降圧薬	β受容体遮断薬	アロチノロール	アロチノロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+抗血小板薬	抗血小板薬	エパデール	イコサペント酸エチル	7日前	3	出血リスク
+骨粗鬆症治療薬	ビスホスホネート薬	ボンビバ	イバンドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+脳循環・代謝改善薬	脳循環・代謝改善薬	セロクラール	イフェンプロジル	2日前	3	出血リスク
+脳循環・代謝改善薬	脳循環・代謝改善薬	ケタス	イブジラスト	2日前	3	出血リスク
+抗アレルギー薬	アレルギー性結膜炎治療剤	ケタス点眼	イブジラスト	-	-	外用剤のため全身への影響は少ない
+糖尿病薬	SGLT2阻害薬	スーグラ	イプラグリフロジン	3日前	1	ケトアシドーシスのリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	イムブルビカ	イブルチニブ	3〜7日	7	出血リスク
+降圧薬	ACE阻害薬	タナトリル	イミダプリル	24時間前	3	術中血圧低下のリスク
+糖尿病薬	Glu依存性ｲﾝｽﾘﾝ分泌促進薬	ツイミーグ	イメグリミン	当日		インスリンによる血糖管理が望まれるため
+降圧薬	ARB	アバプロ	イルベサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB	イルベタン	イルベサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	アイミクス	イルベサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	イルアミクス	イルベサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	イルトラ	イルベサルタン・トリクロルメチアジド	24時間前	3	術中血圧低下のリスク
+糖尿病薬	合剤	ソリクア	インスリングラルギン・リキシセナチド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	合剤	ゾルトファイ	インスリンデグルデク・リラグルチド	当日		インスリンによる血糖管理が望まれるため
+利尿薬	チアジド系類似薬	ナトリックス	インダパミド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+排尿障害改善薬	α1受容体遮断	エブランチル	ウラピジル	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+肝・胆・消化機能改善剤	肝・胆・消化機能改善剤	ウルソ	ウルソデオキシコール酸	院内推奨期間無し	3	十二指腸乳頭部の処置歴あれば慎重投与
+糖尿病薬	GLP-1受容体作動薬	バイエッタ	エキセナチド	当日		インスリンによる血糖管理が望まれるため
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	アリッサ	エステトロール・ドロスピレノン	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	エストラーナテープ	エストラジオール	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	ジュリナ	エストラジオール	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	ディビゲル	エストラジオール	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	ル・エストロジェル	エストラジオール	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン/黄体ホルモン	メノエイドコンビパッチ	エストラジオール・ノルエチステロン酢酸エステル	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン/黄体ホルモン	ウェールナラ	エストラジオール・レボノルゲストレル	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	エストラジオール安息香酸エステル	エストラジオール安息香酸エステル	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	プロギノン・デポー	エストラジオール吉草酸エステル	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	ペラニンデポー	エストラジオール吉草酸エステル	主治医判断	3	長期臥床で血栓リスク
+抗悪性腫瘍薬	卵胞ホルモン	エストラサイト	エストラムスチンリン酸エステルナトリウム水和物	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	エストリール	エストリオール	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	ホーリン	エストリオール	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	プレマリン	エストロゲン	手術前４週	3	静脈血栓塞栓症のリスク
+抗リウマチ剤	TNFα／LTαレセプター製剤 	エンブレル	エタネルセプト	院内推奨期間なし	3	手術前後の臨床試験無し
+骨粗鬆症治療薬	ビスホスホネート薬	ダイドロネル	エチドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+抗悪性腫瘍薬	卵胞ホルモン	プロセキソール	エチニルエストラジオール	主治医判断	3	長期臥床で血栓リスク
+抗凝固薬	抗凝固薬	リクシアナ	エドキサバン	院内プロトコル(別紙)参照	2	出血リスク
+降圧薬	ACE阻害薬	レニベース	エナラプリル	24時間前	3	術中血圧低下のリスク
+糖尿病薬	SGLT2阻害薬	ジャディアンス	エンパグリフロジン	糖尿病3日前/心不全当日	1,11	ケトアシドーシスのリスク
+糖尿病薬	SGLT2阻害薬/DPP-4阻害薬	トラディアンス	エンパグリフロジン・リナグリプチン	3日前	1	ケトアシドーシスのリスク
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	オキシコンチン	オキシコドン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	オキノーム	オキシコドン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+気管支喘息治療薬	TXA2合成阻害	ドメナン	オザグレル	院内推奨期間なし	3	出血リスク
+糖尿病薬	DPP-4阻害薬	マリゼブ	オマリグリプチン	当日		インスリンによる血糖管理が望まれるため
+高脂血症治療薬	高脂血症治療薬	ロトリガ	オメガ－３脂肪酸エチル	7日前	ｴﾊﾟﾃﾞｰﾙを参考	出血リスク
+降圧薬	ARB	オルメテック	オルメサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB	オルメサルタンメドキソミル	オルメサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	レザルタス	オルメサルタンメドキソミル・アゼルニジピン	24時間前	3	術中血圧低下のリスク
+糖尿病薬	SGLT2阻害薬	カナグル	カナグリフロジン	3日前	1	ケトアシドーシスのリスク
+降圧薬	ACE阻害薬	カプトリル	カプトプリル	24時間前	3	術中血圧低下のリスク
+微小血栓形成阻害剤	抗VWF抗体	カブリビ	カプラシズマブ	7日前	3	出血リスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	カボメティクス	カボザンチニブ	28日前	8	創傷治癒遅延
+認知症治療薬	コリンエステラーゼ阻害	レミニール	ガランタミン	院内推奨期間なし	3	消化管手術直後･膀胱手術直後は慎重投与
+降圧薬	β受容体遮断薬	ミケラン	カルテオロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	β受容体遮断薬	ミケランＬＡ	カルテオロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	β受容体遮断薬	アーチスト	カルベジロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	ARB	ブロプレス	カンデサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB	カンデサルタンシレキセチル	カンデサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	カムシア	カンデサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	ユニシア	カンデサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	エカード	カンデサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	カデチア	カンデサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+下剤	下剤	マグコロール	クエン酸マグネシウム	院内推奨期間なし	3	腹部外科手術後腸閉塞や腸管穿孔のリスク
+糖尿病薬	SU薬	グリミクロン	グリクラジド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	SU薬	デアメリン	グリクロピラミド	当日		インスリンによる血糖管理が望まれるため
+緩下剤	便の軟化･腸管刺激	グリセリン	グリセリン	院内推奨期間なし	3	下部消化管術直後は禁忌
+糖尿病薬	SU薬	オイグルコン	グリベンクラミド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	SU薬	ダオニール	グリベンクラミド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	SU薬	アマリール	グリメピリド	当日		インスリンによる血糖管理が望まれるため
+抗血小板薬	抗血小板薬	プラビックス	クロピドグレル	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	コンプラビン	クロピドグレル・アスピリン	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	ロレアス	クロピドグレル・アスピリン	院内プロトコル(別紙)参照	2	出血リスク
+糖尿病薬	SU薬	クロルプロパミド	クロルプロパミド	当日		インスリンによる血糖管理が望まれるため
+治療的流産	プロスタグランジンE2製剤	プレグランディン腟坐剤	ゲメプロスト	院内推奨期間なし	3	帝王切開･子宮切開歴は慎重投与
+鎮咳薬	ｵﾋﾟｵｲﾄﾞ受容体作動	コデイン	コデイン	院内推奨期間なし	3	(禁忌)18歳未満の扁桃摘除術後･アデノイド切除術後､(慎重投与)消化管手術後･尿路手術後
+抗炎症薬	副腎皮質ホルモン	コートン	コルチゾン酢酸エステル	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+糖尿病薬	DPP-4阻害薬	オングリザ	サキサグリプチン	当日		インスリンによる血糖管理が望まれるため
+降圧薬	ARNI	エンレスト	サクビトリルバルサルタン	24時間前	3	術中血圧低下のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	ブルキンザ	ザヌブルチニブ	前後3~7日	3	出血リスク
+抗悪性腫瘍薬	血管新生抑制	サレドカプセル	サリドマイド	主治医判断	3	創傷治癒遅延のリスク
+抗血小板薬	抗血小板薬	アンプラーグ	サルポグレラート	1日前	3	出血リスク
+鎮痛薬	NSAIDs	ジクトルテープ	ジクロフェナク	院内推奨期間なし	3	消化管縫合不全のリスク･腎不全のリスク
+鎮痛薬	NSAIDs	ナボール	ジクロフェナク	院内推奨期間なし	3	消化管縫合不全のリスク･腎不全のリスク
+鎮痛薬	NSAIDs	ボルタレン	ジクロフェナク	院内推奨期間なし	3	消化管縫合不全のリスク･腎不全のリスク
+糖尿病薬	DPP-4阻害薬	グラクティブ	シタグリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	DPP-4阻害薬	ジャヌビア	シタグリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	SGLT2阻害薬/DPP-4阻害薬	スージャヌ	シタグリプチン・イプラグリフロジン	3日前	1	ケトアシドーシスのリスク
+子宮頸管熟化剤	プロスタグランジンE2製剤	プロウペス腟用剤	ジノプロストン	院内推奨期間なし	3	子宮筋層の切開を伴う手術歴は投与禁忌
+陣痛誘発・促進剤	PGE2製剤	プロスタグランジン	ジノプロストン	院内推奨期間なし	3	帝王切開･子宮切開歴は投与禁忌
+鎮咳薬	ｵﾋﾟｵｲﾄﾞ受容体作動	ジヒドロコデイン	ジヒドロコデイン	院内推奨期間なし	3	(禁忌)18歳未満の扁桃摘除術後･アデノイド切除術後､(慎重投与)消化管手術後･尿路手術後
+抗血小板薬	抗血小板薬	ペルサンチン	ジピリダモール	2日前	3	出血リスク
+冠血管拡張薬	冠血管拡張薬	コメリアン	ジラゼプ	2日前	3	出血リスク
+抗血小板薬	抗血小板薬	プレタール	シロスタゾール	院内プロトコル(別紙)参照	2	出血リスク
+前立腺肥大症治療薬	α1A受容体遮断	ユリーフ	シロドシン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+抗悪性腫瘍薬	mTOR阻害	ラパリムス	シロリムス	主治医判断	3	創傷治癒遅延のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	スーテント	スニチニブ	7～10 日前	7	創傷治癒遅延
+抗菌薬	葉酸合成阻害	ダイフェン	スルファメトキサゾール・トリメトプリム	院内推奨期間なし	3	胃摘出術後貧血リスク
+抗菌薬	葉酸合成阻害	バクタ	スルファメトキサゾール・トリメトプリム	院内推奨期間なし	3	胃摘出術後貧血リスク
+抗菌薬	葉酸合成阻害	バクタミニ配合錠	スルファメトキサゾール	院内推奨期間なし	3	胃摘出術後貧血リスク
+抗菌薬	葉酸合成阻害	バクトラミン	スルファメトキサゾール・トリメトプリム	院内推奨期間なし	3	胃摘出術後貧血リスク
+高リン血症治療薬	リン吸着	フォスブロック	セベラマー	院内推奨期間なし	3	腹部手術後腸閉塞のリスク
+高リン血症治療薬	リン吸着	レナジェル	セベラマー	院内推奨期間なし	3	腹部手術後腸閉塞のリスク
+糖尿病薬	GLP-1受容体作動薬	オゼンピック	セマグルチド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	GLP-1受容体作動薬	リベルサス	セマグルチド	当日		インスリンによる血糖管理が望まれるため
+肥満症治療薬	GLP-1受容体作動薬	ウゴービ	セマグルチド	当日	（根拠なし）	インスリンによる血糖管理が望まれるため
+降圧薬	β受容体遮断薬	セレクトール	セリプロロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+肺高血圧症治療薬	IP受容体作動	ウプトラビ	セレキシパグ	2日前	10,12	出血リスク
+鎮痛薬	NSAIDs	セレコックス	セレコキシブ	院内推奨期間なし	3	冠動脈バイパス再建術では投与禁忌
+緩下剤	蠕動運動促進	アジャスト	センナ	院内推奨期間なし	3	腹部手術後腹痛ﾘｽｸあり
+緩下剤	蠕動運動促進	ヨーデル	センナ	院内推奨期間なし	3	腹部手術後腹痛ﾘｽｸあり
+緩下剤	蠕動運動促進	アローゼン	センナ・センナ実	院内推奨期間なし	3	腹部手術後腹痛ﾘｽｸあり
+緩下剤	蠕動運動促進	ピムロ	センナ・センナ実	院内推奨期間なし	3	腹部手術後腹痛ﾘｽｸあり
+緩下剤	蠕動運動促進	プルゼニド	センノシド	院内推奨期間なし	3	腹部手術後腹痛ﾘｽｸあり
+抗精神病薬	非定形型	ロドピン	ゾテピン	院内推奨期間なし	3	ロボトミー手術患者には慎重投与
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	ネクサバール	ソラフェニブ	主治医判断	3	創傷治癒遅延のリスク
+骨粗鬆症治療薬	ビスホスホネート薬	ゾメタ	ゾレドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+骨粗鬆症治療薬	ビスホスホネート薬	リクラスト	ゾレドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+緩下剤	蠕動運動促進	セチロ	ダイオウ・センナ配合剤	院内推奨期間なし	3	腹部手術後腹痛ﾘｽｸあり
+抗リウマチ剤	免疫抑制剤	プログラフ	タクロリムス	院内推奨期間なし	3	ﾘｳﾏﾁ患者で人工関節手術の臨床試験無し
+減感作療法薬	減感作療法	アシテアダニ	ダニアレルゲンエキス	院内推奨期間なし	3	口腔内術後吸収率変化のリスク
+減感作療法薬	減感作療法	ミティキュアダニ	ダニアレルゲンエキス	院内推奨期間なし	3	口腔内術後吸収率変化のリスク
+糖尿病薬	SGLT2阻害薬	フォシーガ	ダパグリフロジン	糖尿病3日前/心不全当日	1,11	ケトアシドーシスのリスク
+抗凝固薬	抗凝固薬	プラザキサ	ダビガトラン	院内プロトコル(別紙)参照	2	出血リスク
+前立腺肥大症治療薬	α1受容体遮断	ハルナール	タムスロシン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+抗悪性腫瘍薬	抗エストロゲン 	ノルバデックス	タモキシフェン	院内推奨期間無し	3	長期臥床で血栓リスク
+血液凝固阻止剤	血液凝固系阻害	フラグミン	ダルテパリン	院内推奨期間なし	3	出血リスク
+抗血小板薬	抗血小板薬	ブリリンタ	チカグレロル	5日以上前	3	出血リスク
+抗血小板薬	抗血小板薬	パナルジン	チクロピジン	院内プロトコル(別紙)参照	2	出血リスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	ベレキシブル	チラブルチニブ	主治医判断	3	出血リスク
+糖尿病薬	持続性GLP-1受容体作動薬	マンジャロ	チルゼパチド	当日		インスリンによる血糖管理が望まれるため
+肥満症治療薬	GLP-1受容体作動薬	ゼップバウンド	チルゼパチド	院内推奨期間なし	3	インスリンによる血糖管理が望まれるため
+抗炎症薬	副腎皮質ホルモン	デカドロン	デキサメタゾン	院内推奨期間なし	3	創傷治癒遅延のリスク
+抗炎症薬	副腎皮質ホルモン	レナデックス	デキサメタゾン	院内推奨期間なし	3	創傷治癒遅延のリスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	ダイホルモン・デポー	テストステロンエナント酸エステル・エストラジオール吉草酸エステル	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン	プリモジアン・デポー筋注	テストステロンエナント酸エステル・エストラジオール吉草酸エステル	主治医判断	3	長期臥床で血栓リスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	ファボワール	デソゲストレル・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	マーベロン	デソゲストレル・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+短腸症候群治療薬	GLP-2ｱﾅﾛｸﾞ	レベスティブ	テデュグルチド	院内推奨期間なし	3	術後の患者→慎重に投与
+糖尿病薬	DPP-4阻害薬	テネリア	テネリグリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	SGLT2阻害薬/DPP-4阻害薬	カナリア	テネリグリプチン・カナグリフロジン	3日前	1	ケトアシドーシスのリスク
+骨吸収抑制	抗RANKL抗体	ランマーク	デノスマブ	院内推奨期間なし	3	顎骨壊死のリスク
+骨粗鬆症治療薬	抗RANKL抗体	プラリア	デノスマブ	院内推奨期間なし	3	顎骨壊死のリスク
+降圧薬	ACE阻害薬	エースコール	テモカプリル	24時間前	3	術中血圧低下のリスク
+糖尿病薬	GLP-1受容体作動薬	トルリシティ	デュラグルチド	当日		インスリンによる血糖管理が望まれるため
+降圧薬	ACE阻害薬	アデカット	デラプリル	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB	ミカルディス	テルミサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	テラムロ	テルミサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	ミカムロ	テルミサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬/利尿薬	ミカトリオ	テルミサルタン・アムロジピン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	テルチア	テルミサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	ミコンビ	テルミサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	α1受容体遮断	カルデナリン	ドキサゾシン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+糖尿病薬	SGLT2阻害薬	デベルザ	トホグリフロジン	3日前	1	ケトアシドーシスのリスク
+利尿薬	ループ系	ルプラック	トラセミド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+抗プラスミン剤	抗プラスミン剤	トランサミン	トラネキサム酸	院内推奨期間なし	3	血栓のリスク
+冠血管拡張薬	冠血管拡張薬	ロコルナール	トラピジル	2日前	3	出血リスク
+鼓膜穿孔治療剤	bFGF受容体刺激	リティンパ	トラフェルミン	院内推奨期間なし	3	鼓室形成手術患者には慎重投与
+降圧薬	ACE阻害薬	オドリック	トランドラプリル	24時間前	3	術中血圧低下のリスク
+抗炎症薬	副腎皮質ホルモン	レダコート	トリアムシノロン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+利尿薬	チアジド系	フルイトラン	トリクロルメチアジド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+冠血管拡張薬	冠血管拡張薬	バスタレル	トリメタジジン	2日前	12	出血リスク
+緑内障治療薬	炭酸脱水酵素阻害	トルソプト点眼液	ドルゾラミド	院内推奨期間なし	3	眼内手術で角膜浮腫リスク増加
+緑内障治療薬	炭酸脱水酵素阻害/β-遮断	コソプト配合点眼液	ドルゾラミド・チモロール	院内推奨期間なし	3	眼内手術で角膜浮腫リスク増加
+緑内障治療薬	炭酸脱水酵素阻害/β-遮断	ドルモロール配合点眼液	ドルゾラミド・チモロール	院内推奨期間なし	3	眼内手術で角膜浮腫リスク増加
+緑内障治療薬	炭酸脱水酵素阻害/β-遮断	コソプトミニ配合点眼液	ドルゾラミド・チモロール	院内推奨期間なし	3	眼内手術で角膜浮腫リスク増加
+肺高血圧症治療薬	PGI2誘導体製剤	トレプロスト	トレプロスチニル	院内推奨期間無し	3	出血リスク､急な中止で死亡の報告(注射製剤)
+抗悪性腫瘍薬	抗エストロゲン 	フェアストン	トレミフェン	院内推奨期間無し	3	長期臥床で血栓リスク
+糖尿病薬	DPP-4阻害薬	ザファテック	トレラグリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	DPP-4阻害薬	ザファテック(週1回)	トレラグリプチン	当日		インスリンによる血糖管理が望まれるため
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	ドロエチ	ドロスピレノン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	ドロエチフレックス	ドロスピレノン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	ヤーズ	ドロスピレノン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	ヤーズフレックス	ドロスピレノン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+糖尿病薬	速効型インスリン分泌促進薬	スターシス	ナテグリニド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	速効型インスリン分泌促進薬	ファスティック	ナテグリニド	当日		インスリンによる血糖管理が望まれるため
+経口腸管洗浄剤 	経口腸管洗浄剤 	ニフレック	ナトリウム・カリウム配合剤	院内推奨期間なし	3	腹部手術後腸閉塞のリスク
+降圧薬	β受容体遮断薬	ナディック	ナドロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+前立腺肥大症治療薬	α1受容体遮断	フリバス	ナフトピジル	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+飲酒量低減薬 	ｵﾋﾟｵｲﾄﾞ受容体拮抗薬/部分作動薬	セリンクロ	ナルメフェン	ｵﾋﾟｵｲﾄﾞ投与1週間前	3	術中オピオイドの効果減少
+降圧薬	Caチャネル阻害	ペルジピン	ニカルジピン	院内推奨期間なし	3	開心術後、投与注意
+禁煙補助薬	禁煙補助薬	ニコチネル	ニコチン	院内推奨期間なし	3	PCI･CABG直後症状悪化リスク禁忌
+脳循環・代謝改善薬	脳循環・代謝改善薬	サアミオン	ニセルゴリン	2日	12	出血リスク
+降圧薬	β受容体遮断薬	ハイパジール	ニプラジロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	オフェブ	ニンテダニブ	主治医判断	3	創傷治癒遅延のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	シンフェーズ	ノルエチステロン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	フリウェル	ノルエチステロン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬(ピル)	卵胞ホルモン/黄体ホルモン	ルナベル	ノルエチステロン・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ﾎﾙﾓﾝ薬	卵胞ホルモン/黄体ホルモン	プラノバール	ノルゲストレル・エチニルエストラジオール	主治医判断	3	長期臥床で血栓リスク
+壊死組織除去剤	タンパク質分解作用	ネキソブリッド外用ゲル	パイナップル茎搾汁精製物	院内推奨期間なし	3	減張切開創に塗布で出血リスク
+骨粗鬆症治療薬	SERM	ビビアント	バゼドキシフェン	長期不動状態の３日前	3	静脈血栓塞栓症のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	ヴォトリエント	パゾパニブ	主治医判断	3	創傷治癒遅延のリスク
+抗血栓性末梢循環改善剤	血漿フィブリノゲン濃度低下	デフィブラーゼ	バトロキソビン	院内推奨期間なし	3	出血リスク
+骨粗鬆症治療薬	ビスホスホネート薬	パミドロン酸	パミドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+抗精神病薬	SDA	インヴェガ	パリペリドンパルミチン酸エステル	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+抗精神病薬	SDA	パリペリドン	パリペリドンパルミチン酸エステル	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+降圧薬	ARB	ディオバン	バルサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	アムバロ	バルサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	エックスフォージ	バルサルタン・アムロジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/Ca拮抗薬	アテディオ	バルサルタン・シルニジピン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	コディオ	バルサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	バルヒディオ	バルサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	カプレルサ	バンデタニブ	主治医判断	3	創傷治癒遅延のリスク
+糖尿病薬	チアゾリジン薬	アクトス	ピオグリタゾン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	SU薬/チアゾリジン薬	ソニアス	ピオグリタゾン・グリメピリド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	ビグアナイド薬/チアゾリジン薬	メタクト	ピオグリタゾン・メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+高リン血症治療薬	リン吸着	キックリン	ビキサロマー	院内推奨期間なし	3	腹部手術後腸閉塞のリスク
+経口腸管洗浄剤 	経口腸管洗浄剤 	ピコプレップ	ピコスルファート・酸化マグネシウム・無水クエン酸	院内推奨期間なし	3	腹部外科手術後腸閉塞や腸管穿孔のリスク
+降圧薬	β受容体遮断薬	ビソノテープ	ビソプロロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	β受容体遮断薬	メインテート	ビソプロロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+利尿薬	チアジド系	ヒドロクロロチアジド	ヒドロクロロチアジド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+抗炎症薬	副腎皮質ホルモン	コートリル	ヒドロコルチゾン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	ナルラピド	ヒドロモルフォン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+緑内障・高眼圧症治療剤	プロスタマイド受容体刺激	グラッシュビスタ	ビマトプロスト	院内推奨期間なし	3	内眼手術の既往で黄斑浮腫のリスク
+糖尿病薬	DPP-4阻害薬	エクア	ビルダグリプチン	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	ビグアナイド薬/DPP-4阻害薬	エクメット	ビルダグリプチン・メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+糖尿病薬	ビグアナイド薬/DPP-4阻害薬	メホビル	ビルダグリプチン・メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	ジャイパーカ	ピルトブルチニブ	前後3~5日	3	出血リスク
+抗リウマチ剤	免疫抑制剤	リマチル	ブシラミン	院内推奨期間なし	3	感染リスク
+クローン病治療薬	副腎皮質ホルモン	ゼンタコート	ブデソニド	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+潰瘍性大腸炎治療薬	副腎皮質ホルモン	コレチメント	ブデソニド	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+潰瘍性大腸炎治療薬	副腎皮質ホルモン	レクタブル	ブデソニド	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+降圧薬	α1受容体遮断	デタントール	ブナゾシン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+緑内障治療薬	α1受容体遮断	デタントール０．０１％点眼液	ブナゾシン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+抗菌薬	アミノグリコシド系	眼・耳科用リンデロンＡ軟膏	フラジオマイシン・ベタメタゾンリン酸エステル	院内推奨期間なし	3	耳手術後創傷治癒遅延のリスク
+抗菌薬	アミノグリコシド系	ネオメドロールＥＥ軟膏	フラジオマイシン・メチルプレドニゾロン	院内推奨期間なし	3	耳手術後創傷治癒遅延のリスク
+抗血小板薬	抗血小板薬	エフィエント	プラスグレル	院内プロトコル(別紙)参照	2	出血リスク
+高血圧・排尿障害治療	α1受容体遮断	ミニプレス	プラゾシン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	フリュザクラ	フルキンチニブ	主治医判断	3	創傷治癒遅延のリスク
+抗炎症薬	副腎皮質ホルモン	フロリネフ	フルドロコルチゾン酢酸エステル	院内推奨期間なし	3	創傷治癒遅延のリスク
+抗炎症薬	副腎皮質ホルモン	プレドニン	プレドニゾロン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	プレドネマ	プレドニゾロンリン酸エステル	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+女性ﾎﾙﾓﾝ薬	黄体ホルモン	エフメノ	プロゲステロン	主治医判断	3	長期臥床で血栓リスク
+利尿薬	ループ系	ラシックス	フロセミド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+降圧薬	β受容体遮断薬	インデラル	プロプラノロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	β受容体遮断薬	プロプラノロール	プロプラノロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+乳児血管腫治療剤	β受容体遮断薬	ヘマンジオル	プロプラノロール	48時間前	3	全身麻酔時低血圧のリスク
+降圧薬	β受容体遮断薬	ケルロング	ベタキソロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+抗炎症薬	副腎皮質ホルモン	リンデロン	ベタメタゾン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	エンペラシン	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	サクコルチン	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	セレスタミン	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	セレスタミン配合シロップ	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	ヒスタブロック	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	プラデスミン	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	ベタセレミン	ベタメタゾン・クロルフェニラミン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+抗炎症薬	副腎皮質ホルモン	ステロネマ	ベタメタゾンリン酸エステル	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+降圧薬	ACE阻害薬	チバセン	ベナゼプリル	24時間前	3	術中血圧低下のリスク
+抗リウマチ剤	免疫抑制剤	メタルカプターゼ	ペニシラミン	院内推奨期間なし	3	手術直後重篤な血液障害のリスク
+抗悪性腫瘍薬	抗VEGF抗体	アバスチン	ベバシズマブ	4～6週間	5	創傷治癒遅延
+血液凝固阻止剤	血液凝固系阻害	ノボ・ヘパリン	ヘパリン	院内推奨期間なし	3	出血リスク
+血液凝固阻止剤	血液凝固系阻害	ヘパリンＣａ	ヘパリンカルシウム	院内推奨期間なし	3	出血リスク
+血液凝固阻止剤	血液凝固系阻害	ヘパリンＮａ	ヘパリンナトリウム	院内推奨期間なし	3	出血リスク
+血液凝固阻止剤	血液凝固系阻害	ヘパリン類似物質	ヘパリン類似物質	-	-	外用剤のため全身への影響は少ない
+降圧薬	β受容体遮断薬	カルバン	ベバントロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+抗血小板薬	抗血小板薬	ケアロード	ベラプロスト	1日前	3	出血リスク
+抗血小板薬	抗血小板薬	ドルナー	ベラプロスト	1日前	3	出血リスク
+抗血小板薬	抗血小板薬	プロサイリン	ベラプロスト	1日前	3	出血リスク
+抗血小板薬	抗血小板薬	ベラサス	ベラプロスト	1日前	3	出血リスク
+降圧薬	ACE阻害薬	コバシル	ペリンドプリル	24時間前	3	術中血圧低下のリスク
+降圧薬	ACE阻害薬	ペリンドプリルエルブミン	ペリンドプリルエルブミン	24時間前	3	術中血圧低下のリスク
+糖尿病薬	α-グリコシダーゼ阻害薬	ベイスン	ボグリボース	当日		インスリンによる血糖管理が望まれるため
+過敏性腸症候群治療薬	ゲル化	ポリフル	ポリカルボフィル	院内推奨期間なし	3	胃全摘術後薬効発揮されない
+肥大型心筋症治療薬	心筋ミオシン阻害	カムザイオス	マバカムテン	院内推奨期間なし	3	心臓手術には慎重投与
+糖尿病薬	α-グリコシダーゼ阻害薬	セイブル	ミグリトール	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	速効型インスリン分泌促進薬	グルファスト	ミチグリニド	当日		インスリンによる血糖管理が望まれるため
+糖尿病薬	速効型ｲﾝｽﾘﾝ分泌促進薬/α-GI	グルベス	ミチグリニド・ボグリボース	当日		インスリンによる血糖管理が望まれるため
+骨粗鬆症治療薬	ビスホスホネート薬	ボノテオ	ミノドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	メサペイン	メサドン	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+抗炎症薬	副腎皮質ホルモン	メドロール	メチルプレドニゾロン	院内推奨期間なし	3	周術期副腎不全に注意､ｽﾃﾛｲﾄﾞｶﾊﾞｰを検討
+褐色細胞腫治療薬	チロシン水酸化酵素阻害	デムサー	メチロシン	院内推奨期間なし	3	褐色細胞腫の手術､高血圧･不整脈のリスク
+降圧薬	β受容体遮断薬	セロケン	メトプロロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+降圧薬	β受容体遮断薬	ロプレソール	メトプロロール	継続を推奨	3	中止により反跳性高血圧､虚血症状､不整脈のリスク
+糖尿病薬	ビグアナイド薬	グリコラン	メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+糖尿病薬	ビグアナイド薬	メトグルコ	メトホルミン	前後2日	9	乳酸アシドーシスのリスク
+抗悪性腫瘍薬	黄体ホルモン	ヒスロンH	メドロキシプロゲステロン酢酸エステル	術後1週間	3	静脈血栓塞栓症のリスク
+女性ホルモン薬	黄体ホルモン	ヒスロン	メドロキシプロゲステロン酢酸エステル	術後1週間	ﾋｽﾛﾝHに準じて	静脈血栓塞栓症のリスク
+女性ホルモン薬	黄体ホルモン	メドロキシプロゲステロン酢酸エステル2.5/5	メドロキシプロゲステロン酢酸エステル	術後1週間	ﾋｽﾛﾝHに準じて	静脈血栓塞栓症のリスク
+抗悪性腫瘍薬	黄体ホルモン	メドロキシプロゲステロン酢酸エステル200	メドロキシプロゲステロン酢酸エステル	術後1週間	ﾋｽﾛﾝHに準じて	静脈血栓塞栓症のリスク
+女性ホルモン薬	黄体ホルモン	プロベラ	メドロキシプロゲステロン酢酸エステル	術後1週間	ﾋｽﾛﾝに準じて	静脈血栓塞栓症のリスク
+利尿薬	チアジド系類似薬	バイカロン	メフルシド	院内推奨期間なし	3	ﾛｸﾛﾆｳﾑの作用増強､昇圧ｱﾐﾝの作用減弱のおそれ
+鎮痛薬	NSAIDs	モービック	メロキシカム	院内推奨期間なし	3	腎不全のリスク
+抗アレルギー薬	副腎皮質ホルモン	ナゾネックス	モメタゾンフランカルボン酸エステル	院内推奨期間なし	3	鼻手術後創傷治癒遅延のリスク
+抗アレルギー薬	副腎皮質ホルモン	モメタゾン点鼻液	モメタゾンフランカルボン酸エステル	院内推奨期間なし	3	鼻手術後創傷治癒遅延のリスク
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	ＭＳコンチン	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	ＭＳツワイスロン	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	アンペック坐剤	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	アンペック	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	オプソ	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	パシーフ	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+鎮痛薬	ｵﾋﾟｵｲﾄﾞ受容体刺激	モルペス	モルヒネ	継続を推奨	3	尿路手術後排尿障害･消化管手術直後消化管運動抑制
+降圧薬	αβ受容体遮断	トランデート	ラベタロール	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+抗悪性腫瘍薬	抗VEGFR2抗体	サイラムザ	ラムシルマブ	4～6週間	6	創傷治癒遅延
+過敏性腸症候群治療薬	5-HT3受容体阻害	イリボー	ラモセトロン	院内推奨期間なし	3	腹部手術後イレウスのリスクあり
+骨粗鬆症治療薬	SERM	エビスタ	ラロキシフェン	長期不動状態の３日前	3	静脈血栓塞栓症のリスク
+高リン血症治療薬	リン吸着	ホスレノール	ランタン	院内推奨期間なし	3	腹部手術後イレウスの報告
+糖尿病薬	GLP-1受容体作動薬	リキスミア	リキシセナチド	当日		インスリンによる血糖管理が望まれるため
+降圧薬	ACE阻害薬	ゼストリル	リシノプリル	24時間前	3	術中血圧低下のリスク
+降圧薬	ACE阻害薬	ロンゲス	リシノプリル	24時間前	3	術中血圧低下のリスク
+抗精神病薬	SDA	リスパダール	リスペリドン	院内推奨期間なし	3	白内障手術時､術中虹彩緊張低下症候群のリスク
+骨粗鬆症治療薬	ビスホスホネート薬	アクトネル	リセドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+骨粗鬆症治療薬	ビスホスホネート薬	ベネット	リセドロン酸	歯科手術２カ月前	4	顎骨壊死のリスク
+糖尿病薬	DPP-4阻害薬	トラゼンタ	リナグリプチン	当日		インスリンによる血糖管理が望まれるため
+抗凝固薬	抗凝固薬	イグザレルト	リバーロキサバン	院内プロトコル(別紙)参照	2	出血リスク
+血管拡張薬	血管拡張薬	オパルモン	リマプロスト	1日前	3	出血リスク
+血管拡張薬	血管拡張薬	プロレナール	リマプロスト	1日前	3	出血リスク
+血管拡張薬	血管拡張薬	リマプロストアルファデクス	リマプロスト　アルファデクス	1日前	3	出血リスク
+糖尿病薬	GLP-1受容体作動薬	ビクトーザ	リラグルチド	当日		インスリンによる血糖管理が望まれるため
+経口腸管洗浄剤 	経口腸管洗浄剤 	ビジクリア	リン酸二水素ナトリウム一水和物・無水リン酸水素二ナトリウム	院内推奨期間なし	3	腹部外科手術後腸閉塞や腸管穿孔のリスク
+糖尿病薬	SGLT2阻害薬	ルセフィ	ルセオグリフロジン	3日前	1	ケトアシドーシスのリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	スチバーガ	レゴラフェニブ	2週間	6	創傷治癒遅延
+糖尿病薬	速効型インスリン分泌促進薬	シュアポスト	レパグリニド	当日		インスリンによる血糖管理が望まれるため
+女性ホルモン薬	黄体ホルモン	ミレーナ	レボノルゲストレル	院内推奨期間なし	3	骨盤内手術後､術部の回復を確認してから装着
+女性ホルモン薬(ピル)	卵胞ホルモン/黄体ホルモン	アンジュ	レボノルゲストレル・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ホルモン薬(ピル)	卵胞ホルモン/黄体ホルモン	ジェミーナ	レボノルゲストレル・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ホルモン薬(ピル)	卵胞ホルモン/黄体ホルモン	トリキュラー	レボノルゲストレル・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+女性ホルモン薬(ピル)	卵胞ホルモン/黄体ホルモン	ラベルフィーユ	レボノルゲストレル・エチニルエストラジオール	手術前４週､術後２週	3	静脈血栓塞栓症のリスク
+抗悪性腫瘍薬	ﾁﾛｼﾝｷﾅｰｾﾞ阻害薬	レンビマ	レンバチニブ	1週間	8	創傷治癒遅延
+降圧薬	ARB	ニューロタン	ロサルタン	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	プレミネント	ロサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	ロサルヒド	ロサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+降圧薬	ARB/利尿薬	ロサルタンカリウム・ヒドロクロロチアジド	ロサルタン・ヒドロクロロチアジド	24時間前	3	術中血圧低下のリスク
+抗パーキンソン病薬	D2受容体遮断薬	レキップ	ロピニロール	院内推奨期間なし	3	腸切除･人工肛門造設術患者には慎重投与
+骨粗鬆症治療薬	抗スクレロスチン抗体	イベニティ	ロモソズマブ	院内推奨期間なし	3	顎骨壊死のリスク
+抗凝固薬	抗凝固薬	ワーファリン	ワルファリン	院内プロトコル(別紙)参照	2	出血リスク
+徐放性カリウム剤	カリウム補充	塩化カリウム	塩化カリウム	院内推奨期間なし	3	消化管吻合術後吸収率低下のおそれ
+経口腸管洗浄剤 	経口腸管洗浄剤 	モビプレップ	塩化ナトリウム・塩化カリウム・無水硫酸ナトリウム・マクロゴール４０００・アスコルビン酸・Ｌ－アスコルビン酸ナトリウム	院内推奨期間なし	3	腹部手術後腸閉塞のリスク
+止瀉薬	収斂･粘膜保護作用	次硝酸ビスマス	次硝酸ビスマス	院内推奨期間なし	3	腸瘻･人工肛門で血中濃度増加のﾘｽｸ
+診断用剤 	診断用剤 	ピロニック	尿素（１３Ｃ）	院内推奨期間なし	3	胃切除後判定に影響する可能性
+診断用剤 	診断用剤 	ユービット	尿素（１３Ｃ）	院内推奨期間なし	3	胃切除後判定に影響する可能性
+減感作療法薬	減感作療法	シダキュア	標準化スギ花粉エキス（２）	院内推奨期間なし	3	口腔内術後吸収率変化のリスク
+経口腸管洗浄剤 	経口腸管洗浄剤 	サルプレップ	無水硫酸ナトリウム・硫酸カリウム・硫酸マグネシウム水和物	院内推奨期間なし	3	腹部手術後腸閉塞のリスク
+造影剤	大腸CT用経口造影剤	エネマスター	硫酸バリウム	院内推奨期間なし	3	消化管切除後穿孔のリスク
+造影剤	注腸用X線造影剤	コロンフォート	硫酸バリウム	院内推奨期間なし	3	消化管切除後穿孔のリスク
+抗血小板薬	抗血小板薬	バッサミン	アスピリン/ダイアルミネート	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	ファモター	アスピリン/ダイアルミネート	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	アスファネート	アスピリン/ダイアルミネート	院内プロトコル(別紙)参照	2	出血リスク
+抗血小板薬	抗血小板薬	ニトギス	アスピリン/ダイアルミネート	院内プロトコル(別紙)参照	2	出血リスク
+`;
+const rawExclusionData = `
+除外キーワード	備考
+ＢＣＧ	
+アクチバシン注	
+アトニン－Ｏ注	
+アヘンアルカロイド・アトロピン注射液	
+アヘンアルカロイド・スコポラミン注射液	
+アミオダロン塩酸塩静注	
+アリクストラ皮下注	
+アルガトロバンＨＩ注	
+アルガトロバン注射液	
+アルチバ静注用	
+アルチバ静注用	
+アルプロスタジルアルファデクス注射用	
+アルプロスタジル　アルファデクス２０μｇ注射用	
+アルプロスタジル　アルファデクス５００μｇ注射用	
+アルプロスタジル１０μｇ２ｍＬ	
+アルプロスタジル５μｇ１ｍＬ注射液	
+アルプロスタジルアルファデクス点滴静注用	
+アルプロスタジル注	
+アレモ皮下注	
+アンカロン注	
+イソゾール注	
+イデルビオン静注用	
+イノソリッド配合経腸用半固形剤	
+イノラス配合経腸用液	
+インデラル注射液	
+ウテメリン注	
+ウテメリン注５０ｍｇ	
+ウロナーゼ冠動注用	
+ウロナーゼ静注用	
+ウロマチックＳ泌尿器科用灌流液３％	
+エクストラニール腹膜透析液	
+エネーボ配合経腸用液	
+エポプロステノール静注用	
+エンシュア・リキッド	
+オキシトシン注射液	
+オルガドロン注射液	
+オルプロリクス静注用	
+オンデキサ静注用	
+キシロカイン注	
+キシロカイン注射液	
+クリアクター静注用	
+グルトパ注	
+クレキサン皮下注キット	
+ケナコルト－Ａ筋注用関節腔内用水懸注	
+ケナコルト－Ａ皮内用関節腔内用水懸注	
+ザルトラップ点滴静注	
+ジノプロスト１ｍｇ１ｍＬ注射液	
+ジノプロスト２ｍｇ２ｍＬ注射液	
+ジノプロスト注射液	
+シンフェーズＴ	
+スロンノンＨＩ注	
+ゼプリオンＴＲＩ水懸筋注	
+ゼプリオン水懸筋注	
+ソセゴン注射液	
+ソル・コーテフ静注用	
+ソル・コーテフ注射用	
+ソル・メドロール静注用	
+ツインラインＮＦ配合経腸用液	
+デカドロン注射液	
+デキサート注射液	
+デファイテリオ静注	
+デポ・メドロール水懸注	
+トーリセル点滴静注液	
+ドブタミン塩酸塩	
+ドブタミン持続静注	
+ドブタミン点滴静注	
+ドブトレックスキット点滴静注用	
+ドブトレックス注射液	
+ドプラム注射液	
+トラマール注	
+トルブタミド	
+トレプロスト注射液	
+ニコペリック腹膜透析液	
+ネクスビアザイム点滴静注用	
+ノバスタンＨＩ注	
+ノボセブンＨＩ静注用	
+パルクス注	
+パルナパリンＮａ透析用	
+ビスダイン静注用	
+ビスダイン静注用	
+ヒムペブジ皮下注	
+ファイバ静注用	
+フェンタニルクエン酸塩０．００５％２ｍＬ注射液	
+フェンタニルクエン酸塩０．００５％５ｍＬ注射液	
+フェンタニル注射液	
+フォリスチム注	
+ブピバカイン	
+ブプレノルフィン注	
+プロスタルモン・Ｆ注射液１０００	
+プロスタンディン注射用	
+プロスタンディン点滴静注用	
+プロタミン硫酸塩静注	
+プロタミン硫酸塩注射液	
+ベイフォータス筋注	
+ペチジン塩酸塩	
+ペチロルファン配合注	
+ペチロルファン配合注	
+ベネフィクス静注用	
+ボトックス注用	
+ポリミキシンＢ硫酸塩	
+ボルベン輸液６％	
+メピバカイン	
+モルヒネ・アトロピン注射液	
+ユニタルク胸膜腔内注入用懸濁剤４ｇ	
+ラコールＮＦ配合経腸用液	
+ラコールＮＦ配合経腸用半固形剤	
+リコモジュリン点滴静注用	
+リドカイン塩酸塩注	
+リドカイン塩酸塩注射液	
+リドカイン注	
+リドカイン注射液	
+リトドリン塩酸塩１％５ｍＬ注射液	
+リトドリン塩酸塩点滴静注液	
+リプルキット注	
+リプル注	
+リメタゾン静注２．５ｍｇ	
+リンデロン懸濁注	
+レギュニール　ＨＣａ	
+レギュニール　ＬＣａ	
+レフィキシア静注用	
+レペタン注	
+レミフェンタニル静注用	
+レミフェンタニル静注用	
+ローヘパ透析用	
+ロピバカイン	
+亜酸化窒素	
+乾燥濃縮人血液凝固第１０因子加活性化第７因子	
+混合型インスリン	
+持効型インスリン	
+次没食子酸ビスマス	
+弱アヘンアルカロイド・スコポラミン注射液	
+水溶性プレドニン	
+静注用フローラン	
+速効型インスリン	
+中間型インスリン	
+注射用チアミラールナトリウム	
+注射用プレドニゾロンコハク酸エステルナトリウム	
+超速効型インスリン	
+腹膜透析液	
+複方オキシコドン・アトロピン	
+複方オキシコドン注射液	20260331追加
+肺炎球菌ワクチン	20260331追加
+メンクアッドフィ筋注	20260331追加
+アクトヒブ　１０μｇ（溶解液付）	20260331追加
+タイフィム　ブイアイ注シリンジ	20260331追加
+ロタリックス内用液	20260331追加
+乾燥組織培養不活化狂犬病ワクチン	20260331追加
+組換え沈降Ｂ型肝炎ワクチン（酵母由来）　０．２５ｍＬ	20260331追加
+乾燥弱毒生おたふくかぜワクチン「タケダ」	20260331追加
+乾燥弱毒生風しんワクチン「タケダ」	20260331追加
+乾燥弱毒生麻しんワクチン「タケダ」	20260331追加
+乾燥弱毒生水痘ワクチン「ビケン」	20260331追加
+ビケンＨＡ	20260331追加
+エイムゲン	20260331追加
+乾燥細胞培養痘そうワクチンＬＣ１６「ＫＭＢ」	20260331追加
+黄熱ワクチン１人用	20260331追加
+ジェービックＶ	20260331追加
+サーバリックス	20260331追加
+イモバックスポリオ皮下注	20260331追加
+シングリックス筋注用	20260331追加
+コミナティＲＴＵ筋注１人用	20260331追加
+ヌバキソビッド筋注	20260331追加
+アレックスビー筋注用	20260331追加
+タイコバック水性懸濁筋注０．５ｍＬ	20260331追加
+フルミスト点鼻液	20260331追加
+沈降破傷風トキソイド　１０ｍＬ	20260331追加
+ＤＴビック	20260331追加
+トリビック	20260331追加
+テトラビック皮下注シリンジ	20260331追加
+ゴービック水性懸濁注シリンジ	20260331追加
+ミールビック	20260331追加
+ロタテック内用液	20260331追加
+ビームゲン注０．２５ｍＬ	20260331追加
+おたふくかぜ生ワクチン「第一三共」	20260331追加
+インフルエンザＨＡワクチン「生研」	20260331追加
+エンセバック皮下注用	20260331追加
+ガーダシル水性懸濁筋注シリンジ	20260331追加
+コミナティＲＴＵ筋注５～１１歳用１人用	20260331追加
+タイコバック小児用水性懸濁筋注０．２５ｍＬ	20260331追加
+アブリスボ筋注用	20260331追加
+沈降破傷風トキソイド　０．５ｍＬ	20260331追加
+クアトロバック皮下注シリンジ	20260331追加
+クイントバック水性懸濁注射用	20260331追加
+乾燥弱毒生麻しん風しん混合ワクチン「タケダ」	20260331追加
+組換え沈降Ｂ型肝炎ワクチン（酵母由来）　０．５ｍＬ	20260331追加
+インフルエンザＨＡワクチン「ＫＭＢ」	20260331追加
+シルガード９水性懸濁筋注シリンジ	20260331追加
+コミナティ筋注シリンジ１２歳以上用	20260331追加
+沈降破傷風トキソイド「生研」	20260331追加
+ヒブトロバック水性懸濁注射用	20260331追加
+はしか風しん混合生ワクチン「第一三共」	20260331追加
+ビームゲン注０．５ｍＬ	20260331追加
+インフルエンザＨＡワクチン「第一三共」１ｍＬ	20260331追加
+コミナティ筋注６ヵ月～４歳用３人用	20260331追加
+破トキ「ビケンＦ」	20260331追加
+ミールビックＩＩ皮下注用	20260331追加
+ヘプタバックス－ＩＩ水性懸濁注シリンジ０．２５ｍＬ	20260331追加
+フルービックＨＡ	20260331追加
+スパイクバックス筋注	20260331追加
+ヘプタバックス－ＩＩ水性懸濁注シリンジ０．５ｍＬ	20260331追加
+インフルエンザＨＡワクチン「第一三共」シリンジ０．５ｍＬ	20260331追加
+ダイチロナ筋注	20260331追加
+組換え沈降Ｂ型肝炎ワクチン（チャイニーズハムスター卵巣細胞由来）	20260331追加
+インフルエンザＨＡワクチン「第一三共」シリンジ０．２５ｍＬ	20260331追加
+コスタイベ筋注用	20260331追加
+エフルエルダ筋注	
+ジクロフェナクナトリウム	
+ヒューマリンＮ注	
+ヒューマログ注	
+ノボラピッド注	
+ランタス注	
+レベミル注	
+アピドラ注	
+トレシーバ注	
+インスリン　リスプロＢＳ注	
+アウィクリ注	
+ヒトインスリン（遺伝子組換え）	
+インスリン　リスプロ（遺伝子組換え）	
+インスリン　アスパルト（遺伝子組換え）	
+インスリン　グラルギン（遺伝子組換え）	
+インスリン　デテミル（遺伝子組換え）	
+インスリン　グルリジン（遺伝子組換え）	
+インスリン　デグルデク（遺伝子組換え）	
+インスリンリスプロ（遺伝子組換え）	
+インスリン　イコデク（遺伝子組換え）	
+ダイアニール	
+シダキュアスギ花粉舌下錠	
+ニューモバックスＮＰ	
+アクトヒブ	
+乾燥ＢＣＧ	
+プレベナー１３	
+組織培養不活化狂犬病ワクチン	
+ラビピュール筋注用	
+組換え沈降Ｂ型肝炎ワクチン	
+エムネクスパイク筋注	
+沈降破傷風トキソイド	
+バイクロット配合静注用	
+ミムリット皮下注用	
+イムノブラダー膀注用	
+不活化狂犬病ウイルス（ＨＥＰ　Ｆｌｕｒｙ株）	
+不活化狂犬病ウイルス（Ｆｌｕｒｙ　ＬＥＰ株）	
+ＨＢｓ抗原	
+破傷風トキソイド	
+イソゾール注射用	
+ドブタミン塩酸塩点滴静注液	
+オルメサルタン　メドキソミル	
+肺炎球菌莢膜ポリサッカライド	
+ミッドペリック	
+ペリセート	
+`;
+const rawReferenceData = `
+番号	文献名
+1	糖尿病治療におけるSGLT2阻害薬の適正使用に関する Recommendation
+2	手術などを行う際の抗凝固薬・抗血小板薬取り扱いの参考目安(院内ポータル)
+3	添付文書
+4	骨吸収抑制薬関連顎骨壊死の病態と管理 : 顎骨壊死検討委員会ポジションペーパー 2016
+5	NCCNガイドライン：結腸癌ガイドライン・直腸癌ガイドライン
+6	医薬品適正使用ガイド
+7	医薬品インタビューフォーム
+8	製薬企業ホームページ
+9	当院代謝内分泌内科より
+10	心不全治療におけるSGLT2阻害薬の適正使用に関するRecommendation
+11	赤木晋介（編）, 周術期の安全な薬剤管理を考える会（執筆）. 術前休薬クイックリファレンス.
+`;
+let refDataArray = [];
+
+// DATA_MARKER_END
+
+// =========================================================
+// 2. 定数・変数
+// =========================================================
+const DATE_RULES = {
+    "1日前": { days: -1, alert: true }, "1週間": { days: -7, alert: true }, "7日前": { days: -7, alert: true },
+    "2日": { days: -2, alert: true }, "2日前": { days: -2, alert: true }, "3日前": { days: -3, alert: true },
+    "前日(1日前)": { days: -1, alert: true }, "当日": { days: 0, alert: true },
+    "24時間前": { text: "{date} 手術予定時刻の24時間前から休薬", alert: true },
+    "48時間前": { text: "{date} 手術予定時刻の48時間前から休薬", alert: true },
+    "糖尿病3日前/心不全当日": { text: "{d3} または {date}", alert: true },
+    "資料参照": { text: "要確認", alert: true },
+    "院内推奨期間なし": { text: "院内推奨期間なし", alert: false, css: "row-gray" },
+    "-": { text: "-", alert: false }, "対象外": { text: "-", alert: false },
+    "継続を推奨": { text: "-", alert: false }
+};
+
+const AC_MATRIX = {
+    "warfarin_dental": { h: "継続下での施行推奨", l: "継続下での施行推奨", hd: 0, ld: 0 },
+    "warfarin_minor":  { h: "休薬なし", l: "休薬なし", hd: 0, ld: 0 },
+    "warfarin_major":  { h: "【休薬期間】3〜5日<br>中止翌日よりヘパリン置換", l: "【休薬期間】3〜5日", hd: [3,5], ld: [3,5] },
+    "warfarin_spinal": { h: "【休薬期間】5日<br>中止翌日よりヘパリン置換", l: "低リスク群では休薬なし", hd: 5, ld: 0 },
+    "doac_pe_dental": { h: "継続下での施行推奨", l: "継続下での施行推奨", hd: 0, ld: 0 },
+    "doac_pe_minor":  { h: "【休薬期間】1日", l: "【休薬期間】1日", hd: 1, ld: 1 },
+    "doac_pe_major":  { h: "【休薬期間】2日<br>最終投与12時間後よりヘパリン置換", l: "【休薬期間】2日", hd: 2, ld: 2 },
+    "doac_pe_spinal": { h: "【休薬期間】3〜5日", l: "半減期の2倍程度休薬", hd: [3,5], ld: 0 },
+    "doac_il_dental": { h: "継続下での施行推奨", l: "継続下での施行推奨", hd: 0, ld: 0 },
+    "doac_il_minor":  { h: "【休薬期間】1日", l: "【休薬期間】1日", hd: 1, ld: 1 },
+    "doac_il_major":  { h: "【休薬期間】1日<br>最終投与24時間後よりヘパリン置換", l: "【休薬期間】1日", hd: 1, ld: 1 },
+    "doac_il_spinal": { h: "【休薬期間】2日", l: "半減期の2倍程度休薬", hd: 2, ld: 0 },
+    "platelet_main_dental": { h: "継続下での施行を原則とする", l: "継続下での施行を原則とする", hd: 0, ld: 0 },
+    "platelet_main_minor":  { h: "継続下での施行を原則とする", l: "継続下での施行を原則とする", hd: 0, ld: 0 },
+    "platelet_main_major":  { h: "【休薬期間】7日<br>中止翌日よりヘパリン置換", l: "【休薬期間】7日", hd: 7, ld: 7 },
+    "platelet_main_spinal": { h: "【休薬期間】7日", l: "低リスク群では休薬なし", hd: 7, ld: 0 },
+    "platelet_cilo_dental": { h: "継続下での施行を原則とする", l: "継続下での施行を原則とする", hd: 0, ld: 0 },
+    "platelet_cilo_minor":  { h: "継続下での施行を原則とする", l: "継続下での施行を原則とする", hd: 0, ld: 0 },
+    "platelet_cilo_major":  { h: "【休薬期間】シロスタゾール 2日<br>中止翌日よりヘパリン置換", l: "【休薬期間】2日", hd: 2, ld: 2 },
+    "platelet_cilo_spinal": { h: "【休薬期間】シロスタゾール 2日", l: "低リスク群では休薬なし", hd: 2, ld: 0 }
+};
+
+let masterDataArray = [];
+let exclDataArray = [];
+let currentDrug = null;
+let currentSurgery = null;
+
+// =========================================================
+// 3. 初期化とタブ制御
+// =========================================================
+window.onload = function() {
+    document.getElementById("verDisplay").textContent = DATA_UPDATED;
+    document.getElementById("printDateDisplay_Check").textContent = "データ更新日: " + DATA_UPDATED;
+    parseDatabase();
+    filterMasterTable();
+    setupDragAndDrop();
+};
+
+function switchTab(tabId) {
+    document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+    const targetLink = document.querySelector(`[data-target="${tabId}"]`);
+    if(targetLink) targetLink.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(el => {
+        el.classList.remove('show', 'active');
+        el.style.display = 'none';
+    });
+    const targetTab = document.getElementById(tabId);
+    if(targetTab) {
+        targetTab.style.display = 'block';
+        targetTab.classList.add('show', 'active');
+    }
+    
+    if(tabId === 'admin-tab') {
+        setTimeout(() => {
+            const pwd = document.getElementById('admin-password');
+            if(pwd) { pwd.value = ''; pwd.focus(); }
+        }, 100);
+    }
+}
+
+// =========================================================
+// 4. 文字列正規化・データベース構築
+// =========================================================
+function normalizeString(str) {
+    if (!str) return "";
+    let s = str.trim().toUpperCase().replace(/[\s ]/g, "");
+    // 英数字・記号を全角に変換
+    s = s.replace(/[!-~]/g, function(ch) { return String.fromCharCode(ch.charCodeAt(0) + 0xFEE0); });
+    // 半角カナを全角に変換
+    const kanaMap = {
+        'ｶﾞ':'ガ', 'ｷﾞ':'ギ', 'ｸﾞ':'グ', 'ｹﾞ':'ゲ', 'ｺﾞ':'ゴ', 'ｻﾞ':'ザ', 'ｼﾞ':'ジ', 'ｽﾞ':'ズ', 'ｾﾞ':'ゼ', 'ｿﾞ':'ゾ',
+        'ﾀﾞ':'ダ', 'ﾁﾞ':'ヂ', 'ﾂﾞ':'ヅ', 'ﾃﾞ':'デ', 'ﾄﾞ':'ド', 'ﾊﾞ':'バ', 'ﾋﾞ':'ビ', 'ﾌﾞ':'ブ', 'ﾍﾞ':'ベ', 'ﾎﾞ':'ボ',
+        'ﾊﾟ':'パ', 'ﾋﾟ':'ピ', 'ﾌﾟ':'プ', 'ﾍﾟ':'ペ', 'ﾎﾟ':'ポ', 'ｳﾞ':'ヴ', 'ﾜﾞ':'ヷ', 'ｦﾞ':'ヺ',
+        'ｱ':'ア', 'ｲ':'イ', 'ｳ':'ウ', 'ｴ':'エ', 'ｵ':'オ', 'ｶ':'カ', 'ｷ':'キ', 'ｸ':'ク', 'ｹ':'ケ', 'ｺ':'コ',
+        'ｻ':'サ', 'ｼ':'シ', 'ｽ':'ス', 'ｾ':'セ', 'ｿ':'ソ', 'ﾀ':'タ', 'ﾁ':'チ', 'ﾂ':'ツ', 'ﾃ':'テ', 'ﾄ':'ト',
+        'ﾅ':'ナ', 'ﾆ':'ニ', 'ﾇ':'ヌ', 'ﾈ':'ネ', 'ﾉ':'ノ', 'ﾊ':'ハ', 'ﾋ':'ヒ', 'ﾌ':'フ', 'ﾍ':'ヘ', 'ﾎ':'ホ',
+        'ﾏ':'マ', 'ﾐ':'ミ', 'ﾑ':'ム', 'ﾒ':'メ', 'ﾓ':'モ', 'ﾔ':'ヤ', 'ﾕ':'ユ', 'ﾖ':'ヨ',
+        'ﾗ':'ラ', 'ﾘ':'リ', 'ﾙ':'ル', 'ﾚ':'レ', 'ﾛ':'ロ', 'ﾜ':'ワ', 'ｦ':'ヲ', 'ﾝ':'ン',
+        'ｧ':'ァ', 'ｨ':'ィ', 'ｩ':'ゥ', 'ｪ':'ェ', 'ｫ':'ォ', 'ｯ':'ッ', 'ｬ':'ャ', 'ｭ':'ュ', 'ｮ':'ョ',
+        '｡':'。', '､':'、', 'ｰ':'ー', '｢':'「', '｣':'」', '･':'・'
+    };
+    const reg = new RegExp('(' + Object.keys(kanaMap).join('|') + ')', 'g');
+    s = s.replace(reg, m => kanaMap[m]);
+    return s; 
+}
+
+function stripManufacturer(str) {
+    if (!str) return "";
+    let pos = str.indexOf("｢"); if(pos > -1) str = str.substring(0, pos);
+    pos = str.indexOf("("); if(pos > -1) str = str.substring(0, pos);
+    pos = str.indexOf("「"); if(pos > -1) str = str.substring(0, pos);
+    pos = str.indexOf("（"); if(pos > -1) str = str.substring(0, pos);
+    return str.replace(/\s/g, "");
+}
+
+function cleanDrugName(rawText) {
+    if (!rawText || rawText.trim() === "") return null;
+    let name = rawText.trim();
+    
+    // 1. 先頭のカッコ類（持参薬）などを削除
+    name = name.replace(/^[（\(【［\[].*?[）\)】］\]]/g, "").trim();
+    name = name.replace(/^[\s　]+/g, "");
+
+    // 2. スペースやタブ、カッコ（「など）が来るまでの最初の単語を抽出
+    const splitMatch = name.match(/^([^\s　\t「【\(（]+)/);
+    if(splitMatch) name = splitMatch[1];
+
+    // 3. 不要な記号や単位を置換・削除
+    name = name.replace(/[★※・\/／]/g, "");
+    name = name.replace(/㎎/g, "mg").replace(/㎍/g, "μg").replace(/㎖/g, "ml").replace(/㌘/g, "g");
+    
+    // 4. 英数字を全角に変換
+    name = name.replace(/[!-~]/g, function(ch) { return String.fromCharCode(ch.charCodeAt(0) + 0xFEE0); });
+    name = name.replace(/．/g, ".");
+
+    // 5. 剤形の後に数字が続く場合、剤形以降をカット
+    const boundaries = ["OD錠", "ＯＤ錠", "錠", "カプセル", "散", "顆粒", "細粒", "シロップ", "ドライシロップ", "液", "テープ", "パップ", "クリーム", "軟膏", "ゲル", "ローション", "坐剤", "坐薬", "スプレー", "塩酸塩", "硫酸塩", "リン酸塩", "マレイン酸塩", "クエン酸塩", "フマル酸塩", "メシル酸塩", "ベシル酸塩", "トシル酸塩", "ナトリウム", "カリウム", "カルシウム"];
+    for (const b of boundaries) {
+        const reg = new RegExp("(" + b + ")[0-9０-９]+.*$");
+        if (reg.test(name)) { name = name.replace(reg, "$1"); break; }
+    }
+
+    // 6. 末尾に残った数字＋単位をカット
+    name = name.replace(/[0-9０-９]+(\.[0-9０-９]+)?(mg|g|ml|μg|mcg|ｍｇ|ｇ|ｍｌ|μｇ|ｍｃｇ|%|％)$/gi, "");
+
+    return name.trim();
+}
+
+
+
+function renderCitations() {
+    citations = {};
+    refDataArray.forEach(r => {
+        citations[r.no] = r.name;
+    });
+    
+    const citationListEl = document.getElementById("citationList");
+    const printCitationListEl = document.getElementById("printCitationList");
+    if(citationListEl && printCitationListEl) {
+        let cHtml = "";
+        refDataArray.forEach(r => {
+            cHtml += `<li class="citation-item">[${r.no}] ${r.name}</li>`;
+        });
+        citationListEl.innerHTML = `<ul class="citation-list">${cHtml}</ul>`;
+        printCitationListEl.innerHTML = `<ul class="citation-list">${cHtml}</ul>`;
+    }
+}
+
+function parseDatabase() {
+    masterDataArray = [];
+    const mLines = rawMasterData.trim().split("\n");
+    let isHeader = false;
+    for (const line of mLines) {
+        if(!line) continue;
+        if (line.startsWith("分類")) { isHeader = true; continue; }
+        if (!isHeader) continue;
+        const cols = line.split("\t");
+        if (cols.length < 3) continue;
+        masterDataArray.push({
+            type: cols[0] || "",
+            type2: cols[1] || "",
+            brand: cols[2] || "",
+            gene: cols[3] || "",
+            period: cols[4] || "",
+            ref: cols[5] || "",
+            reason: cols[6] || "",
+            normBrand: typeof normalizeString === 'function' ? normalizeString(cols[2] || "") : (cols[2]||""),
+            normGene: typeof normalizeString === 'function' ? normalizeString(cols[3] || "") : (cols[3]||"")
+        });
+    }
+
+    exclDataArray = [];
+    const eLines = rawExclusionData.trim().split("\n");
+    let eHeader = false;
+    for (const line of eLines) {
+        if(!line) continue;
+        if (line.startsWith("除外キーワード")) { eHeader = true; continue; }
+        if (!eHeader) continue;
+        const cols = line.split("\t");
+        exclDataArray.push({
+            orig: cols[0] || "",
+            remark: cols[1] || "",
+            norm: typeof normalizeString === 'function' ? normalizeString(cols[0] || "") : (cols[0] || "")
+        });
+    }
+    exclusionKeywords = exclDataArray.map(e => e.orig).filter(w => w);
+
+    refDataArray = [];
+    if (typeof rawReferenceData !== 'undefined') {
+        const rLines = rawReferenceData.trim().split("\n");
+        let rHeader = false;
+        for (const line of rLines) {
+            if(!line) continue;
+            if (line.startsWith("番号")) { rHeader = true; continue; }
+            if (!rHeader) continue;
+            const cols = line.split("\t");
+            if (cols.length >= 2) {
+                refDataArray.push({
+                    no: cols[0].trim(),
+                    name: cols[1].trim()
+                });
+            }
+        }
+    }
+    
+    renderCitations();
+    
+    if (typeof renderAdminTables === 'function') {
+        renderAdminTables();
+    }
+}
+
+
+function findMatchingDrug(line, cleanedName) {
+    const targetNorm = normalizeString(cleanedName);
+    let bestMatch = null, maxLen = 0;
+    
+    for(let m of masterDataArray) {
+        let keys = [m.normBrand, m.normGene, m.normClean].filter(k=>k);
+        for(let k of keys) {
+            // Tab 2と同じ前方一致＋単語境界判定
+            if(targetNorm.indexOf(k) === 0) {
+                const remainder = targetNorm.substring(k.length);
+                if(remainder === "" || isSeparatorWord(remainder)) {
+                    if (k.length > maxLen) { 
+                        maxLen = k.length; 
+                        bestMatch = m; 
+                    }
+                }
+            }
+        }
+    }
+    return bestMatch;
+}
+
+// =========================================================
+// 5. タブ1: 判定実行
+// =========================================================
+function processData() {
+    const rawInput = document.getElementById("rawInput").value;
+    const sDateStr = document.getElementById("surgeryDate").value;
+    const hasDate = !!sDateStr;
+    const dateText = hasDate ? new Date(sDateStr).toLocaleDateString('ja-JP', {year:'numeric', month:'2-digit', day:'2-digit'}) : "未設定";
+    document.getElementById("printDateDisplay_Check").textContent = "手術予定日：" + dateText;
+    
+    document.querySelectorAll(".col-calc").forEach(el => { el.style.display = hasDate ? "" : "none"; });
+
+    const lines = rawInput.split("\n");
+    const results = [];
+    
+    // 行全体に含まれていたら確実に弾くキーワード（施設名や固定メッセージなど）
+    const lineNoiseKeywords = [
+        "薬効名称", "院内(", "院内採用", "院外専用", "在庫なし", "持参無", "持参薬用法", "処方あり", 
+        "クリニック", "病院", "眼科", "内科", "外科", "歯科", "薬局",
+        "薬剤師", "未実施", "退院", "No.", "Ｎｏ．", "実数入力", "用法",
+        "医師", "科)", "科）", "救急", "皮膚科", "小児科", "産婦人科", "精神科", "泌尿器科"
+    ];
+
+    // 抽出された単語自体がこれらを含んでいたら弾くキーワード（用法指示など）
+    // ※行全体で判定すると、薬の横に用法が書かれているだけで薬ごと消えてしまうため
+    const wordNoiseKeywords = [
+        "分１", "分２", "分３", "分４", "分５", "分６", "回分", "日分", "日目", "日毎", "日おき", "ヶ月", "残",
+        "痛む", "頭痛", "発熱", "疼痛", "不眠", "便秘", "頓服",
+        "食後", "食前", "食間", "眠前", "朝食", "夕食", "昼食", "就寝",
+        "時間", "間隔", "まで", "飲みきり", "適宜", "振って", "検認",
+        "眼に", "耳に", "鼻に"
+    ];
+
+    lines.forEach(line => {
+        let trimmed = line.replace(/　/g, " ").trim();
+        if (!trimmed) return;
+        
+        // 1. 行全体の構造や確実なノイズキーワードで弾く
+        if (/^Rp\s*[0-9]*$/i.test(trimmed)) return;
+        if (/[0-9]{4}\/[0-9]{1,2}\/[0-9]{1,2}/.test(trimmed)) return;
+        if (trimmed.includes("。") || trimmed.includes("、")) return;
+        if (trimmed.includes("して下さい") || trimmed.includes("してください") || trimmed.includes("との話")) return;
+        
+        if (lineNoiseKeywords.some(kw => trimmed.includes(kw))) return;
+        
+        // 2. 薬剤名の抽出
+        const cleaned = cleanDrugName(line);
+        if (!cleaned || cleaned.length < 2) return; // 短すぎる文字は無視
+        
+        // 3. 抽出された単語(cleaned)自体が用法指示などのノイズであるかをチェック
+        const isNoise = wordNoiseKeywords.some(kw => cleaned.includes(kw));
+        const endsWithNoise = cleaned.endsWith("時") || cleaned.endsWith("まで") || cleaned.endsWith("なし") || cleaned.endsWith("あり") || cleaned.endsWith("回") || cleaned.endsWith("枚") || cleaned.endsWith("滴");
+        
+        if (isNoise || endsWithNoise) {
+            return; 
+        }
+        
+        // 4. マスタ判定
+        const bestMatch = findMatchingDrug(line, cleaned);
+        
+        if (bestMatch) {
+            // 外用剤の上書き判定
+            let isExt = ["点眼", "軟膏", "テープ", "貼付", "ローション", "坐剤", "クリーム", "パップ", "外用", "スプレー", "エアロゾル", "吸入"].some(kw => line.includes(kw) && !bestMatch.brand.includes(kw) && !bestMatch.gene.includes(kw));
+            if (isExt) {
+                results.push({ name: cleaned, data: {...bestMatch, period: "-", reason: "外用剤のため影響少ない"} });
+            } else {
+                results.push({ name: cleaned, data: bestMatch });
+            }
+        } else {
+            results.push({ name: cleaned, data: null });
+        }
+    });
+    
+    renderResults(results, hasDate, sDateStr);
+}
+
+function calculateStopDateStrict(period, sDateStr) {
+    if (period.includes("④") || period.includes("参照")) return { text: "院内プロトコル(別紙)参照", alert: true }; 
+    const rule = DATE_RULES[period];
+    if (rule) {
+        if (rule.text && !rule.text.includes("{")) return { text: rule.text, alert: rule.alert, css: rule.css };
+        const sDate = new Date(sDateStr);
+        const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+        const add = n => { const x = new Date(sDate); x.setDate(x.getDate() + n); return x; };
+        
+        if (rule.text) {
+             let txt = rule.text.replace("{date}", fmt(sDate));
+             if(txt.includes("{d3}")) txt = txt.replace("{d3}", fmt(add(-3)));
+             if(txt.includes("{d5}")) txt = txt.replace("{d5}", fmt(add(-5)));
+             return { text: txt, alert: rule.alert };
+        }
+        if (Array.isArray(rule.days)) return { text: `${fmt(add(rule.days[0]))}～${fmt(add(rule.days[1]))}`, alert: rule.alert };
+        return { text: fmt(add(rule.days)), alert: rule.alert };
+    }
+    return { text: "-", alert: false };
+}
+
+function renderResults(results, hasDate, sDateStr) {
+    const tbody = document.querySelector("#resultTable tbody");
+    const pBody = document.querySelector("#printResultTable tbody");
+    
+    if (results.length === 0) { 
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">有効なデータなし</td></tr>'; 
+        pBody.innerHTML = '';
+        return; 
+    }
+    
+    let screenHtml = "";
+    let printHtml = "";
+    
+    results.forEach((r, idx) => {
+        const m = r.data;
+        if(m) {
+            let calcText = "-";
+            let rowClass = "row-none";
+            if(hasDate) {
+                const res = calculateStopDateStrict(m.period, sDateStr);
+                calcText = res.text;
+                rowClass = res.alert ? "row-alert" : (res.css || "");
+            } else {
+                if (m.period.includes("なし")) { rowClass = "row-gray"; calcText = "院内推奨期間なし"; }
+                else if (m.period !== "-" && m.period !== "対象外") { rowClass = "row-alert"; calcText = m.period.includes("参照") ? "院内プロトコル(別紙)参照" : m.period; }
+            }
+            
+            const trClass = rowClass;
+            const displayStyle = hasDate ? '' : 'display:none;';
+            
+            screenHtml += `<tr class="${trClass}" id="row_screen_${idx}">
+                <td class="fw-bold">${r.name}</td>
+                <td class="small">${m.type}</td>
+                <td class="small">${m.period}</td>
+                <td class="fw-bold editable-date" style="${displayStyle} background-color:#fffbea; cursor:text; border: 1px dashed #ffc107;" contenteditable="true" data-orig="${calcText}" oninput="document.getElementById('row_print_${idx}').querySelector('.print-date').innerHTML = this.innerHTML">${calcText}</td>
+                <td class="small">${m.reason}</td>
+                <td class="small text-center">${m.ref}</td>
+                <td class="text-center align-middle no-print">
+                    <button class="btn btn-sm btn-outline-secondary p-0 px-1 me-1" onclick="const ed = this.closest('tr').querySelector('.editable-date'); ed.innerHTML = ed.dataset.orig; document.getElementById('row_print_${idx}').querySelector('.print-date').innerHTML = ed.dataset.orig;" title="元に戻す">↺</button>
+                    <button class="btn btn-sm btn-outline-danger p-0 px-1" onclick="document.getElementById('row_screen_${idx}').remove(); const pRow = document.getElementById('row_print_${idx}'); if(pRow) pRow.remove();" title="この行を削除">✖</button>
+                </td>
+            </tr>`;
+            
+            printHtml += `<tr class="${trClass}" id="row_print_${idx}">
+                <td class="fw-bold">${r.name}</td>
+                <td class="small">${m.type}</td>
+                <td class="small">${m.period}</td>
+                <td class="fw-bold print-date" style="${displayStyle}">${calcText}</td>
+                <td class="small">${m.reason}</td>
+                <td class="small text-center">${m.ref}</td>
+            </tr>`;
+            
+        } else {
+            screenHtml += `<tr id="row_screen_${idx}">
+                <td>${r.name}</td>
+                <td class="small text-muted">-</td>
+                <td class="small text-muted">指定なし</td>
+                <td class="small text-muted editable-date" style="${hasDate?'':'display:none;'} background-color:#fffbea; cursor:text; border: 1px dashed #ffc107;" contenteditable="true" data-orig="-" oninput="document.getElementById('row_print_${idx}').querySelector('.print-date').innerHTML = this.innerHTML">-</td>
+                <td class="small text-muted">-</td>
+                <td class="text-center">-</td>
+                <td class="text-center align-middle no-print">
+                    <button class="btn btn-sm btn-outline-secondary p-0 px-1 me-1" onclick="const ed = this.closest('tr').querySelector('.editable-date'); ed.innerHTML = ed.dataset.orig; document.getElementById('row_print_${idx}').querySelector('.print-date').innerHTML = ed.dataset.orig;" title="元に戻す">↺</button>
+                    <button class="btn btn-sm btn-outline-danger p-0 px-1" onclick="document.getElementById('row_screen_${idx}').remove(); const pRow = document.getElementById('row_print_${idx}'); if(pRow) pRow.remove();" title="この行を削除">✖</button>
+                </td>
+            </tr>`;
+            
+            printHtml += `<tr id="row_print_${idx}">
+                <td>${r.name}</td>
+                <td class="small text-muted">-</td>
+                <td class="small text-muted">指定なし</td>
+                <td class="small text-muted print-date" style="${hasDate?'':'display:none;'}">-</td>
+                <td class="small text-muted">-</td>
+                <td class="text-center">-</td>
+            </tr>`;
+        }
+    });
+    
+    tbody.innerHTML = screenHtml;
+    pBody.innerHTML = printHtml;
+}
+
+// =========================================================
+// 6. タブ2: カレンダー
+// =========================================================
+function calcScheduleTab() {
+    const dStr = document.getElementById("scheduleDateInput").value;
+    const area = document.getElementById("scheduleResultArea");
+    if (!dStr) { area.innerHTML = ""; return; }
+    
+    document.getElementById("printScheduleDateDisplay").textContent = "手術予定日：" + new Date(dStr).toLocaleDateString('ja-JP');
+    const sDate = new Date(dStr);
+    const fmt = d => `${d.getMonth()+1}/${d.getDate()} (${["日","月","火","水","木","金","土"][d.getDay()]})`;
+    const add = n => { const x = new Date(sDate); x.setDate(x.getDate() + n); return x; };
+    
+    const patterns = [
+        { l: "6週間前", d: -42 }, { l: "4週間前", d: -28 }, { l: "2週間前", d: -14 },
+        { l: "1週間前", d: -7 }, { l: "7日前", d: -7 }, { l: "5日以上前", d: -5 },
+        { l: "3日前", d: -3 }, { l: "2日前", d: -2 }, { l: "前日(1日前)", d: -1 },
+        { l: "手術当日", d: 0 }, { l: "術後2週", d: 14 }
+    ];
+    
+    let highlightDates = {};
+    let h = `<div class="timeline-wrapper"><div class="timeline-container"><table class="timeline-table"><thead><tr><th class="timeline-date-col">日付</th><th class="timeline-content-col">休薬・対応</th></tr></thead><tbody>`;
+    patterns.forEach(p => {
+        let dateObj = add(p.d);
+        let dateStr = `${dateObj.getFullYear()}-${dateObj.getMonth()+1}-${dateObj.getDate()}`;
+        if(p.d === 0) highlightDates[dateStr] = { class: "cal-surgery", label: "手術" };
+        else highlightDates[dateStr] = { class: "cal-mark", label: p.l.replace("手術前","").replace("前","") };
+        h += `<tr class="${p.d===0?'timeline-row-today':''}"><td class="timeline-date-col">${fmt(dateObj)}</td><td class="timeline-content-col">${p.l}</td></tr>`;
+    });
+    h += `</tbody></table></div><div class="calendar-container"><div class="cal-wrapper">`;
+    h += generateCalendarHTML(new Date(sDate.getFullYear(), sDate.getMonth() - 1, 1), highlightDates);
+    h += generateCalendarHTML(new Date(sDate.getFullYear(), sDate.getMonth(), 1), highlightDates);
+    h += `</div></div></div>`;
+    area.innerHTML = h;
+}
+
+function generateCalendarHTML(baseDate, highlights) {
+    const year = baseDate.getFullYear(); const month = baseDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay(); const lastDate = new Date(year, month + 1, 0).getDate();
+    let html = `<div class="cal-month"><div class="cal-header">${year}年 ${month+1}月</div><div class="cal-grid">`;
+    const days = ["日","月","火","水","木","金","土"];
+    days.forEach(d => html += `<div class="cal-day-header">${d}</div>`);
+    for(let i=0; i<firstDay; i++) { html += `<div class="cal-cell"></div>`; }
+    for(let d=1; d<=lastDate; d++) {
+        const currentKey = `${year}-${month+1}-${d}`;
+        const hl = highlights[currentKey];
+        let className = "cal-cell" + (hl ? ` ${hl.class}` : "");
+        let content = d + (hl ? `<span class="cal-mark-desc">${hl.label}</span>` : "");
+        html += `<div class="${className}">${content}</div>`;
+    }
+    html += `</div></div>`;
+    return html;
+}
+
+// =========================================================
+// 7. タブ3: マスター検索
+// =========================================================
+function filterMasterTable() {
+    const txt = document.getElementById("masterSearch") ? document.getElementById("masterSearch").value : "";
+    const tbody = document.getElementById("masterTableBody");
+    if(!tbody) return;
+    tbody.innerHTML = "";
+    const normTxt = typeof normalizeString === 'function' ? normalizeString(txt) : txt;
+    masterDataArray.forEach(row => {
+        if (!normTxt || (row.normBrand && row.normBrand.includes(normTxt)) || (row.normGene && row.normGene.includes(normTxt))) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${row.type}</td><td>${row.type2}</td><td>${row.brand}</td><td>${row.gene}</td><td>${row.period}</td><td>${row.ref}</td><td>${row.reason}</td>`;
+            tbody.appendChild(tr);
+        }
+    });
+}
+// =========================================================
+// 8. タブ4: プロトコル
+// =========================================================
+function selectAC(type, val, btn) {
+    if(type === 'drug') currentDrug = val;
+    if(type === 'surgery') currentSurgery = val;
+    const group = type === 'drug' ? 'drug-buttons' : 'surgery-buttons';
+    document.querySelectorAll(`#${group} button`).forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    updateACDisplay();
+}
+function setACDrug(type, btn) { selectAC('drug', type, btn); }
+function setACSurgery(type, btn) { selectAC('surgery', type, btn); }
+
+function updateACDisplay() {
+    if(!currentDrug || !currentSurgery) return;
+    document.getElementById('ac-result-area').style.display = 'block';
+    
+    const key = currentDrug + "_" + currentSurgery;
+    const data = AC_MATRIX[key];
+    document.getElementById('high-risk-action').innerHTML = data.h;
+    document.getElementById('low-risk-action').innerHTML = data.l;
+    
+    const sVal = document.getElementById('ac-surgery-date').value;
+    const hSch = document.getElementById('high-schedule');
+    const lSch = document.getElementById('low-schedule');
+    if(sVal) {
+        hSch.style.display = 'block'; lSch.style.display = 'block';
+        hSch.innerHTML = getAcScheduleText(data.hd, sVal);
+        lSch.innerHTML = getAcScheduleText(data.ld, sVal);
+    } else {
+        hSch.style.display = 'none'; lSch.style.display = 'none';
+    }
+    document.getElementById('ac-result-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function getAcScheduleText(days, sDateVal) {
+    if(!sDateVal || days === 0) return "";
+    const sDate = new Date(sDateVal);
+    const fmt = d => (d.getMonth() + 1) + '/' + d.getDate();
+    const add = n => { const x = new Date(sDate); x.setDate(x.getDate() - n); return x; };
+    if (Array.isArray(days)) return `${fmt(add(days[1]))}～${fmt(add(days[0]))}から休薬`;
+    return `${fmt(add(days))}から休薬`;
+}
+
+// =========================================================
+// 9. ⚙️管理設定: パスワード＆CSV抽出・エディタ
+// =========================================================
+
+function bulkAddMaster() {
+    const text = document.getElementById("bulkPasteArea").value.trim();
+    if(!text) return;
+    const lines = text.split("\n");
+    let addedCount = 0;
+    for(const line of lines) {
+        if(!line.trim()) continue;
+        const cols = line.split("\t");
+        if(cols.length < 3 && cols[0] === "") continue; // 空行無視
+        const type = cols[0] || "";
+        const type2 = cols[1] || "";
+        const brand = cols[2] || "";
+        const gene = cols[3] || "";
+        const period = cols[4] || "";
+        const ref = cols[5] || "";
+        const reason = cols[6] || "";
+        
+        masterDataArray.push({
+            type: type, type2: type2, brand: brand, gene: gene, 
+            period: period, ref: ref, reason: reason,
+            normBrand: typeof normalizeString === 'function' ? normalizeString(brand) : brand,
+            normGene: typeof normalizeString === 'function' ? normalizeString(gene) : gene
+        });
+        addedCount++;
+    }
+    document.getElementById("bulkPasteArea").value = "";
+    renderAdminTables();
+    alert(addedCount + "件のデータを追加しました！");
+}
+
+function checkPassword() {
+    const pw = document.getElementById("adminPassword").value;
+    if(pw === "713665") {
+        document.getElementById("admin-login").style.display = "none";
+        document.getElementById("admin-content").style.display = "block";
+        renderEditors();
+    } else {
+        alert("パスワードが違います。");
+    }
+}
+
+function isSeparatorWord(remainStr) {
+    if(!remainStr) return true;
+    const firstChar = remainStr.charAt(0);
+    // 数字、記号、アルファベット判定
+    if (/[0-9０-９]/.test(firstChar)) return true;
+    if ("（「［【『－ー-()[]".includes(firstChar)) return true;
+    if (/[a-zA-Zａ-ｚＡ-Ｚ]/.test(firstChar)) return true;
+    
+    const sepWords = [
+        "錠", "カプセル", "散", "顆粒", "細粒", "シロップ", "ドライシロップ", "液", "水性", "懸濁", "ワクチン",
+        "テープ", "パップ", "クリーム", "軟膏", "ゲル", "ローション", "坐剤", "坐薬", "スプレー", "エアロゾル", "ポンプ", "吸入", "外用", "内服",
+        "点眼", "点耳", "点鼻", "注射", "注", "キット", "シリンジ", "バッグ", "ディスポ", "ポリアンプ",
+        "配合", "徐放", "舌下", "無水物",
+        "塩酸塩", "マレイン酸塩", "ナトリウム", "二ナトリウム", "カリウム", "カルシウム",
+        "メシル酸塩", "ベシル酸塩", "トシル酸塩", "フマル酸塩", "酢酸塩", "酒石酸塩",
+        "臭化水素酸塩", "硫酸塩", "リン酸塩", "硝酸塩", "エステル", "水和物",
+        "シレキセチル", "メドキソミル", "プロキセチル", "ＰＤ", "PD"
+    ];
+    for(let w of sepWords) { if (remainStr.startsWith(w)) return true; }
+    return false;
+}
+
+function setupDragAndDrop() {
+    
+    // 画面外へのドロップでファイルが開いてしまうブラウザのデフォルト挙動を防止
+    window.addEventListener("dragover", function(e) { e.preventDefault(); }, false);
+    window.addEventListener("drop", function(e) { e.preventDefault(); }, false);
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('csvFileInput');
+    if(!dropZone) return;
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault(); dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleCSVFile(e.dataTransfer.files[0]);
+    });
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) handleCSVFile(e.target.files[0]);
+    });
+}
+
+function handleCSVFile(file) {
+    if (!file.name.match(/\.(csv|txt|tsv)$/i)) { alert("CSVまたはテキストファイル(.csv, .txt, .tsv)を選択してください。"); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) { 
+        let text = e.target.result;
+        // UTF-8で読んで文字化け（）が出た場合、Shift_JISで読み直す（Shift_JIS→UTF-8の誤読はが出やすいため、UTF-8を先に試すのが安全です）
+        if(text.includes("")) {
+            const r2 = new FileReader();
+            r2.onload = function(e2) { processCSV(e2.target.result); };
+            r2.readAsText(file, 'Shift_JIS');
+        } else {
+            // もしUTF-8で読めても「名称」が含まれていない場合、念のためShift_JISで読み直すフォールバックを追加
+            if (!text.includes("名称")) {
+                const r3 = new FileReader();
+                r3.onload = function(e3) { processCSV(e3.target.result); };
+                r3.readAsText(file, 'Shift_JIS');
+            } else {
+                processCSV(text);
+            }
+        }
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+
+
+function handleCSVPaste() {
+    const text = document.getElementById("csvPasteArea").value.trim();
+    if(!text) {
+        alert("データが貼り付けられていません。");
+        return;
+    }
+    try {
+        processCSV(text);
+    } catch(e) {
+        alert("エラーが発生しました: " + e);
+    }
+}
+
+function processCSV(csvText) {
+    const lines = csvText.split(/\r\n|\n/);
+    if(lines.length < 2) {
+        alert("データが1行しかありません。見出し行（名称など）を含めて複数行コピーしてください。");
+        return;
+    }
+    
+    // 見出し行の特定（"名称"が含まれる行を探す）
+    let headerLineIdx = 0;
+    for(let i=0; i<Math.min(10, lines.length); i++) {
+        if(lines[i].includes("名称")) { headerLineIdx = i; break; }
+    }
+    
+    let delimiter = lines[headerLineIdx].includes('\t') ? '\t' : ',';
+    const headers = lines[headerLineIdx].split(delimiter);
+    const colName = headers.findIndex(h => h.includes("名称"));
+    const colIng = headers.findIndex(h => h.includes("成分"));
+    if(colName === -1) { alert("「名称」を含む列が見つかりません。"); return; }
+
+    const outputMap = new Map();
+    const results = [];
+    
+    for(let i = headerLineIdx + 1; i < lines.length; i++) {
+        let cols = lines[i].split(delimiter);
+        if(cols.length <= colName) continue;
+        
+        let sName = cols[colName].replace(/^"|"$/g, '').trim();
+        let sIng = colIng > -1 ? (cols[colIng] || "").replace(/^"|"$/g, '').trim() : "";
+        let normName = normalizeString(sName);
+        let normIng = normalizeString(sIng);
+        
+        if(!normName) continue;
+        let isSkip = false;
+        let similarDrugs = "";
+        
+        // 1. 自動除外チェック（境界判定）
+        if(isAutoExcluded(normName) || (normIng && isAutoExcluded(normIng))) isSkip = true;
+        
+        // 2. 部分一致チェック
+        if(!isSkip) {
+            masterDataArray.forEach(m => {
+                if(m.normBrand && m.normBrand.length >= 2 && (normName.includes(m.normBrand) || (normIng && normIng.includes(m.normBrand)))) {
+                    if(!similarDrugs.includes(m.brand)) similarDrugs += `【休薬】${m.brand}\n`;
+                }
+                if(m.normGene && m.normGene.length >= 2 && (normName.includes(m.normGene) || (normIng && normIng.includes(m.normGene)))) {
+                    if(!similarDrugs.includes(m.gene)) similarDrugs += `【休薬】${m.gene}\n`;
+                }
+            });
+            exclDataArray.forEach(e => {
+                if(e.norm && e.norm.length >= 2 && (normName.includes(e.norm) || (normIng && normIng.includes(e.norm)))) {
+                    if(!similarDrugs.includes(e.orig)) similarDrugs += `【除外】${e.orig}\n`;
+                }
+            });
+            
+            if(normIng) {
+                if(outputMap.has(normIng)) isSkip = true;
+                else outputMap.set(normIng, true);
+            }
+        }
+        
+        if(!isSkip) {
+            similarDrugs = similarDrugs.trim();
+            results.push({
+                type: similarDrugs ? "要確認(部分一致)" : "完全新規",
+                name: sName, ing: sIng, similar: similarDrugs
+            });
+        }
+    }
+    renderExtractResults(results);
+}
+
+function isAutoExcluded(targetNorm) {
+    for(let m of masterDataArray) {
+        let keys = [m.normBrand, m.normGene].filter(k=>k);
+        for(let k of keys) {
+            if(targetNorm.indexOf(k) === 0) {
+                if(k && targetNorm.length === k.length) return true;
+                if(isSeparatorWord(targetNorm.substring(k.length))) return true;
+            }
+        }
+    }
+    for(let e of exclDataArray) {
+        if(e.norm && targetNorm.indexOf(e.norm) === 0) {
+            if(targetNorm.length === e.norm.length) return true;
+            if(isSeparatorWord(targetNorm.substring(e.norm.length))) return true;
+        }
+    }
+    return false;
+}
+
+function renderExtractResults(results) {
+    const tbody = document.querySelector("#extractResultTable tbody");
+    if(!tbody) { alert("抽出結果を表示するテーブルが見つかりません。"); return; }
+    tbody.innerHTML = "";
+    if(results.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-success fw-bold py-3">処理完了: 新規の候補薬剤は見つかりませんでした（すべて既存・除外済み）</td></tr>';
+        alert("処理が完了しました。新規候補はありません（すべて既存マスタまたは除外リストに含まれています）。");
+        return;
+    }
+    alert("処理が完了しました。" + results.length + "件の候補が抽出されました。");
+    
+    results.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        const color = r.type === "完全新規" ? "color: #dc3545; font-weight: bold;" : "color: #b8860b;";
+        const bgColor = r.type === "完全新規" ? "background-color: #f8d7da;" : "background-color: #fff3cd;";
+        
+        tr.id = `ext-row-${idx}`;
+        tr.innerHTML = `
+            <td style="${color} ${bgColor}">${r.type}</td>
+            <td id="ext-name-${idx}">${r.name}</td>
+            <td id="ext-ing-${idx}">${r.ing}</td>
+            <td style="white-space: pre-wrap; font-size: 0.85em;">${r.similar}</td>
+            <td id="ext-action-${idx}">
+                <button class="btn btn-sm btn-primary mb-1 w-100" onclick="showInlineMasterForm(${idx})">➕ マスタ</button>
+                <button class="btn btn-sm btn-secondary w-100" onclick="showInlineExclForm(${idx})">➕ 除外</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    }
+
+function renderEditors() {
+    const mTbody = document.querySelector("#editorMasterTable tbody");
+    let mHtml = "";
+    masterDataArray.forEach((m, idx) => {
+        mHtml += `<tr><td>${m.type}</td><td>${m.brand}</td><td>${m.gene}</td><td>${m.period}</td><td><button class="btn btn-sm btn-danger" onclick="delMaster(${idx})">削除</button></td></tr>`;
+    });
+    mTbody.innerHTML = mHtml;
+
+    const eTbody = document.querySelector("#editorExclTable tbody");
+    let eHtml = "";
+    exclDataArray.forEach((e, idx) => {
+        eHtml += `<tr><td>${e.orig}</td><td><button class="btn btn-sm btn-danger" onclick="delExcl(${idx})">削除</button></td></tr>`;
+    });
+    eTbody.innerHTML = eHtml;
+}
+
+
+function updateMasterCell(idx, field, value) {
+    if(masterDataArray[idx]) {
+        masterDataArray[idx][field] = value.trim();
+        if(field === 'brand') masterDataArray[idx].normBrand = typeof normalizeString === 'function' ? normalizeString(value) : value;
+        if(field === 'gene') masterDataArray[idx].normGene = typeof normalizeString === 'function' ? normalizeString(value) : value;
+    }
+}
+
+function addMasterRow() {
+    const cls = document.getElementById("addM_Class").value;
+    const prod = document.getElementById("addM_Prod").value;
+    const gene = document.getElementById("addM_Gene").value;
+    const period = document.getElementById("addM_Period").value;
+    if(!prod && !gene) return alert("商品名か一般名を入力してください");
+    masterDataArray.push({ type: cls, type2:"", brand: prod, gene: gene, period: period, ref:"", reason:"", normBrand: normalizeString(prod), normGene: normalizeString(gene), normClean: normalizeString(stripManufacturer(prod)) });
+    renderEditors(); filterMasterTable();
+    document.getElementById("addM_Prod").value = ""; document.getElementById("addM_Gene").value = "";
+}
+
+
+function updateExclCell(idx, val) {
+    if(exclDataArray[idx]) {
+        exclDataArray[idx].orig = val.trim();
+        exclDataArray[idx].norm = typeof normalizeString === 'function' ? normalizeString(val) : val;
+    }
+}
+
+function addExclRow() {
+    const word = document.getElementById("addE_Word").value;
+    if(!word) return;
+    exclDataArray.push({ orig: word, norm: normalizeString(word) });
+    renderEditors();
+    document.getElementById("addE_Word").value = "";
+}
+
+function delMaster(idx) { masterDataArray.splice(idx, 1); renderEditors(); filterMasterTable(); }
+function delExcl(idx) { exclDataArray.splice(idx, 1); renderEditors(); }
+
+function showInlineMasterForm(idx) {
+    const tr = document.getElementById(`ext-row-${idx}`);
+    if(document.getElementById(`inline-form-${idx}`)) return;
+    const formTr = document.createElement("tr");
+    formTr.id = `inline-form-${idx}`;
+    formTr.innerHTML = `
+        <td colspan="5" class="bg-light p-3" style="border-left: 4px solid #0d6efd;">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <strong class="text-primary me-2">マスタ登録:</strong>
+                <input type="text" id="il_m_type_${idx}" class="form-control form-control-sm" placeholder="大分類 (例: 抗凝固薬)" style="width: 160px;">
+                <input type="text" id="il_m_type2_${idx}" class="form-control form-control-sm" placeholder="小分類" style="width: 120px;">
+                <input type="text" id="il_m_period_${idx}" class="form-control form-control-sm" placeholder="休薬期間" style="width: 100px;">
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="me-2" style="visibility:hidden">マスタ登録:</span>
+                <input type="text" id="il_m_ref_${idx}" class="form-control form-control-sm" placeholder="引用元" style="width: 160px;">
+                <input type="text" id="il_m_reason_${idx}" class="form-control form-control-sm" placeholder="休薬理由" style="width: 250px;">
+                <button class="btn btn-sm btn-primary ms-auto px-4" onclick="submitInlineMaster(${idx})">確定</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="cancelInlineForm(${idx})">キャンセル</button>
+            </div>
+        </td>
+    `;
+    tr.parentNode.insertBefore(formTr, tr.nextSibling);
+    document.getElementById(`il_m_type_${idx}`).focus();
+}
+
+function submitInlineMaster(idx) {
+    const name = document.getElementById(`ext-name-${idx}`).innerText.trim();
+    const ing = document.getElementById(`ext-ing-${idx}`).innerText.trim();
+    masterDataArray.push({
+        type: document.getElementById(`il_m_type_${idx}`).value.trim(),
+        type2: document.getElementById(`il_m_type2_${idx}`).value.trim(),
+        brand: name,
+        gene: ing,
+        period: document.getElementById(`il_m_period_${idx}`).value.trim(),
+        ref: document.getElementById(`il_m_ref_${idx}`).value.trim(),
+        reason: document.getElementById(`il_m_reason_${idx}`).value.trim(),
+        normBrand: typeof normalizeString === 'function' ? normalizeString(name) : name,
+        normGene: typeof normalizeString === 'function' ? normalizeString(ing) : ing
+    });
+    renderAdminTables();
+    cancelInlineForm(idx);
+    document.getElementById(`ext-action-${idx}`).innerHTML = `<span class="badge bg-success" style="font-size: 0.9em; padding: 8px;">マスタ登録済</span>`;
+}
+
+function showInlineExclForm(idx) {
+    const tr = document.getElementById(`ext-row-${idx}`);
+    if(document.getElementById(`inline-form-${idx}`)) return;
+    const formTr = document.createElement("tr");
+    formTr.id = `inline-form-${idx}`;
+    formTr.innerHTML = `
+        <td colspan="5" class="bg-light p-3" style="border-left: 4px solid #6c757d;">
+            <div class="d-flex align-items-center gap-2">
+                <strong class="text-secondary me-2">除外リスト登録:</strong>
+                <input type="text" id="il_e_remark_${idx}" class="form-control form-control-sm" placeholder="備考" style="width: 300px;" value="CSV抽出から追加">
+                <button class="btn btn-sm btn-secondary ms-auto px-4" onclick="submitInlineExcl(${idx})">確定</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="cancelInlineForm(${idx})">キャンセル</button>
+            </div>
+        </td>
+    `;
+    tr.parentNode.insertBefore(formTr, tr.nextSibling);
+    document.getElementById(`il_e_remark_${idx}`).focus();
+}
+
+function submitInlineExcl(idx) {
+    const name = document.getElementById(`ext-name-${idx}`).innerText.trim();
+    exclDataArray.push({
+        orig: name,
+        remark: document.getElementById(`il_e_remark_${idx}`).value.trim(),
+        norm: typeof normalizeString === 'function' ? normalizeString(name) : name
+    });
+    exclusionKeywords = exclDataArray.map(e => e.orig).filter(w => w);
+    renderAdminTables();
+    cancelInlineForm(idx);
+    document.getElementById(`ext-action-${idx}`).innerHTML = `<span class="badge bg-secondary" style="font-size: 0.9em; padding: 8px;">除外登録済</span>`;
+}
+
+function cancelInlineForm(idx) {
+    const el = document.getElementById(`inline-form-${idx}`);
+    if(el) el.remove();
+}
+
+// --- 自分自身を保存してダウンロード ---
+
+function downloadUpdatedTool() {
+    const ver = document.getElementById("genVersionInput").value;
+    
+    let newMasterTSV = "分類\t分類2\t商品名\t一般名\t休薬期間\t引用\t休薬理由\n";
+    masterDataArray.forEach(m => { newMasterTSV += `${m.type}\t${m.type2}\t${m.brand}\t${m.gene}\t${m.period}\t${m.ref}\t${m.reason}\n`; });
+    
+    let newExclTSV = "除外キーワード\t備考\n";
+    exclDataArray.forEach(e => { newExclTSV += `${e.orig}\t${e.remark}\n`; });
+    
+    let newRefTSV = "番号\t文献名\n";
+    refDataArray.forEach(r => { newRefTSV += `${r.no}\t${r.name}\n`; });
+
+    // HTML取得前にDOMを初期状態（初期タブ、管理タブ非表示）に戻す
+    document.querySelectorAll('.admin-sub-tab').forEach(el => el.style.display = 'none');
+    const loginNav = document.getElementById('nav-admin-login');
+    if (loginNav) loginNav.style.display = 'block';
+    switchTab('check-tab');
+
+    // 画面状態をコピー
+    let html = "<!DOCTYPE html>\n<html lang=\"ja\">\n" + document.documentElement.outerHTML + "\n</html>";
+    
+    // ダウンロード作業継続のため、すぐに元の画面に戻す
+    document.querySelectorAll('.admin-sub-tab').forEach(el => el.style.display = 'block');
+    if (loginNav) loginNav.style.display = 'none';
+    switchTab('admin-download-tab');
+    
+    // データ部分の書き換え
+    html = html.replace(/(const rawMasterData = `)[\s\S]*?(`;)/, "$1\n" + newMasterTSV.trim() + "\n$2");
+    html = html.replace(/(const rawExclusionData = `)[\s\S]*?(`;)/, "$1\n" + newExclTSV.trim() + "\n$2");
+    html = html.replace(/(const rawReferenceData = `)[\s\S]*?(`;)/, "$1\n" + newRefTSV.trim() + "\n$2");
+    
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+    html = html.replace(/const DATA_UPDATED = "[^"]*";/, `const DATA_UPDATED = "Ver${ver} (${dateStr})";`);
+    html = html.replace(/<title>術前休薬確認ツール Ver[^<]*<\/title>/g, `<title>術前休薬確認ツール Ver${ver}</title>`);
+    html = html.replace(/<h3 class="fw-bold m-0" style="font-size:18px;">🏥 術前休薬確認ツール Ver[^<]*<\/h3>/g, `<h3 class="fw-bold m-0" style="font-size:18px;">🏥 術前休薬確認ツール Ver${ver}</h3>`);
+
+    // DOMから復元する際の念のためのパスワード除去
+    html = html.replace(/id="admin-password"[^>]*>/gi, 'id="admin-password" class="form-control mb-3" placeholder="パスワードを入力">');
+    
+    const blob = new Blob([html], {type: "text/html;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kyuyaku_tool.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert(`Ver${ver} を保存しました。`);
+}
+
+
+
+
+
+// --- NEW ADMIN LOGIC OVERRIDES ---
+function renderAdminTables() {
+    const mTBody = document.querySelector("#editorMasterTable tbody");
+    if(mTBody) {
+        let html = "";
+        masterDataArray.forEach((m, i) => {
+            html += `<tr>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'type', this.innerText)">${m.type}</td>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'type2', this.innerText)">${m.type2}</td>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'brand', this.innerText)">${m.brand}</td>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'gene', this.innerText)">${m.gene}</td>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'period', this.innerText)">${m.period}</td>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'ref', this.innerText)" class="bg-warning bg-opacity-10">${m.ref}</td>
+                <td contenteditable="true" onblur="updateMasterCell(${i}, 'reason', this.innerText)">${m.reason}</td>
+                <td class="text-center"><button class="btn btn-link text-danger p-0 m-0" style="text-decoration:none; font-size:1.2em; line-height:1;" onclick="deleteMasterRow(${i})" title="削除">✖</button></td>
+            </tr>`;
+        });
+        mTBody.innerHTML = html;
+    }
+
+    const eTBody = document.querySelector("#editorExclTable tbody");
+    if(eTBody) {
+        let eHtml = "";
+        exclDataArray.forEach((e, i) => {
+            eHtml += `<tr>
+                <td>${e.orig}</td>
+                <td>${e.remark}</td>
+                <td><button class="btn btn-link text-danger p-0 m-0" style="text-decoration:none; font-size:1.2em; line-height:1;" onclick="deleteExclRow(${i})">✖</button></td>
+            </tr>`;
+        });
+        eTBody.innerHTML = eHtml;
+    }
+    
+    const rTBody = document.querySelector("#editorRefTable tbody");
+    if(rTBody) {
+        let rHtml = "";
+        // No sorting here anymore, the array order dictates the visual order
+                refDataArray.forEach((r, i) => {
+            rHtml += `<tr>
+                <td>${r.no}</td>
+                <td contenteditable="true" onblur="updateRefName(${i}, this.innerText)">${r.name}</td>
+                <td class="text-center">
+                    <button class="btn btn-link text-primary p-0 m-0 me-1" style="text-decoration:none; font-size:1.2em; line-height:1;" onclick="moveRefUp(${i})" title="上へ">↑</button>
+                    <button class="btn btn-link text-primary p-0 m-0 me-2" style="text-decoration:none; font-size:1.2em; line-height:1;" onclick="moveRefDown(${i})" title="下へ">↓</button>
+                    <button class="btn btn-link text-danger p-0 m-0" style="text-decoration:none; font-size:1.2em; line-height:1;" onclick="deleteRefRow(${i})" title="削除">✖</button>
+                </td>
+            </tr>`;
+        });
+        rTBody.innerHTML = rHtml;
+    }
+}
+
+
+function updateMasterCell(idx, field, value) {
+    if(masterDataArray[idx]) {
+        masterDataArray[idx][field] = value.trim();
+        if(field === 'brand') masterDataArray[idx].normBrand = typeof normalizeString === 'function' ? normalizeString(value) : value;
+        if(field === 'gene') masterDataArray[idx].normGene = typeof normalizeString === 'function' ? normalizeString(value) : value;
+    }
+}
+
+function addMasterRow() {
+    const c1 = document.getElementById("addM_Class").value;
+    const c2 = document.getElementById("addM_Class2").value;
+    const p = document.getElementById("addM_Prod").value;
+    const g = document.getElementById("addM_Gene").value;
+    const pd = document.getElementById("addM_Period").value;
+    const ref = document.getElementById("addM_Ref").value;
+    const reason = document.getElementById("addM_Reason").value;
+    if(!p && !g) { alert("商品名か一般名は必須です"); return; }
+    masterDataArray.push({ type:c1, type2:c2, brand:p, gene:g, period:pd, ref:ref, reason:reason, normBrand: typeof normalizeString === 'function' ? normalizeString(p) : p, normGene: typeof normalizeString === 'function' ? normalizeString(g) : g });
+    document.getElementById("addM_Class").value = "";
+    document.getElementById("addM_Class2").value = "";
+    document.getElementById("addM_Prod").value = "";
+    document.getElementById("addM_Gene").value = "";
+    document.getElementById("addM_Period").value = "";
+    document.getElementById("addM_Ref").value = "";
+    document.getElementById("addM_Reason").value = "";
+    renderAdminTables();
+}
+
+function deleteMasterRow(idx) {
+    if(confirm("削除しますか？")) {
+        masterDataArray.splice(idx, 1);
+        renderAdminTables();
+    }
+}
+
+
+function updateExclCell(idx, val) {
+    if(exclDataArray[idx]) {
+        exclDataArray[idx].orig = val.trim();
+        exclDataArray[idx].norm = typeof normalizeString === 'function' ? normalizeString(val) : val;
+    }
+}
+
+function addExclRow() {
+    const w = document.getElementById("addE_Word").value;
+    const rem = document.getElementById("addE_Remark").value;
+    if(!w) return;
+    exclDataArray.push({ orig: w, remark: rem });
+    document.getElementById("addE_Word").value = "";
+    document.getElementById("addE_Remark").value = "";
+    exclusionKeywords = exclDataArray.map(e => e.orig).filter(w => w);
+    renderAdminTables();
+}
+
+function deleteExclRow(idx) {
+    if(confirm("削除しますか？")) {
+        exclDataArray.splice(idx, 1);
+        exclusionKeywords = exclDataArray.map(e => e.orig).filter(w => w);
+        renderAdminTables();
+    }
+}
+
+
+function updateRefName(idx, val) {
+    if(refDataArray[idx]) { refDataArray[idx].name = val.trim(); renderCitations(); }
+}
+function moveRefUp(idx) {
+    if(idx === 0) return;
+    const temp = refDataArray[idx-1];
+    refDataArray[idx-1] = refDataArray[idx];
+    refDataArray[idx] = temp;
+    rebuildRefNumbers();
+}
+function moveRefDown(idx) {
+    if(idx === refDataArray.length - 1) return;
+    const temp = refDataArray[idx+1];
+    refDataArray[idx+1] = refDataArray[idx];
+    refDataArray[idx] = temp;
+    rebuildRefNumbers();
+}
+function rebuildRefNumbers() {
+    const map = {};
+    refDataArray.forEach((r, i) => {
+        const newNo = String(i + 1);
+        if(r.no !== newNo) {
+            map[r.no] = newNo;
+            r.no = newNo;
+        }
+    });
+    
+    // Update masterDataArray
+    let updatedCount = 0;
+    masterDataArray.forEach(m => {
+        if(m.ref) {
+            const parts = m.ref.split(",");
+            const newParts = parts.map(p => {
+                const pt = p.trim();
+                return map[pt] ? map[pt] : pt;
+            });
+            const newRef = newParts.join(",");
+            if(newRef !== m.ref) {
+                m.ref = newRef;
+                updatedCount++;
+            }
+        }
+    });
+    
+    renderAdminTables();
+    renderCitations();
+    if(updatedCount > 0) {
+        // Just a subtle notification could be nice, but silent is better for UX
+    }
+}
+
+function addRefRow() {
+    const no = document.getElementById("addR_No").value;
+    const name = document.getElementById("addR_Name").value;
+    if(!no || !name) return;
+    refDataArray.push({ no: no, name: name });
+    document.getElementById("addR_No").value = "";
+    document.getElementById("addR_Name").value = "";
+    renderAdminTables();
+    renderCitations();
+}
+
+function deleteRefRow(idx) {
+    if(confirm("削除しますか？")) {
+        refDataArray.splice(idx, 1);
+        renderAdminTables();
+        parseDatabase();
+    }
+}
+
+
+function bulkAddMaster() {
+    const text = document.getElementById("bulkPasteArea").value.trim();
+    if(!text) return;
+    const lines = text.split("\n");
+    let addedCount = 0;
+    for(const line of lines) {
+        if(!line.trim()) continue;
+        const cols = line.split("\t");
+        if(cols.length < 3 && cols[0] === "") continue; // 空行無視
+        const type = cols[0] || "";
+        const type2 = cols[1] || "";
+        const brand = cols[2] || "";
+        const gene = cols[3] || "";
+        const period = cols[4] || "";
+        const ref = cols[5] || "";
+        const reason = cols[6] || "";
+        
+        masterDataArray.push({
+            type: type, type2: type2, brand: brand, gene: gene, 
+            period: period, ref: ref, reason: reason,
+            normBrand: typeof normalizeString === 'function' ? normalizeString(brand) : brand,
+            normGene: typeof normalizeString === 'function' ? normalizeString(gene) : gene
+        });
+        addedCount++;
+    }
+    document.getElementById("bulkPasteArea").value = "";
+    renderAdminTables();
+    alert(addedCount + "件のデータを追加しました！");
+}
+
+function checkPassword() {
+    const pwd = document.getElementById('admin-password').value;
+    if (pwd === '713665') {
+        document.querySelectorAll('.admin-sub-tab').forEach(el => el.style.display = 'block');
+        const loginNav = document.getElementById('nav-admin-login');
+        if (loginNav) loginNav.style.display = 'none';
+        switchTab('admin-csv-tab');
+    } else {
+        alert('パスワードが違います');
+    }
+}
+
+</script>
+
+
+
+</html>
+</body>
