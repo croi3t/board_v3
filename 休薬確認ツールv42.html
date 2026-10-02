@@ -429,6 +429,10 @@
         <div id="admin-master-tab" class="tab-pane">
             <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
                 <h4 style="margin-top:0;">📚 2. 休薬マスタ（一覧）エディタ</h4>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="exportData('master', 'copy')">📋 全データをコピー (Excelペースト用)</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="exportData('master', 'download')">⬇️ TSVファイル出力</button>
+                </div>
                 <div class="card mt-2 mb-3 p-2 bg-light">
                     <h6 class="m-0 mb-2 text-primary" style="font-size:0.9em;">📥 複数行一括追加 (Excelからペースト)</h6>
                     <textarea id="bulkPasteArea" class="form-control mb-2" rows="3" placeholder="分類&#9;分類2&#9;商品名&#9;一般名&#9;休薬期間&#9;引用&#9;休薬理由 (タブ区切り)"></textarea>
@@ -458,6 +462,10 @@
         <div id="admin-exclude-tab" class="tab-pane">
             <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
                 <h4 style="margin-top:0;">🚫 3. 除外リスト エディタ</h4>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="exportData('excl', 'copy')">📋 全データをコピー (Excelペースト用)</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="exportData('excl', 'download')">⬇️ TSVファイル出力</button>
+                </div>
                 <div class="d-flex gap-2 mb-2">
                     <input type="text" id="addE_Word" class="form-control" placeholder="除外キーワードを入力" style="width:60%">
                     <input type="text" id="addE_Remark" class="form-control" placeholder="備考 (追加時期など)" style="width:30%">
@@ -489,6 +497,10 @@
         <div id="admin-ref-tab" class="tab-pane">
             <div class="admin-section" style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff;">
                 <h4 style="margin-top:0;">📖 5. 参考文献 エディタ</h4>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="exportData('ref', 'copy')">📋 全データをコピー (Excelペースト用)</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="exportData('ref', 'download')">⬇️ TSVファイル出力</button>
+                </div>
                 <div class="d-flex gap-2 mb-2">
                     <input type="text" id="addR_Name" class="form-control" placeholder="文献名" style="width:75%">
                     <button class="btn btn-primary btn-sm" onclick="addRefRow()" style="width:10%">追加</button>
@@ -2193,6 +2205,57 @@ function downloadUpdatedTool() {
 
 
 // --- NEW ADMIN LOGIC OVERRIDES ---
+
+function exportData(type, action) {
+    let tsv = "";
+    let filename = "";
+    
+    if (type === 'master') {
+        tsv = "分類\t分類2\t商品名\t一般名\t休薬期間\t引用\t休薬理由\n";
+        masterDataArray.forEach(m => { tsv += `${m.type}\t${m.type2}\t${m.brand}\t${m.gene}\t${m.period}\t${m.ref}\t${m.reason}\n`; });
+        filename = "休薬マスタ.tsv";
+    } else if (type === 'excl') {
+        tsv = "除外キーワード\t備考\n";
+        exclDataArray.forEach(e => { tsv += `${e.orig}\t${e.remark}\n`; });
+        filename = "除外リスト.tsv";
+    } else if (type === 'ref') {
+        tsv = "番号\t文献名\n";
+        refDataArray.forEach(r => { tsv += `${r.no}\t${r.name}\n`; });
+        filename = "参考文献リスト.tsv";
+    }
+    
+    if (action === 'copy') {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(tsv).then(() => {
+                alert("クリップボードにコピーしました！Excel等にそのまま貼り付け可能です。");
+            }).catch(err => alert("コピーに失敗しました。"));
+        } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = tsv;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert("クリップボードにコピーしました！Excel等にそのまま貼り付け可能です。");
+            } catch (err) {
+                alert("お使いの環境ではコピーが制限されています。「TSVファイル出力」をご利用ください。");
+            }
+            document.body.removeChild(textArea);
+        }
+    } else if (action === 'download') {
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, tsv], {type: "text/tab-separated-values;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
 function renderAdminTables() {
     const mTBody = document.querySelector("#editorMasterTable tbody");
     if(mTBody) {
