@@ -1809,7 +1809,15 @@
                             futureEntries.sort(function(a, b) { return a.dateObj.getTime() - b.dateObj.getTime(); });
                             var target = futureEntries[0];
                             p.sampleDate = target.displayDate;
-                            p.bloodDetail = "予定有 (" + target.detail + ")";
+                            
+                            var todayStrLocal = today.getFullYear() + '-' + ((today.getMonth()+1)<10?'0':'')+(today.getMonth()+1) + '-' + (today.getDate()<10?'0':'')+today.getDate();
+                            
+                            if (target.displayDate === todayStrLocal && futureEntries.length > 1) {
+                                var nextTarget = futureEntries[1];
+                                p.bloodDetail = "予定有 (今日:" + target.detail + " / 次回:" + nextTarget.displayDate.substring(5).replace('-', '/') + " " + nextTarget.detail + ")";
+                            } else {
+                                p.bloodDetail = "予定有 (" + target.detail + ")";
+                            }
                         } else {
                             p.bloodDetail = "30日以内の予定なし";
                         }

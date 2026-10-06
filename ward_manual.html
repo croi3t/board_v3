@@ -471,8 +471,11 @@ const AppCore = (function() {
                     if (url) replacements[fname] = url;
                 }
             }
+            window.blobToLocalImgMap = window.blobToLocalImgMap || {};
             for (const fname in replacements) {
-                data.content = data.content.split(`src="local-img:${fname}"`).join(`src="${replacements[fname]}" data-local-src="local-img:${fname}"`);
+                const blobUrl = replacements[fname];
+                window.blobToLocalImgMap[blobUrl] = `local-img:${fname}`;
+                data.content = data.content.split(`src="local-img:${fname}"`).join(`src="${blobUrl}"`);
             }
         }
         
@@ -601,7 +604,12 @@ const AppCore = (function() {
             for (const pId in State.pageDataCache) {
                 const idxPage = State.index.pages.find(p => p.id === pId);
                 let safeTitle = (idxPage && idxPage.title) ? idxPage.title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 30) : "無題";
-                let fileName = `${safeTitle}_${pId}.json`;
+                let secName = "不明セクション";
+                if (idxPage) {
+                    const sec = State.index.sections.find(s => s.id === idxPage.secId);
+                    if (sec && sec.name) secName = sec.name.replace(/[\\/:*?"<>|]/g, '_').substring(0, 20);
+                }
+                let fileName = `${secName}_${safeTitle}_${pId}.json`;
                 
                 if (idxPage && idxPage.fileName && idxPage.fileName !== fileName) {
                     try { await pagesDirHandle.removeEntry(idxPage.fileName); } catch(e) {}
@@ -657,6 +665,21 @@ const AppCore = (function() {
         if (!attachDirHandle) return null;
         if (!pageId) return attachDirHandle;
         
+        let pageMeta = State.index.pages.find(p => p.id === pageId);
+        let expectedName = `page_${pageId}`;
+        if (pageMeta) {
+            let sec = State.index.sections.find(s => s.id === pageMeta.secId);
+            let secName = sec ? sec.name.replace(/[\\/:*?"<>|]/g, '_').substring(0, 20) : "不明セクション";
+            let title = (pageMeta.title || "無題").replace(/[\\/:*?"<>|]/g, '_').substring(0, 30);
+            expectedName = `${secName}_${title}_${pageId}`;
+            
+            try {
+                // まず最新の命名規則に一致するフォルダを探す
+                return await attachDirHandle.getDirectoryHandle(expectedName, { create: false });
+            } catch(e) {}
+        }
+        
+        // 見つからなければ、古い命名規則のフォルダを探す
         for await (const [name, handle] of attachDirHandle.entries()) {
             if (handle.kind === 'directory' && name.endsWith(`_${pageId}`)) {
                 return handle;
@@ -664,15 +687,7 @@ const AppCore = (function() {
         }
         
         if (createIfMissing) {
-            let pageMeta = State.index.pages.find(p => p.id === pageId);
-            let folderName = `page_${pageId}`;
-            if (pageMeta) {
-                let sec = State.index.sections.find(s => s.id === pageMeta.secId);
-                let secName = sec ? sec.name.replace(/[\\/:*?"<>|]/g, '_').substring(0, 20) : "不明セクション";
-                let title = (pageMeta.title || "無題").replace(/[\\/:*?"<>|]/g, '_').substring(0, 30);
-                folderName = `${secName}_${title}_${pageId}`;
-            }
-            return await attachDirHandle.getDirectoryHandle(folderName, { create: true });
+            return await attachDirHandle.getDirectoryHandle(expectedName, { create: true });
         }
         return null;
     }
@@ -858,6 +873,8 @@ const AppCore = (function() {
                         if (name !== expectedName) {
                             try {
                                 const newDir = await attachDirHandle.getDirectoryHandle(expectedName, { create: true });
+                                if (await handle.isSameEntry(newDir)) continue;
+                                
                                 for await (const [fName, fHandle] of handle.entries()) {
                                     if (fHandle.kind === 'file') {
                                         const file = await fHandle.getFile();
@@ -885,7 +902,7 @@ const AppCore = (function() {
         }
     }
 
-    return { connectNew, connectHistory, loadPageData, appendTransaction, checkDailyMerge, forceMerge: () => checkDailyMerge(true), attachFile, downloadAttachment, saveInlineImage, getAttachmentUrl, cleanupAttachments };
+    return { connectNew, connectHistory, loadPageData, appendTransaction, checkDailyMerge, forceMerge: () => { if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) Editor.saveCurrentPage(); return checkDailyMerge(true); }, attachFile, downloadAttachment, saveInlineImage, getAttachmentUrl, cleanupAttachments };
 })();
 
 // =========================================================
@@ -1004,14 +1021,9 @@ const Editor = {
                                     const filename = await AppCore.saveInlineImage(compressedBlob);
                                     const url = await AppCore.getAttachmentUrl(filename);
                                     
+                                    window.blobToLocalImgMap = window.blobToLocalImgMap || {};
+                                    window.blobToLocalImgMap[url] = `local-img:${filename}`;
                                     resolve(url);
-                                    
-                                    setTimeout(() => {
-                                        if (tinymce.activeEditor) {
-                                            const imgEl = tinymce.activeEditor.dom.select(`img[src="${url}"]`)[0];
-                                            if (imgEl) imgEl.setAttribute('data-local-src', `local-img:${filename}`);
-                                        }
-                                    }, 100);
                                 } catch(err) {
                                     resolve(canvas.toDataURL('image/jpeg', 0.75));
                                 }
@@ -1068,11 +1080,11 @@ const Editor = {
                     text: 'ノートシール',
                     fetch: function (callback) {
                         const items = [
-                            { type: 'menuitem', text: '★ 重要', onAction: () => editor.insertContent('<span class="note-tag note-star">★重要</span>&nbsp;') },
-                            { type: 'menuitem', text: '☐ TODO', onAction: () => editor.insertContent('<span class="note-tag note-todo">☐TODO</span>&nbsp;') },
-                            { type: 'menuitem', text: '✓ 確認済', onAction: () => editor.insertContent('<span class="note-tag note-check">✓確認済</span>&nbsp;') },
-                            { type: 'menuitem', text: '❓ 質問', onAction: () => editor.insertContent('<span class="note-tag note-question">❓質問</span>&nbsp;') },
-                            { type: 'menuitem', text: '💡 アイデア', onAction: () => editor.insertContent('<span class="note-tag note-star" style="background:#e0f7fa; color:#006064; border-color:#b2ebf2;">💡アイデア</span>&nbsp;') }
+                            { type: 'menuitem', text: '★ 重要', onAction: () => editor.insertContent('<span style="color:#e74c3c; font-weight:bold; font-size:1.2em; margin-right:4px;">★</span>&nbsp;') },
+                            { type: 'menuitem', text: '☐ TODO (切替可)', onAction: () => editor.insertContent('<span class="custom-checkbox" data-checked="false" style="color:#7f8c8d; font-weight:bold; font-size:1.2em; margin-right:4px; cursor:pointer; user-select:none;" contenteditable="false">☐</span>&nbsp;') },
+                            { type: 'menuitem', text: '☑ 完了 (切替可)', onAction: () => editor.insertContent('<span class="custom-checkbox" data-checked="true" style="color:#2ecc71; font-weight:bold; font-size:1.2em; margin-right:4px; cursor:pointer; user-select:none;" contenteditable="false">☑</span>&nbsp;') },
+                            { type: 'menuitem', text: '❓ 質問', onAction: () => editor.insertContent('<span style="color:#3498db; font-weight:bold; font-size:1.2em; margin-right:4px;">❓</span>&nbsp;') },
+                            { type: 'menuitem', text: '💡 アイデア', onAction: () => editor.insertContent('<span style="font-size:1.2em; margin-right:4px;">💡</span>&nbsp;') }
                         ];
                         callback(items);
                     }
@@ -1150,6 +1162,21 @@ const Editor = {
                         const filename = e.target.getAttribute('data-attachment');
                         AppCore.downloadAttachment(filename, e.target.innerText);
                     }
+                    if (e.target.classList.contains('custom-checkbox')) {
+                        e.preventDefault();
+                        const isChecked = e.target.getAttribute('data-checked') === 'true';
+                        if (isChecked) {
+                            e.target.setAttribute('data-checked', 'false');
+                            e.target.innerText = '☐';
+                            e.target.style.color = '#7f8c8d';
+                        } else {
+                            e.target.setAttribute('data-checked', 'true');
+                            e.target.innerText = '☑';
+                            e.target.style.color = '#2ecc71';
+                        }
+                        editor.undoManager.add();
+                        Editor.triggerSave();
+                    }
                 });
             }
         });
@@ -1179,6 +1206,13 @@ const Editor = {
         }
         
         // 保存時にローカル画像のblob URLを元の local-img: 形式に戻す
+        if (window.blobToLocalImgMap) {
+            for (const blobUrl in window.blobToLocalImgMap) {
+                content = content.split(`src="${blobUrl}"`).join(`src="${window.blobToLocalImgMap[blobUrl]}"`);
+            }
+        }
+        
+        // 過去バージョンの data-local-src が残っている場合は除去して src を置換（後方互換）
         if (content.includes('data-local-src="local-img:')) {
             try {
                 let parser = new DOMParser();
