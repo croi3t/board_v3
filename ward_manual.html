@@ -475,7 +475,7 @@ const AppCore = (function() {
             for (const fname in replacements) {
                 const blobUrl = replacements[fname];
                 window.blobToLocalImgMap[blobUrl] = `local-img:${fname}`;
-                data.content = data.content.split(`src="local-img:${fname}"`).join(`src="${blobUrl}"`);
+                data.content = data.content.split(`src="local-img:${fname}"`).join(`src="${blobUrl}" data-local-src="local-img:${fname}"`);
             }
         }
         
@@ -751,11 +751,11 @@ const AppCore = (function() {
         }
     }
 
-    async function saveInlineImage(blob) {
+    async function saveInlineImage(blob, customFilename = null, targetPageId = null) {
         if (!attachDirHandle) throw new Error("Not connected");
         const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-        const filename = `img_${Date.now()}_${Math.floor(Math.random()*1000)}.${ext}`;
-        const pageId = State.currentPageId;
+        const filename = customFilename || `img_${Date.now()}_${Math.floor(Math.random()*1000)}.${ext}`;
+        const pageId = targetPageId || State.currentPageId;
         const targetDir = pageId ? await getPageAttachmentDir(pageId, true) : attachDirHandle;
         
         const fh = await targetDir.getFileHandle(filename, { create: true });
@@ -997,6 +997,15 @@ const Editor = {
             images_upload_handler: function (blobInfo, progress) {
                 return new Promise((resolve, reject) => {
                     const blob = blobInfo.blob();
+                    const pageId = State.currentPageId;
+                    const preGeneratedName = `img_${Date.now()}_${Math.floor(Math.random()*1000)}.jpg`;
+                    const expectedInternalPath = pageId ? `${pageId}/${preGeneratedName}` : preGeneratedName;
+                    
+                    window.blobToLocalImgMap = window.blobToLocalImgMap || {};
+                    if (blobInfo.blobUri && blobInfo.blobUri()) {
+                        window.blobToLocalImgMap[blobInfo.blobUri()] = `local-img:${expectedInternalPath}`;
+                    }
+
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         const img = new Image();
@@ -1018,11 +1027,14 @@ const Editor = {
                             
                             canvas.toBlob(async (compressedBlob) => {
                                 try {
-                                    const filename = await AppCore.saveInlineImage(compressedBlob);
+                                    const filename = await AppCore.saveInlineImage(compressedBlob, preGeneratedName, pageId);
                                     const url = await AppCore.getAttachmentUrl(filename);
                                     
                                     window.blobToLocalImgMap = window.blobToLocalImgMap || {};
                                     window.blobToLocalImgMap[url] = `local-img:${filename}`;
+                                    if (blobInfo.blobUri && blobInfo.blobUri()) {
+                                        window.blobToLocalImgMap[blobInfo.blobUri()] = `local-img:${filename}`;
+                                    }
                                     resolve(url);
                                 } catch(err) {
                                     resolve(canvas.toDataURL('image/jpeg', 0.75));
@@ -1052,6 +1064,17 @@ const Editor = {
                 }
             `,
             setup: function (editor) {
+                // 既に保存済みのローカル画像（blob URL）をTinyMCEが新規画像と誤認して再アップロードするのを防ぐ
+                editor.on('PreInit', function () {
+                    if (editor.editorUpload && editor.editorUpload.addFilter) {
+                        editor.editorUpload.addFilter(function (img) {
+                            if (img.hasAttribute('data-local-src')) return false;
+                            if (img.src && window.blobToLocalImgMap && window.blobToLocalImgMap[img.src]) return false;
+                            return true;
+                        });
+                    }
+                });
+
                 const sizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72];
                 editor.ui.registry.addButton('fontup', {
                     text: 'A⁺',
@@ -1092,37 +1115,113 @@ const Editor = {
 
                 editor.ui.registry.addMenuButton('acc_menu', {
                     text: 'アコーディオン操作',
-                    tooltip: 'アコーディオン全体を移動・インデント',
+                    tooltip: 'アコーディオンの移動・インデント・一括開閉',
                     fetch: function (callback) {
-                        const getAcc = () => editor.selection.getNode().closest('details.mce-accordion');
+                        const getAcc = () => {
+                            const node = editor.selection.getNode();
+                            return node && node.closest ? node.closest('details.mce-accordion, details') : null;
+                        };
+                        const getAccIndentLevel = (acc) => {
+                            if (!acc) return 0;
+                            const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0) || 0;
+                            const sum = acc.querySelector('summary');
+                            const p = sum ? (parseInt(editor.dom.getStyle(sum, 'padding-left') || 0) || 0) : 0;
+                            let depth = 0;
+                            let parent = acc.parentElement;
+                            while (parent && parent !== editor.getBody()) {
+                                if (parent.nodeName === 'DETAILS') depth++;
+                                parent = parent.parentElement;
+                            }
+                            return depth + Math.round(m / 20) + Math.round(p / 16);
+                        };
+                        const setAccOpen = (acc, isOpen) => {
+                            acc.setAttribute('data-mce-accordion-open', isOpen ? 'open' : 'closed');
+                            if (isOpen) {
+                                acc.setAttribute('open', 'open');
+                            } else {
+                                acc.removeAttribute('open');
+                            }
+                        };
                         callback([
+                            { type: 'menuitem', text: '📂 すべて展開', onAction: () => {
+                                editor.undoManager.transact(() => {
+                                    editor.getBody().querySelectorAll('details').forEach(d => setAccOpen(d, true));
+                                });
+                                Editor.triggerSave();
+                            }},
+                            { type: 'menuitem', text: '📁 すべて折りたたむ', onAction: () => {
+                                editor.undoManager.transact(() => {
+                                    editor.getBody().querySelectorAll('details').forEach(d => setAccOpen(d, false));
+                                });
+                                Editor.triggerSave();
+                            }},
+                            { type: 'menuitem', text: '📂 同じインデントを展開', onAction: () => {
+                                const acc = getAcc();
+                                if (!acc) {
+                                    alert('基準にするアコーディオン内にカーソルを置いてから実行してください。');
+                                    return;
+                                }
+                                const targetLevel = getAccIndentLevel(acc);
+                                editor.undoManager.transact(() => {
+                                    editor.getBody().querySelectorAll('details').forEach(d => {
+                                        if (getAccIndentLevel(d) === targetLevel) setAccOpen(d, true);
+                                    });
+                                });
+                                Editor.triggerSave();
+                            }},
+                            { type: 'menuitem', text: '📁 同じインデントを折りたたむ', onAction: () => {
+                                const acc = getAcc();
+                                if (!acc) {
+                                    alert('基準にするアコーディオン内にカーソルを置いてから実行してください。');
+                                    return;
+                                }
+                                const targetLevel = getAccIndentLevel(acc);
+                                editor.undoManager.transact(() => {
+                                    editor.getBody().querySelectorAll('details').forEach(d => {
+                                        if (getAccIndentLevel(d) === targetLevel) setAccOpen(d, false);
+                                    });
+                                });
+                                Editor.triggerSave();
+                            }},
                             { type: 'menuitem', text: '↑ 全体を上に移動', onAction: () => {
                                 const acc = getAcc();
                                 if (acc && acc.previousElementSibling) {
-                                    acc.parentNode.insertBefore(acc, acc.previousElementSibling);
+                                    editor.undoManager.transact(() => {
+                                        acc.parentNode.insertBefore(acc, acc.previousElementSibling);
+                                    });
                                     editor.focus();
+                                    Editor.triggerSave();
                                 }
                             }},
                             { type: 'menuitem', text: '↓ 全体を下に移動', onAction: () => {
                                 const acc = getAcc();
                                 if (acc && acc.nextElementSibling) {
-                                    acc.parentNode.insertBefore(acc.nextElementSibling, acc);
+                                    editor.undoManager.transact(() => {
+                                        acc.parentNode.insertBefore(acc.nextElementSibling, acc);
+                                    });
                                     editor.focus();
+                                    Editor.triggerSave();
                                 }
                             }},
                             { type: 'menuitem', text: '➡ インデント (+)', onAction: () => {
                                 const acc = getAcc();
                                 if (acc) {
-                                    const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0);
-                                    editor.dom.setStyle(acc, 'margin-left', (m + 20) + 'px');
+                                    editor.undoManager.transact(() => {
+                                        const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0);
+                                        editor.dom.setStyle(acc, 'margin-left', (m + 20) + 'px');
+                                    });
+                                    Editor.triggerSave();
                                 }
                             }},
                             { type: 'menuitem', text: '⬅ インデント解除 (-)', onAction: () => {
                                 const acc = getAcc();
                                 if (acc) {
-                                    const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0);
-                                    const nm = Math.max(0, m - 20);
-                                    editor.dom.setStyle(acc, 'margin-left', nm > 0 ? nm + 'px' : '');
+                                    editor.undoManager.transact(() => {
+                                        const m = parseInt(editor.dom.getStyle(acc, 'margin-left') || 0);
+                                        const nm = Math.max(0, m - 20);
+                                        editor.dom.setStyle(acc, 'margin-left', nm > 0 ? nm + 'px' : '');
+                                    });
+                                    Editor.triggerSave();
                                 }
                             }}
                         ]);
@@ -1212,18 +1311,22 @@ const Editor = {
             }
         }
         
-        // 過去バージョンの data-local-src が残っている場合は除去して src を置換（後方互換）
+        // data-local-src が残っている場合、src がまだ local-img: でなければ復元し、属性自体は除去する
         if (content.includes('data-local-src="local-img:')) {
-            try {
-                let parser = new DOMParser();
-                let doc = parser.parseFromString(content, 'text/html');
-                let imgs = doc.querySelectorAll('img[data-local-src]');
-                imgs.forEach(img => {
-                    img.setAttribute('src', img.getAttribute('data-local-src'));
-                    img.removeAttribute('data-local-src');
-                });
-                content = doc.body.innerHTML;
-            } catch(e) {}
+            if (/src="(?!local-img:)[^"]*"[^>]*data-local-src="local-img:|data-local-src="local-img:[^"]*"[^>]*src="(?!local-img:)/.test(content)) {
+                try {
+                    let parser = new DOMParser();
+                    let doc = parser.parseFromString(content, 'text/html');
+                    let imgs = doc.querySelectorAll('img[data-local-src]');
+                    imgs.forEach(img => {
+                        img.setAttribute('src', img.getAttribute('data-local-src'));
+                        img.removeAttribute('data-local-src');
+                    });
+                    content = doc.body.innerHTML;
+                } catch(e) {}
+            } else {
+                content = content.replace(/\s*data-local-src="local-img:[^"]*"/g, '');
+            }
         }
         
         let idxPage = State.index.pages.find(p => p.id === State.currentPageId);
@@ -1360,13 +1463,13 @@ const UI = {
         });
     },
 
-    renderAll: function() {
+    renderAll: async function() {
         document.getElementById('btn-add-page').style.display = State.isViewOnly ? 'none' : 'block';
         document.getElementById('btn-force-merge').style.display = State.isViewOnly ? 'none' : 'inline-block';
         
         this.renderSections();
         this.renderPages();
-        this.renderEditor();
+        await this.renderEditor();
     },
 
     renderSections: function() {
@@ -1448,8 +1551,10 @@ const UI = {
                 }
             }
             
-            div.onclick = (e) => {
+            div.onclick = async (e) => {
                 if (State.currentSecId === sec.id) return;
+                if (State.isLoadingPage) return;
+                
                 if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
                     Editor.saveCurrentPage();
                 }
@@ -1457,7 +1562,13 @@ const UI = {
                 State.searchResults = null; // 検索結果をリセット
                 const firstPage = State.index.pages.find(p => p.secId === sec.id);
                 State.currentPageId = firstPage ? firstPage.id : null;
-                this.renderAll();
+                
+                State.isLoadingPage = true;
+                try {
+                    await this.renderAll();
+                } finally {
+                    State.isLoadingPage = false;
+                }
             };
             
             if (!State.isViewOnly) {
@@ -1677,12 +1788,20 @@ const UI = {
             
             div.onclick = async () => {
                 if (State.currentPageId === p.id) return;
+                if (State.isLoadingPage) return;
+
                 if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
                     Editor.saveCurrentPage();
                 }
                 State.currentPageId = p.id;
-                this.renderPages(); 
-                await this.renderEditor();
+                
+                State.isLoadingPage = true;
+                try {
+                    this.renderPages(); 
+                    await this.renderEditor();
+                } finally {
+                    State.isLoadingPage = false;
+                }
             };
             container.appendChild(div);
         });
