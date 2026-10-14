@@ -40,6 +40,24 @@
         /* TinyMCE未読込時のテキストエリアスタイル */
         #tinymce-editor { flex: 1; width: 100%; resize: none; border: 1px solid #ccc; border-radius: 4px; padding: 15px; font-size: 14px; font-family: inherit; line-height: 1.6; outline: none; box-sizing: border-box; }
 
+        /* 閲覧モード（リードオンリー）のレスポンシブ自動折り返し */
+        #readonly-viewer {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        #readonly-viewer div[style*="width"][style*="in"],
+        #readonly-viewer div[style*="width"][style*="pt"],
+        #readonly-viewer div[style*="width"][style*="cm"],
+        #readonly-viewer div[style*="border-width: 100%"] {
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        #readonly-viewer img {
+            max-width: 100%;
+            height: auto;
+        }
+
         /* ================= ページリスト (右側) ================= */
         .page-pane { width: 280px; background: #fdfdfd; border-left: 1px solid #ddd; display: flex; flex-direction: column; flex-shrink: 0; }
         .page-header { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; color: #555; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
@@ -222,6 +240,8 @@
                 <div id="readonly-viewer" style="display:none; padding: 30px; overflow-y: auto; height: 100%; box-sizing: border-box; background: white; font-family: sans-serif; line-height: 1.6;"></div>
                 <!-- フローティング全画面トグルボタン -->
                 <button id="floating-fullscreen-btn" onclick="UI.toggleFullscreen()" style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 6px 10px; cursor: pointer; color: #555; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='#fff'" title="全画面表示の切り替え">⛶</button>
+                <!-- フローティング ページトップへ移動ボタン -->
+                <button id="scroll-top-btn" onclick="UI.scrollToTop()" style="position: absolute; bottom: 25px; right: 25px; z-index: 1000; background: rgba(44, 62, 80, 0.85); color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; padding: 7px 14px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.25); transition: all 0.2s ease; display: flex; align-items: center; gap: 4px;" onmouseover="this.style.background='#2c3e50'; this.style.transform='translateY(-2px)'" onmouseout="this.style.background='rgba(44, 62, 80, 0.85)'; this.style.transform='none'" title="ページの先頭へスクロール">▲ トップへ</button>
             </div>
         </div>
 
@@ -972,9 +992,16 @@ const Editor = {
             paste_webkit_styles: 'none',
             paste_retain_style_properties: 'color,font-size,font-weight,font-style,text-decoration,text-align,background-color',
             paste_preprocess: function (plugin, args) {
+                if (!args.content) return;
+
+                // 【方法3】OneNote等のコピー時に付与される固定幅（in, pt, cm等）指定をクリーンアップ
+                // これにより、新しく貼り付けたコンテンツがエディタ幅に合わせて自然に折り返されるようになります
+                args.content = args.content.replace(/(<div\b[^>]*style=["'][^"']*)\bwidth:\s*[\d.]+(?:in|pt|cm)\s*;?/gi, '$1');
+                args.content = args.content.replace(/(<div\b[^>]*style=["'][^"']*)\bborder-width:\s*100%\s*;?/gi, '$1');
+
                 // LINEWORKSなどのプレーンテキスト系コピーで改行が消える問題の対策
                 // ※画像(img)やテーブル(table)等のHTMLが含まれる場合は構造を壊さないようスキップする
-                if (args.content && !/<(p|br|div|img|html|table|ul|ol|li)[ >]/i.test(args.content)) {
+                if (!/<(p|br|div|img|html|table|ul|ol|li)[ >]/i.test(args.content)) {
                     let lines = args.content.split(/\r?\n/);
                     args.content = lines.map(line => {
                         let match = line.match(/^([ \t　]+)(.*)/);
@@ -1047,6 +1074,20 @@ const Editor = {
                 });
             },
             content_style: `
+                body {
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                }
+                /* 【方法1】OneNote由来の固定幅コンテナ (width: ...in や width: ...pt 等) をエディタ幅に合わせて自動伸縮・折り返し可能にする */
+                div[style*="width"][style*="in"],
+                div[style*="width"][style*="pt"],
+                div[style*="width"][style*="cm"],
+                div[style*="border-width: 100%"] {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+                
                 ul[style*="list-style-type: kome"] { list-style-type: "※ " !important; }
                 ul[style*="list-style-type: asterisk"] { list-style-type: "* " !important; }
                 
@@ -1103,7 +1144,10 @@ const Editor = {
                     text: 'ノートシール',
                     fetch: function (callback) {
                         const items = [
-                            { type: 'menuitem', text: '★ 重要', onAction: () => editor.insertContent('<span style="color:#e74c3c; font-weight:bold; font-size:1.2em; margin-right:4px;">★</span>&nbsp;') },
+                            { type: 'menuitem', text: '★ 重要 (黄)', onAction: () => editor.insertContent('<span style="color:#f39c12; font-weight:bold; font-size:1.2em; margin-right:4px;">★</span>&nbsp;') },
+                            { type: 'menuitem', text: '★ 重要 (赤)', onAction: () => editor.insertContent('<span style="color:#e74c3c; font-weight:bold; font-size:1.2em; margin-right:4px;">★</span>&nbsp;') },
+                            { type: 'menuitem', text: '！ 注意・至急', onAction: () => editor.insertContent('<span style="color:#e74c3c; font-weight:bold; font-size:1.2em; margin-right:4px;">！</span>&nbsp;') },
+                            { type: 'menuitem', text: '📞 電話連絡', onAction: () => editor.insertContent('<span style="font-size:1.2em; margin-right:4px;">📞</span>&nbsp;') },
                             { type: 'menuitem', text: '☐ TODO (切替可)', onAction: () => editor.insertContent('<span class="custom-checkbox" data-checked="false" style="color:#7f8c8d; font-weight:bold; font-size:1.2em; margin-right:4px; cursor:pointer; user-select:none;" contenteditable="false">☐</span>&nbsp;') },
                             { type: 'menuitem', text: '☑ 完了 (切替可)', onAction: () => editor.insertContent('<span class="custom-checkbox" data-checked="true" style="color:#2ecc71; font-weight:bold; font-size:1.2em; margin-right:4px; cursor:pointer; user-select:none;" contenteditable="false">☑</span>&nbsp;') },
                             { type: 'menuitem', text: '❓ 質問', onAction: () => editor.insertContent('<span style="color:#3498db; font-weight:bold; font-size:1.2em; margin-right:4px;">❓</span>&nbsp;') },
@@ -2118,6 +2162,42 @@ const UI = {
                 tinymce.activeEditor.execCommand('mceAutoResize');
             }, 50);
         }
+    },
+
+    scrollToTop: function() {
+        // 1. TinyMCE エディタ内 (iframe) のスクロールを最上部へ
+        if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+            try {
+                const win = tinymce.activeEditor.getWin();
+                if (win && win.scrollTo) {
+                    win.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                const doc = tinymce.activeEditor.getDoc();
+                if (doc && doc.documentElement) {
+                    doc.documentElement.scrollTo ? doc.documentElement.scrollTo({ top: 0, behavior: 'smooth' }) : (doc.documentElement.scrollTop = 0);
+                }
+                const body = tinymce.activeEditor.getBody();
+                if (body) {
+                    body.scrollTo ? body.scrollTo({ top: 0, behavior: 'smooth' }) : (body.scrollTop = 0);
+                }
+            } catch(e) {}
+        }
+        
+        // 2. テキストエリアの場合
+        const ta = document.getElementById('tinymce-editor');
+        if (ta) {
+            ta.scrollTo ? ta.scrollTo({ top: 0, behavior: 'smooth' }) : (ta.scrollTop = 0);
+        }
+
+        // 3. 閲覧モード (readonly-viewer) のスクロールを最上部へ
+        const viewer = document.getElementById('readonly-viewer');
+        if (viewer) {
+            viewer.scrollTo ? viewer.scrollTo({ top: 0, behavior: 'smooth' }) : (viewer.scrollTop = 0);
+        }
+
+        // 4. 外側コンテナ
+        const pane = document.querySelector('.editor-pane');
+        if (pane) pane.scrollTop = 0;
     }
 };
 
