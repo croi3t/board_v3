@@ -277,7 +277,7 @@
                 <!-- コピー用パス -->
                 <div style="background: #eef2f5; padding: 10px 15px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #cdd4db; margin-bottom: 15px;">
                     <code id="target-path" style="user-select: all; font-size: 15px; color: #d35400; font-family: monospace; font-weight: bold;">Z:\reiwa\report\data</code>
-                    <button onclick="copyTargetPath()" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('target-path').innerText); const btn = this; const originalText = btn.innerHTML; btn.innerHTML = '✓ コピー完了'; btn.style.background = '#2ecc71'; setTimeout(() => { btn.innerHTML = originalText; btn.style.background = '#3498db'; }, 2000);" style="background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s;">📋 コピー</button>
                 </div>
                 
                 <!-- アドレスバーモックアップ -->
@@ -449,6 +449,11 @@
                 </thead>
                 <tbody id="masterTableBody"></tbody>
             </table>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:12px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+            <button class="btn btn-info" style="padding:6px 14px; font-size:12px; font-weight:bold;" onclick="addCustomOtherJob(true)">＋ 算定対象の「その他」行を追加 (青色・⑫)</button>
+            <button class="btn" style="background:#7f8c8d; color:white; padding:6px 14px; font-size:12px; font-weight:bold;" onclick="addCustomOtherJob(false)">＋ 算定対象外の「その他」行を追加 (灰色・⑯)</button>
+            <span style="font-size:11px; color:#666;">※必要な人だけ行を増やせます。追加した行は不要になったら「🗑️ 削除」できます。</span>
         </div>
         <button class="btn btn-success" style="width:100%; padding:10px; font-size:12px; font-weight:bold;" onclick="saveMasterSettings()">上記カスタマイズ内容を現在のパターンに一括反映</button>
     </div>
@@ -669,7 +674,13 @@
             if ((appData.timelines[currentUser] || []).length === 0) {
                 let layout = appData.users[currentUser].initialLayouts[currentPattern] || [];
                 if (layout.length > 0) {
-                    appData.timelines[currentUser] = JSON.parse(JSON.stringify(layout));
+                    let userWard = appData.users[currentUser].defaultWard || currentWard || '3A';
+                    appData.timelines[currentUser] = layout.map(b => {
+                        let newB = JSON.parse(JSON.stringify(b));
+                        newB.id = Date.now() + Math.random();
+                        newB.ward = userWard || b.ward || '';
+                        return newB;
+                    });
                 }
             }
 
@@ -699,17 +710,13 @@
             { outputName: "⑨ TDM・投与量計算", name: "📊TDM・投与量計算", duration: 30, isTarget: true, color: targetColors[0], defaultDetail: "", hint: "抗菌薬血中濃度解析および初期投与設計計算" },
             { outputName: "⑩ カンファレンス・回診参加", name: "👥カンファ・回診参加", duration: 30, isTarget: true, color: targetColors[1], defaultDetail: "", hint: "病棟多職種カンファレンスおよび教授回診への同行参加" },
             { outputName: "⑪ 病棟業務日誌の作成", name: "📝業務日誌の作成", duration: 15, isTarget: true, color: targetColors[2], defaultDetail: "", hint: "病棟常駐加算に係る業務ログ・日誌の作成" },
-            { outputName: "⑫ その他（業務内容を備考に記入）", name: "📁その他業務(算定内)1", duration: 30, isTarget: true, color: targetColors[3], defaultDetail: "", hint: "自由記述用" },
-            { outputName: "⑫ その他（業務内容を備考に記入）", name: "📁その他業務(算定内)2", duration: 30, isTarget: true, color: targetColors[3], defaultDetail: "", hint: "自由記述用" },
-            { outputName: "⑫ その他（業務内容を備考に記入）", name: "📁その他業務(算定内)3", duration: 30, isTarget: true, color: targetColors[3], defaultDetail: "", hint: "自由記述用" },
+            { outputName: "⑫ その他（業務内容を備考に記入）", name: "📁その他業務(算定内)", duration: 30, isTarget: true, color: targetColors[3], defaultDetail: "", hint: "自由記述用" },
             { outputName: "⑬ 薬剤管理指導 (算定外)", name: "🚪薬剤管理指導(外)", duration: 45, isTarget: false, color: nontargetColors[0], defaultDetail: "", hint: "通常の服薬指導・指導記録作成業務" },
             { outputName: "⑭ 退院時指導 (算定外)", name: "🚪退院時指導(外)", duration: 30, isTarget: false, color: nontargetColors[1], defaultDetail: "", hint: "退院処方の指導・お薬手帳交付" },
             { outputName: "⑮ チーム医療 (算定外)", name: "🤝チーム医療(外)", duration: 30, isTarget: false, color: nontargetColors[2], defaultDetail: "", hint: "NST、ICT、AST等のチーム医療活動" },
             { outputName: "⑮ 中央業務", name: "📦中央業務(外)", duration: 120, isTarget: false, color: nontargetColors[4], defaultDetail: "", hint: "中央調剤室応援、注射調剤、DI室業務など" },
             { outputName: "⑯ その他（業務内容を備考に記入・算定外）", name: "☕昼休憩", duration: 60, isTarget: false, color: nontargetColors[3], defaultDetail: "休憩", hint: "休憩時間" },
-            { outputName: "⑯ その他（業務内容を備考に記入・算定外）", name: "📁その他業務(外)1", duration: 30, isTarget: false, color: nontargetColors[5], defaultDetail: "", hint: "自由記述用" },
-            { outputName: "⑯ その他（業務内容を備考に記入・算定外）", name: "📁その他業務(外)2", duration: 30, isTarget: false, color: nontargetColors[5], defaultDetail: "", hint: "自由記述用" },
-            { outputName: "⑯ その他（業務内容を備考に記入・算定外）", name: "📁その他業務(外)3", duration: 30, isTarget: false, color: nontargetColors[5], defaultDetail: "", hint: "自由記述用" }
+            { outputName: "⑯ その他（業務内容を備考に記入・算定外）", name: "📁その他業務(外)", duration: 30, isTarget: false, color: nontargetColors[5], defaultDetail: "", hint: "自由記述用" }
         ];
 
         let appData = { users: {}, timelines: {} };
@@ -862,37 +869,19 @@
             if ((appData.timelines[currentUser] || []).length === 0) {
                 let layout = appData.users[currentUser].initialLayouts[currentPattern] || [];
                 if (layout.length > 0) {
-                    appData.timelines[currentUser] = JSON.parse(JSON.stringify(layout));
+                    let userWard = appData.users[currentUser].defaultWard || currentWard || '3A';
+                    appData.timelines[currentUser] = layout.map(b => {
+                        let newB = JSON.parse(JSON.stringify(b));
+                        newB.id = Date.now() + Math.random();
+                        newB.ward = userWard || b.ward || '';
+                        return newB;
+                    });
                 }
             }
 
             updateUserSelect(); loadUserData();
         }
 
-        
-        function copyTargetPath() {
-            const text = document.getElementById('target-path').innerText;
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => alert('コピーしました！')).catch(() => fallbackCopyTextToClipboard(text));
-            } else {
-                fallbackCopyTextToClipboard(text);
-            }
-        }
-        function fallbackCopyTextToClipboard(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                alert('コピーしました！');
-            } catch (err) {
-                alert('コピーに失敗しました。手動で選択してコピーしてください。');
-            }
-            document.body.removeChild(textArea);
-        }
 
         function handleConnectionError(err) {
             console.error(err);
@@ -1284,9 +1273,69 @@
             });
         }
 
+        function syncMasterInputsToData() {
+            let jobs = appData.users[currentUser].patterns[currentPattern];
+            jobs.forEach((job, i) => {
+                let nameEl = document.getElementById(`m_name_${i}`);
+                let detailEl = document.getElementById(`m_detail_${i}`);
+                let showEl = document.getElementById(`m_show_${i}`);
+                if (nameEl) job.name = nameEl.value;
+                if (detailEl) job.defaultDetail = detailEl.value;
+                if (showEl) job.isHidden = !showEl.checked;
+            });
+        }
+
+        function addCustomOtherJob(isTarget) {
+            syncMasterInputsToData();
+            let jobs = appData.users[currentUser].patterns[currentPattern];
+            let newJob = isTarget ? {
+                outputName: "⑫ その他（業務内容を備考に記入）",
+                name: "📁その他業務(算定内)",
+                duration: 30,
+                isTarget: true,
+                color: targetColors[3],
+                defaultDetail: "",
+                hint: "自由記述用",
+                isCustom: true
+            } : {
+                outputName: "⑯ その他（業務内容を備考に記入・算定外）",
+                name: "📁その他業務(外)",
+                duration: 30,
+                isTarget: false,
+                color: nontargetColors[5],
+                defaultDetail: "",
+                hint: "自由記述用",
+                isCustom: true
+            };
+            jobs.push(newJob);
+            renderMasterTable();
+            setTimeout(() => {
+                let lastIdx = jobs.length - 1;
+                let input = document.getElementById(`m_name_${lastIdx}`);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 50);
+        }
+
+        function deleteCustomOtherJob(index) {
+            let jobs = appData.users[currentUser].patterns[currentPattern];
+            let job = jobs[index];
+            if (confirm(`「${job.name}」を行ごと削除してもよろしいですか？\n※「一括反映」を押すと完全に確定されます。`)) {
+                syncMasterInputsToData();
+                jobs.splice(index, 1);
+                renderMasterTable();
+            }
+        }
+
         function renderMasterTable() {
             const tbody = document.getElementById("masterTableBody"); tbody.innerHTML = "";
             let jobs = appData.users[currentUser].patterns[currentPattern];
+            
+            let targetOtherCount = 0;
+            let nontargetOtherCount = 0;
+
             jobs.forEach((job, i) => {
                 let tr = document.createElement("tr");
                 tr.className = "draggable-row";
@@ -1298,8 +1347,27 @@
                 tr.addEventListener('drop', handleDrop);
                 
                 tbody.appendChild(tr);
+
+                let isOther = job.outputName.includes("その他");
+                let canDelete = false;
+                if (job.isCustom) {
+                    canDelete = true;
+                } else if (isOther) {
+                    if (job.isTarget) {
+                        targetOtherCount++;
+                        if (targetOtherCount > 1) canDelete = true;
+                    } else if (job.name !== "☕昼休憩") {
+                        nontargetOtherCount++;
+                        if (nontargetOtherCount > 1) canDelete = true;
+                    }
+                }
+
+                let actionBtn = canDelete ? 
+                    `<button class="step-btn" style="background:#e74c3c; color:white; padding:2px 8px;" onclick="deleteCustomOtherJob(${i})" title="この行を削除">🗑️ 削除</button>` :
+                    `<button class="step-btn" style="background:#f5d6d6;" onclick="restoreSingleMasterRow(${i})" title="初期状態に戻す">↩️ 初期化</button>`;
+
                 tr.innerHTML = `
-                    <td><span class="drag-handle" title="ここを掴んでドラッグ">☰</span> ${job.outputName}</td>
+                    <td><span class="drag-handle" title="ここを掴んでドラッグ">☰</span> ${job.outputName}${job.isCustom ? ' <span style="font-size:10px; color:#3498db; background:#ebf5fb; padding:1px 4px; border-radius:3px;">追加</span>' : ''}</td>
                     <td><input type="text" id="m_name_${i}" value="${job.name}"></td>
                     <td><input type="text" id="m_detail_${i}" value="${job.defaultDetail}"></td>
                     <td>
@@ -1312,7 +1380,7 @@
                             <input type="text" class="master-dur-input" id="m_dur_input_${i}" value="${job.duration}" onchange="manualUpdateMasterTime(${i}, this.value)">分
                             <button class="step-btn" onclick="stepMasterTime(${i}, 5)">▶</button>
                             <span style="color:#ccc; margin:0 4px;">|</span>
-                            <button class="step-btn" style="background:#f5d6d6;" onclick="restoreSingleMasterRow(${i})" title="初期状態に戻す">↩️ 初期化</button>
+                            ${actionBtn}
                         </div>
                     </td>
                 `;
@@ -1331,6 +1399,7 @@
             e.preventDefault(); this.classList.remove("drag-over");
             let targetRowIndex = parseInt(this.getAttribute("data-index"), 10);
             if (dragSourceRowIndex === null || dragSourceRowIndex === targetRowIndex) return;
+            syncMasterInputsToData();
             let jobs = appData.users[currentUser].patterns[currentPattern];
             let movedItem = jobs.splice(dragSourceRowIndex, 1)[0];
             jobs.splice(targetRowIndex, 0, movedItem);
@@ -1353,18 +1422,18 @@
         }
 
         async function saveMasterSettings() {
-            let jobs = appData.users[currentUser].patterns[currentPattern];
-            jobs.forEach((job, i) => {
-                job.name = document.getElementById(`m_name_${i}`).value;
-                job.defaultDetail = document.getElementById(`m_detail_${i}`).value;
-                job.isHidden = !document.getElementById(`m_show_${i}`).checked; // チェックなし＝isHidden true
-            });
+            syncMasterInputsToData();
             
             // 現在のタイムライン配置を「初期配置」として保存
-            appData.users[currentUser].initialLayouts[currentPattern] = JSON.parse(JSON.stringify(appData.timelines[currentUser] || []));
+            let currentTL = appData.timelines[currentUser] || [];
+            currentTL.forEach(b => {
+                if (!b.ward) b.ward = currentWard;
+            });
+            appData.users[currentUser].initialLayouts[currentPattern] = JSON.parse(JSON.stringify(currentTL));
             
             await syncSaveToFile();
             renderPanels();
+            renderMasterTable();
             alert("設定を保存し、現在の配置を初期配置として記憶しました。");
         }
 
@@ -1413,6 +1482,9 @@
         function saveAsInitialLayout() {
             if(confirm(`現在のタイムラインを、パターン${currentPattern}の「初期配置」として記憶しますか？\n次回からワンクリックでこの配置を呼び出せます。`)) {
                 let currentTL = appData.timelines[currentUser] || [];
+                currentTL.forEach(b => {
+                    if (!b.ward) b.ward = currentWard;
+                });
                 appData.users[currentUser].initialLayouts[currentPattern] = JSON.parse(JSON.stringify(currentTL));
                 syncSaveToFile();
                 alert("初期配置として記憶しました。設定ファイル(config)に保存されました。");
@@ -1428,10 +1500,11 @@
             if(appData.timelines[currentUser] && appData.timelines[currentUser].length > 0) {
                 if(!confirm("現在のタイムラインが上書きされます。よろしいですか？")) return;
             }
-            // IDが被らないように新しいIDを付与して配置
+            // IDが被らないように新しいIDを付与して配置し、担当病棟もセット
             let newTL = layout.map(b => {
                 let newB = JSON.parse(JSON.stringify(b));
                 newB.id = Date.now() + Math.random();
+                newB.ward = currentWard || b.ward || '';
                 return newB;
             });
             appData.timelines[currentUser] = newTL;
@@ -1528,8 +1601,9 @@
                 tbody.innerHTML += `
                     <tr>
                         <td class="time-col" id="time_lbl_${block.id}">${startStr} ～ ${endStr}</td>
-                        <td><select onchange="updateBlockWard(${block.id}, this.value)" style="width:100%; padding:2px; font-size:11px;">
-                            ${['3A', 'NICU', '3C', '4B', '4C', '5A', 'HCU', '5C', '6A', '6B', '6C'].map(w => `<option value="${w}" ${block.ward === w ? 'selected' : ''}>${w}</option>`).join('')}
+                        <td><select onchange="updateBlockWard(${block.id}, this.value)" style="width:100%; padding:2px; font-size:11px; ${!block.ward ? 'border-color:#e74c3c; background:#fff5f5;' : ''}">
+                            <option value="" ${!block.ward ? 'selected' : ''}>--未設定--</option>
+                            ${ALL_WARDS.map(w => `<option value="${w}" ${block.ward === w ? 'selected' : ''}>${w}</option>`).join('')}
                         </select></td>
                         <td class="name-col"><span style="border-left:5px solid ${block.color}; padding-left:6px; font-weight:bold;">${block.name}</span></td>
                         <td class="flag-col"><span style="color:${block.isTarget ? '#2980b9' : '#e74c3c'}; font-size: 14px;">${block.isTarget ? '〇' : '×'}</span></td>
@@ -1649,6 +1723,7 @@
             let original = masterBackupTemplate.find(o => o.outputName === currentOutputName);
             if (original) {
                 if (confirm(`「${currentOutputName}」の設定内容をすべて初期状態に戻してもよろしいですか？`)) {
+                    syncMasterInputsToData();
                     jobs[index] = JSON.parse(JSON.stringify(original));
                     renderMasterTable();
                 }
