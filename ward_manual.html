@@ -92,7 +92,7 @@
                 <input type="text" id="search-box" placeholder="🔍 全文検索 (Enter)" onkeydown="if(event.key==='Enter') UI.performFullSearch()" style="padding: 5px 10px; border-radius: 4px 0 0 4px; border: 1px solid #ccc; border-right: none; width: 180px; font-size: 13px;">
                 <button class="btn" style="border-radius: 0 4px 4px 0; background: #3498db; padding: 6px 10px; margin-right: 10px; font-size: 13px;" onclick="UI.performFullSearch()">検索</button>
             </div>
-            <button class="btn" style="background:#e67e22; margin-right:10px;" onclick="AppCore.cleanupAttachments()">🗑️ 不要ファイル削除</button>
+            <button class="btn" id="btn-cleanup" style="background:#e67e22; margin-right:10px;" onclick="AppCore.cleanupAttachments()">🗑️ 不要ファイル削除</button>
             <button class="btn" id="btn-force-merge" style="background:#6c757d;" onclick="AppCore.forceMerge()">🔄 手動最適化</button>
         </div>
     </div>
@@ -464,16 +464,40 @@ const AppCore = (function() {
         let cached = State.pageDataCache[pageId];
         
         if (!cached) {
-            if (!pagesDirHandle) return { content: "" };
+            if (!pagesDirHandle) return { content: "", isError: false };
             try {
                 const pageMeta = State.index.pages.find(p => p.id === pageId);
+                let fh = null;
                 const fileName = (pageMeta && pageMeta.fileName) ? pageMeta.fileName : `${pageId}.json`;
-                const fh = await pagesDirHandle.getFileHandle(fileName, { create: false });
+                
+                try {
+                    fh = await pagesDirHandle.getFileHandle(fileName, { create: false });
+                } catch(err1) {
+                    // 【フォールバック探索】PC間コピーや特殊記号でファイル名が一致しない場合、末尾が _pageId.json または pageId.json のファイルを探す
+                    for await (const entry of pagesDirHandle.values()) {
+                        if (entry.kind === 'file' && (entry.name.endsWith(`_${pageId}.json`) || entry.name === `${pageId}.json`)) {
+                            fh = entry;
+                            if (pageMeta) pageMeta.fileName = entry.name; // 最新のファイル名に自己修復
+                            break;
+                        }
+                    }
+                    if (!fh) throw err1;
+                }
+
                 const file = await fh.getFile();
                 cached = JSON.parse(await file.text());
                 State.pageDataCache[pageId] = cached;
             } catch (e) {
-                return { content: "" };
+                console.error("ページファイル読み込みエラー:", pageId, e);
+                // 読み込みに失敗した場合は、空データで上書きされないようエラーフラグを付与する
+                return { 
+                    content: `<div style="padding: 20px; border: 2px solid #e74c3c; background: #fff5f5; border-radius: 6px; color: #c0392b;">
+                        <h3 style="margin-top:0;">⚠️ ページデータの読み込みに失敗しました</h3>
+                        <p style="font-size: 13px;">ファイルが見つからないか、アクセス権限または一時的な読み込み遅延の可能性があります。</p>
+                        <p style="font-size: 12px; color: #7f8c8d;">※既存データ保護のため、このページの自動上書き保存は一時停止されています。ページを再選択するか画面をリロードしてください。</p>
+                    </div>`, 
+                    isError: true 
+                };
             }
         }
         
@@ -503,7 +527,7 @@ const AppCore = (function() {
     }
 
     async function appendTransaction(op, payload) {
-        if (!txDirHandle) return;
+        if (State.isViewOnly || !txDirHandle) return;
         setStatus("✍️ 保存中...");
         const txId = Date.now() + "_" + State.userId + "_" + Math.floor(Math.random() * 1000);
         const txData = { id: txId, ts: Date.now(), op: op, data: payload, userId: State.userId };
@@ -1326,7 +1350,7 @@ const Editor = {
     },
     
     triggerSave: function() {
-        if(!State.currentPageId) return;
+        if(State.isViewOnly || !State.currentPageId || State.isLoadingPage || State.currentLoadError) return;
         clearTimeout(this.saveTimer);
         this.saveTimer = setTimeout(() => {
             this.saveCurrentPage();
@@ -1334,7 +1358,14 @@ const Editor = {
     },
     
     saveCurrentPage: function() {
+        if (State.isViewOnly) return; // 閲覧モードでは保存を行わない
         if (!State.currentPageId) return;
+        if (State.isLoadingPage) return; // 読み込み中は絶対に保存しない
+        if (State.currentLoadError) return; // 読み込みエラー発生中は既存ファイルを空で上書きしない
+        
+        clearTimeout(this.saveTimer);
+        this.saveTimer = null;
+
         const title = document.getElementById('page-title').value || "無題のページ";
         
         let content = "";
@@ -1383,6 +1414,14 @@ const Editor = {
             }
         }
         
+        // 【空データ上書き事故ガード】
+        // キャッシュに元のコンテンツがしっかり存在していたのに、エディタの内容が完全な空（白紙）の場合は
+        // 読み込み途中での誤保存の可能性が極めて高いため上書きをブロックする
+        if (cachedData && cachedData.content && cachedData.content.length > 50 && (!content || content.trim() === '' || content === '<p></p>' || content === '<p><br></p>')) {
+            console.warn("空データによる上書き保存を防止しました:", State.currentPageId);
+            return;
+        }
+
         let indent = idxPage ? (idxPage.indentLevel || 0) : 0;
         let sortOrder = idxPage ? idxPage.sortOrder : undefined;
         
@@ -1403,11 +1442,17 @@ const Editor = {
     },
     
     loadContent: function(content) {
-        if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
-            tinymce.activeEditor.setContent(content || '');
-            tinymce.activeEditor.undoManager.clear();
-        } else {
-            document.getElementById('tinymce-editor').value = content || '';
+        State.isLoadingPage = true;
+        try {
+            if (typeof tinymce !== 'undefined' && tinymce.activeEditor) {
+                tinymce.activeEditor.setContent(content || '');
+                tinymce.activeEditor.undoManager.clear();
+            } else {
+                document.getElementById('tinymce-editor').value = content || '';
+            }
+        } finally {
+            // setContent直後のイベント（change等）による誤保存を防ぐため、わずかに遅延して解除
+            setTimeout(() => { State.isLoadingPage = false; }, 100);
         }
     }
 };
@@ -1510,6 +1555,10 @@ const UI = {
     renderAll: async function() {
         document.getElementById('btn-add-page').style.display = State.isViewOnly ? 'none' : 'block';
         document.getElementById('btn-force-merge').style.display = State.isViewOnly ? 'none' : 'inline-block';
+        const manualSaveBtn = document.getElementById('btn-manual-save');
+        if (manualSaveBtn) manualSaveBtn.style.display = State.isViewOnly ? 'none' : 'inline-block';
+        const cleanupBtn = document.getElementById('btn-cleanup');
+        if (cleanupBtn) cleanupBtn.style.display = State.isViewOnly ? 'none' : 'inline-block';
         
         this.renderSections();
         this.renderPages();
@@ -1599,8 +1648,14 @@ const UI = {
                 if (State.currentSecId === sec.id) return;
                 if (State.isLoadingPage) return;
                 
-                if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
-                    Editor.saveCurrentPage();
+                if (typeof Editor !== 'undefined') {
+                    if (Editor.saveTimer) {
+                        clearTimeout(Editor.saveTimer);
+                        Editor.saveTimer = null;
+                    }
+                    if (!State.isViewOnly && Editor.saveCurrentPage) {
+                        Editor.saveCurrentPage();
+                    }
                 }
                 State.currentSecId = sec.id;
                 State.searchResults = null; // 検索結果をリセット
@@ -1834,12 +1889,21 @@ const UI = {
                 if (State.currentPageId === p.id) return;
                 if (State.isLoadingPage) return;
 
-                if (typeof Editor !== 'undefined' && Editor.saveCurrentPage) {
-                    Editor.saveCurrentPage();
+                // 直前のページの自動保存タイマーを即座に破棄して競合・誤上書きを防ぐ
+                if (typeof Editor !== 'undefined') {
+                    if (Editor.saveTimer) {
+                        clearTimeout(Editor.saveTimer);
+                        Editor.saveTimer = null;
+                    }
+                    if (!State.isViewOnly && Editor.saveCurrentPage) {
+                        Editor.saveCurrentPage();
+                    }
                 }
-                State.currentPageId = p.id;
                 
+                State.currentPageId = p.id;
+                State.currentLoadError = false;
                 State.isLoadingPage = true;
+                
                 try {
                     this.renderPages(); 
                     await this.renderEditor();
@@ -1890,27 +1954,33 @@ const UI = {
             }
         }
         
-        const pageData = await AppCore.loadPageData(State.currentPageId);
-        
-        if (State.isViewOnly) {
-            document.getElementById('page-title').readOnly = true;
-            document.getElementById('attachment-bar').style.display = 'none';
-            document.getElementById('tinymce-editor').style.display = 'none';
-            const tox = document.querySelector('.tox-tinymce');
-            if (tox) tox.style.display = 'none';
+        State.isLoadingPage = true;
+        try {
+            const pageData = await AppCore.loadPageData(State.currentPageId);
+            State.currentLoadError = !!pageData.isError;
             
-            const viewer = document.getElementById('readonly-viewer');
-            viewer.style.display = 'block';
-            viewer.innerHTML = pageData.content;
-        } else {
-            document.getElementById('page-title').readOnly = false;
-            document.getElementById('attachment-bar').style.display = 'flex';
-            document.getElementById('tinymce-editor').style.display = 'none'; // TinyMCE本体が非表示にしているのでそのまま維持
-            document.getElementById('readonly-viewer').style.display = 'none';
-            const tox = document.querySelector('.tox-tinymce');
-            if (tox) tox.style.display = '';
-            
-            Editor.loadContent(pageData.content);
+            if (State.isViewOnly) {
+                document.getElementById('page-title').readOnly = true;
+                document.getElementById('attachment-bar').style.display = 'none';
+                document.getElementById('tinymce-editor').style.display = 'none';
+                const tox = document.querySelector('.tox-tinymce');
+                if (tox) tox.style.display = 'none';
+                
+                const viewer = document.getElementById('readonly-viewer');
+                viewer.style.display = 'block';
+                viewer.innerHTML = pageData.content;
+            } else {
+                document.getElementById('page-title').readOnly = State.currentLoadError;
+                document.getElementById('attachment-bar').style.display = State.currentLoadError ? 'none' : 'flex';
+                document.getElementById('tinymce-editor').style.display = 'none';
+                document.getElementById('readonly-viewer').style.display = 'none';
+                const tox = document.querySelector('.tox-tinymce');
+                if (tox) tox.style.display = '';
+                
+                Editor.loadContent(pageData.content);
+            }
+        } finally {
+            State.isLoadingPage = false;
         }
     },
     
