@@ -16,10 +16,10 @@
         .instruction { font-size: 13px; color: #666; margin-bottom: 15px; line-height: 1.5; }
         
         .layout-grid { display: flex; gap: 20px; }
-        .left-panel { flex: 0 0 350px; }
+        .left-panel { flex: 0 0 360px; }
         .right-panel { flex: 1; min-width: 0; }
 
-        textarea { width: 100%; height: 180px; padding: 10px; font-family: monospace; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 13px; }
+        textarea { width: 100%; height: 170px; padding: 10px; font-family: monospace; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 13px; }
         
         .btn-group { display: flex; gap: 10px; margin-top: 5px; }
         button.clear-btn { background-color: #6c757d; color: white; border: none; padding: 8px; cursor: pointer; border-radius: 4px; font-size: 13px; width: 100%; }
@@ -29,6 +29,116 @@
         .input-group label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 14px; }
         input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
         
+        /* イベント発生日入力コントロール */
+        .event-input-wrapper {
+            background: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 5px;
+        }
+        .event-controls {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            align-items: center;
+        }
+        .event-controls select {
+            flex: 1;
+            min-width: 0;
+            padding: 7px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #fff;
+        }
+        .event-controls input[type="date"] {
+            padding: 6px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #fff;
+            width: 120px;
+        }
+        .btn-secondary {
+            background-color: #4a5568;
+            color: white;
+            border: none;
+            padding: 7px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover { background-color: #2d3748; }
+
+        .event-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .event-tag {
+            background-color: #e2e8f0;
+            color: #2d3748;
+            padding: 3px 8px 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #cbd5e0;
+        }
+        .event-tag .remove-tag-btn {
+            cursor: pointer;
+            font-weight: bold;
+            color: #e53e3e;
+            font-size: 14px;
+            border: none;
+            background: none;
+            padding: 0;
+            line-height: 1;
+        }
+        .event-tag .remove-tag-btn:hover { color: #9b2c2c; }
+
+        /* スロープ変化点自動解析ボックス */
+        .change-point-box {
+            margin-top: 15px;
+            background: #ebf8ff;
+            border: 1px solid #bee3f8;
+            border-radius: 6px;
+            padding: 12px;
+        }
+        .change-point-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .change-point-header strong {
+            color: #2b6cb0;
+            font-size: 13px;
+        }
+        .btn-detect {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-detect:hover { background-color: #2b6cb0; }
+        .change-point-body {
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #2d3748;
+        }
+
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef; }
         .settings-grid label { font-weight: normal; font-size: 12px; margin-bottom: 2px; }
 
@@ -43,12 +153,88 @@
         .results-box { margin-top: 0; padding: 15px; background-color: #fff; border-radius: 4px; border: 1px solid #cce5ff; border-left: 5px solid #0056b3; }
         .result-item { margin: 6px 0; font-size: 15px; font-weight: bold; }
         
-        .canvas-container { margin-top: 20px; background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px; overflow-x: auto; }
-        canvas { display: block; margin: 0 auto; }
+        .canvas-container { margin-top: 20px; background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 15px; overflow-x: auto; position: relative; }
+        canvas { display: block; margin: 0 auto; cursor: crosshair; }
+
+        /* 年次推移セクションのスタイル */
+        .yearly-analysis-section {
+            margin-top: 25px;
+            background: #ffffff;
+            border: 1px solid #b8daff;
+            border-top: 4px solid #17a2b8;
+            border-radius: 6px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .yearly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .yearly-header h3 {
+            margin: 0;
+            color: #0f6674;
+            font-size: 16px;
+        }
+        .yearly-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: white;
+            margin-top: 5px;
+        }
+        .yearly-table th {
+            background-color: #f1f5f9;
+            color: #334155;
+            padding: 9px 12px;
+            text-align: left;
+            border-bottom: 2px solid #cbd5e1;
+            font-weight: 600;
+        }
+        .yearly-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #333;
+        }
+        .yearly-table tr:hover {
+            background-color: #f8fafc;
+        }
+
+        /* ツールチップスタイル */
+        .chart-tooltip {
+            position: absolute;
+            display: none;
+            background: rgba(30, 41, 59, 0.94);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            z-index: 100;
+            transform: translate(-50%, -100%);
+            margin-top: -12px;
+            white-space: nowrap;
+            line-height: 1.4;
+            transition: opacity 0.1s ease;
+        }
+        .chart-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: rgba(30, 41, 59, 0.94) transparent transparent transparent;
+        }
 
         /* ヘルプモーダルのCSS */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: white; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; line-height: 1.6; }
+        .modal-content { background: white; width: 90%; max-width: 720px; max-height: 90vh; overflow-y: auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; line-height: 1.6; }
         .close-modal { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: #666; background: none; border: none; padding: 0; }
         .close-modal:hover { color: #000; }
         .modal-content h3 { color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-top: 0; }
@@ -83,7 +269,80 @@
 
             <div class="input-group">
                 <label for="eventDates">イベント発生日 (カンマ区切りで複数可):</label>
-                <input type="text" id="eventDates" placeholder="例: 2016/05/12, 2020/08/20">
+                <div class="event-input-wrapper">
+                    <input type="text" id="eventDates" placeholder="例: 2016/05/12, 2020/08/20" oninput="updateEventTagsFromInput()">
+                    
+                    <div class="event-controls">
+                        <select id="dateDropdown">
+                            <option value="">-- 検査日一覧から選択 --</option>
+                        </select>
+                        <input type="date" id="eventDateCalendar" title="カレンダーから日付を選択">
+                        <button type="button" class="btn-secondary" onclick="addSelectedEventDate()">追加</button>
+                    </div>
+                    
+                    <div class="event-tags-container" id="eventTagsContainer"></div>
+                </div>
+            </div>
+
+            <!-- スロープ変化点の自動解析機能 -->
+            <div class="change-point-box">
+                <div class="change-point-header">
+                    <strong>⚡ スロープ変化点の自動解析</strong>
+                    <button type="button" class="btn-detect" onclick="detectSlopeChangePoint()">変化点を検出</button>
+                </div>
+
+                <!-- 詳細設定アコーディオン -->
+                <details class="change-point-settings" style="margin-top: 8px; font-size: 12px; color: #495057;">
+                    <summary style="cursor: pointer; font-weight: bold; color: #2b6cb0; padding: 3px 0; user-select: none;">⚙ 詳細設定・条件絞り込み</summary>
+                    <div style="background: white; border: 1px solid #d0e2ff; border-radius: 4px; padding: 10px; margin-top: 6px; display: grid; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: #212529;">
+                            <input type="checkbox" id="cpNegativeOnly" checked>
+                            <span><strong>負のスロープ（&le; 0）のみ対象</strong>（正の傾きを除外）</span>
+                        </label>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div>
+                                <label style="display: block; margin-bottom: 2px;">各区間の最小点数:</label>
+                                <select id="cpMinPoints" style="width: 100%; padding: 4px; font-size: 12px; border: 1px solid #ccc; border-radius: 3px;">
+                                    <option value="2">2点以上</option>
+                                    <option value="3" selected>3点以上 (推奨)</option>
+                                    <option value="4">4点以上</option>
+                                    <option value="5">5点以上</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 2px;">各区間の最小期間:</label>
+                                <select id="cpMinDuration" style="width: 100%; padding: 4px; font-size: 12px; border: 1px solid #ccc; border-radius: 3px;">
+                                    <option value="0">制限なし</option>
+                                    <option value="0.25">3ヶ月以上</option>
+                                    <option value="0.5" selected>6ヶ月以上 (推奨)</option>
+                                    <option value="1.0">1年以上</option>
+                                    <option value="2.0">2年以上</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 2px;">解析対象期間（任意）:</label>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <input type="date" id="cpStartDate" style="flex: 1; padding: 4px; font-size: 12px; border: 1px solid #ccc; border-radius: 3px;" title="解析開始日">
+                                <span>〜</span>
+                                <input type="date" id="cpEndDate" style="flex: 1; padding: 4px; font-size: 12px; border: 1px solid #ccc; border-radius: 3px;" title="解析終了日">
+                            </div>
+                        </div>
+
+                        <div style="border-top: 1px dashed #d0e2ff; padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <button type="button" onclick="calculateYearlySlopes(true)" style="background: #17a2b8; color: white; border: none; padding: 5px 9px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;">
+                                📅 各年の推移・スロープを表示
+                            </button>
+                            <button type="button" onclick="resetCpSettings()" style="background: none; border: none; color: #6c757d; font-size: 11px; text-decoration: underline; cursor: pointer;">
+                                初期設定に戻す
+                            </button>
+                        </div>
+                    </div>
+                </details>
+
+                <div id="changePointResult" class="change-point-body" style="display: none;"></div>
             </div>
 
             <div class="settings-grid">
@@ -118,7 +377,35 @@
             </div>
 
             <div class="canvas-container">
+                <div id="chartTooltip" class="chart-tooltip"></div>
                 <canvas id="customChart"></canvas>
+            </div>
+
+            <!-- 提出用サマリー：年度別eGFRスロープ推移グラフ -->
+            <div id="yearlyAnalysisSection" class="yearly-analysis-section" style="display:none;">
+                <div class="yearly-header">
+                    <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+                        <h3>📅 提出用サマリー：年度別eGFRスロープ推移グラフ</h3>
+                        <span style="font-size: 12px; color: #666;">（年ごとに分割されたeGFR推移線と各年のスロープ値）</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn-secondary" onclick="applyAllYearlyEvents()" style="background-color: #0056b3; padding: 6px 12px;" title="各年の区切り日をメインのイベント発生日に一括設定">
+                            ⚡ 年次区切りをイベント日に一括反映
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="downloadYearlyChartPNG()" style="background-color: #28a745; padding: 6px 12px;" title="このグラフを高解像度PNG画像としてダウンロード">
+                            💾 グラフ画像を保存 (PNG)
+                        </button>
+                        <button type="button" onclick="document.getElementById('yearlyAnalysisSection').style.display='none'" style="background:none; border:none; color:#888; font-size:22px; cursor:pointer; line-height:1; padding-left: 5px;" title="閉じる">&times;</button>
+                    </div>
+                </div>
+                
+                <!-- 年度別スロープ線形回帰グラフ描画エリア -->
+                <div class="canvas-container" style="margin-top: 5px; margin-bottom: 15px;">
+                    <canvas id="yearlySlopeChart"></canvas>
+                </div>
+
+                <!-- 年次詳細テーブル -->
+                <div id="yearlyTableContainer"></div>
             </div>
         </div>
     </div>
@@ -130,7 +417,28 @@
         <h3>使用方法</h3>
         <ul>
             <li><strong>データ入力:</strong> 電子カルテやExcelから検査日とeGFR値をコピーし、左側のテキストエリアに貼り付けます。時刻や不要な文字列が含まれていても、自動的に日付と直後の数値を抽出します。</li>
-            <li><strong>イベント発生日:</strong> 薬剤の投与開始日などを指定できます。カンマ（<code>,</code>）区切りで複数入力が可能です。指定がない場合は全体通算のスロープのみを算出します。</li>
+            <li><strong>イベント発生日の入力支援:</strong>
+                <ul>
+                    <li><strong>テキスト入力:</strong> カンマ（<code>,</code>）区切りで従来通り自由に入力できます。</li>
+                    <li><strong>ドロップダウン選択:</strong> 入力データから読み取った検査日一覧からワンクリックで選択できます。</li>
+                    <li><strong>カレンダー機能:</strong> 検査日以外の日付（手術日・投薬日など）もカレンダーピッカーから直接指定可能です。</li>
+                    <li>追加されたイベント日はタグとして表示され、<code>&times;</code> ボタンで個別に削除できます。</li>
+                </ul>
+            </li>
+            <li><strong>グラフのツールチップ:</strong> 描画されたグラフ上のデータ点にカーソルを合わせると、採血日と検査値が吹き出しで表示されます。</li>
+            <li><strong>スロープ変化点の自動解析（変曲点検出）:</strong>
+                <ul>
+                    <li>「変化点を検出」ボタンをクリックすると、区分線形回帰により傾きが最も大きく変化した変曲点を自動推定し、ワンクリックでイベント日に適用できます。</li>
+                    <li><strong>詳細設定（⚙）:</strong>
+                        <ul>
+                            <li><strong>負のスロープ限定（初期値ON）:</strong> 臨床上想定される低下傾向（&le; 0）のみを探索し、短期的な測定誤差等による正（+）のスロープ候補を自動除外します。</li>
+                            <li><strong>最小点数・最小期間:</strong> 各区間に必要な最低検査点数（3点以上等）や最低期間（6ヶ月以上等）を指定し、ノイズによる誤検出を防止します。</li>
+                            <li><strong>対象期間絞り込み:</strong> 指定した開始日〜終了日の中だけで変化点を探索できます。</li>
+                            <li><strong>各年の推移・スロープ一覧:</strong> 年次ごとの採血回数、平均eGFR、年間スロープを表形式で一覧表示し、年単位の推移確認や区切り日の追加が可能です。</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
             <li><strong>結果のコピー:</strong> 「数値のみコピー」ボタンをクリックすると、算出したスロープ値がタブ区切りでクリップボードに保存されます。Excelのセルに直接貼り付けると横方向へ展開されます。</li>
         </ul>
 
@@ -177,8 +485,20 @@
     let lastResults = [];
     let lastOverallCalc = null;
 
+    // グラフ上のデータ点管理およびホバー用キャッシュ
+    let currentChartState = {
+        points: [],      // { date, value, pixelX, pixelY }
+        baseImage: null, // ホバー前のCanvas背景スナップショット
+        width: 1000,
+        height: 450
+    };
+
     function clearData() {
         document.getElementById('dataInput').value = '';
+        updateDateDropdown([]);
+        document.getElementById('changePointResult').style.display = 'none';
+        const yearlySec = document.getElementById('yearlyAnalysisSection');
+        if (yearlySec) yearlySec.style.display = 'none';
         document.getElementById('dataInput').focus();
     }
 
@@ -186,6 +506,13 @@
         return str.replace(/[！-～]/g, function(s) {
             return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
         }).replace(/ /g, " ");
+    }
+
+    function formatDateToString(d) {
+        const y = d.getFullYear();
+        const m = ('0' + (d.getMonth() + 1)).slice(-2);
+        const day = ('0' + d.getDate()).slice(-2);
+        return `${y}/${m}/${day}`;
     }
 
     function parseRawData(text) {
@@ -218,12 +545,107 @@
         return pairs.sort((a, b) => a.date - b.date);
     }
 
+    // データ入力テキストエリアの変更検知でドロップダウンを更新
+    document.getElementById('dataInput').addEventListener('input', function() {
+        const points = parseRawData(this.value);
+        updateDateDropdown(points);
+    });
+
+    function updateDateDropdown(points) {
+        const select = document.getElementById('dateDropdown');
+        select.innerHTML = '<option value="">-- 検査日一覧から選択 --</option>';
+        
+        if (!points || points.length === 0) return;
+
+        const dateMap = new Map();
+        points.forEach(p => {
+            const dStr = formatDateToString(p.date);
+            if (!dateMap.has(dStr)) {
+                dateMap.set(dStr, p.value);
+            }
+        });
+
+        dateMap.forEach((val, dStr) => {
+            const opt = document.createElement('option');
+            opt.value = dStr;
+            opt.textContent = `${dStr} (eGFR: ${val})`;
+            select.appendChild(opt);
+        });
+    }
+
+    // イベント日のパース
     function parseEventDates(str) {
         if (!str.trim()) return [];
         return str.split(/[,,、\s]+/)
                   .map(s => new Date(convertToHalfWidth(s).trim().replace(/-/g, '/')))
                   .filter(d => !isNaN(d.getTime()))
                   .sort((a, b) => a - b);
+    }
+
+    // イベント日管理用のヘルパー関数群
+    function getEventDatesList() {
+        const val = document.getElementById('eventDates').value;
+        if (!val.trim()) return [];
+        return val.split(/[,,、\s]+/)
+                  .map(s => convertToHalfWidth(s).trim().replace(/-/g, '/'))
+                  .filter(s => /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s));
+    }
+
+    function updateEventInputFromList(list) {
+        const unique = [...new Set(list)].sort((a, b) => new Date(a) - new Date(b));
+        document.getElementById('eventDates').value = unique.join(', ');
+        renderEventTags(unique);
+    }
+
+    function renderEventTags(list) {
+        const container = document.getElementById('eventTagsContainer');
+        container.innerHTML = '';
+        list.forEach((dateStr, idx) => {
+            const tag = document.createElement('div');
+            tag.className = 'event-tag';
+            tag.innerHTML = `<span>Event ${idx + 1}: <strong>${dateStr}</strong></span><button type="button" class="remove-tag-btn" onclick="removeEventDate('${dateStr}')" title="削除">&times;</button>`;
+            container.appendChild(tag);
+        });
+    }
+
+    function updateEventTagsFromInput() {
+        const list = getEventDatesList();
+        renderEventTags(list);
+    }
+
+    function addEventDateString(dateStr) {
+        if (!dateStr) return;
+        const normalized = dateStr.replace(/-/g, '/');
+        const current = getEventDatesList();
+        if (!current.includes(normalized)) {
+            current.push(normalized);
+            updateEventInputFromList(current);
+        }
+    }
+
+    function removeEventDate(dateStr) {
+        const current = getEventDatesList().filter(d => d !== dateStr);
+        updateEventInputFromList(current);
+    }
+
+    function addSelectedEventDate() {
+        const select = document.getElementById('dateDropdown');
+        const cal = document.getElementById('eventDateCalendar');
+        
+        let targetDate = '';
+        if (cal.value) {
+            targetDate = cal.value.replace(/-/g, '/');
+            cal.value = '';
+        } else if (select.value) {
+            targetDate = select.value;
+            select.value = '';
+        }
+
+        if (targetDate) {
+            addEventDateString(targetDate);
+        } else {
+            alert('追加する日付をドロップダウンまたはカレンダーから選択してください。');
+        }
     }
 
     function calculateSlopeForSegment(points, globalMinDate) {
@@ -259,6 +681,9 @@
             return;
         }
 
+        updateDateDropdown(points);
+        updateEventTagsFromInput();
+
         const eventDates = parseEventDates(document.getElementById('eventDates').value);
         const globalMinDate = points[0].date;
         const globalMaxDate = points[points.length - 1].date;
@@ -290,6 +715,7 @@
 
         displayResultsHTML(results, overallCalc, eventDates.length);
         drawCustomCanvasChart(points, eventDates, results, overallCalc, globalMinDate, globalMaxDate);
+        calculateYearlySlopes(false);
     }
 
     function displayResultsHTML(results, overallCalc, eventCount) {
@@ -345,12 +771,536 @@
         });
     }
 
+    // 設定リセット
+    function resetCpSettings() {
+        document.getElementById('cpNegativeOnly').checked = true;
+        document.getElementById('cpMinPoints').value = "3";
+        document.getElementById('cpMinDuration').value = "0.5";
+        document.getElementById('cpStartDate').value = "";
+        document.getElementById('cpEndDate').value = "";
+    }
+
+    // スロープ変化点の自動解析アルゴリズム（高度な設定と臨床的制約対応）
+    function detectSlopeChangePoint() {
+        const rawText = document.getElementById('dataInput').value;
+        const allPoints = parseRawData(rawText);
+
+        if (allPoints.length < 4) {
+            alert("変化点の自動検出には、少なくとも4点以上の検査データが必要です。");
+            return;
+        }
+
+        // 詳細設定パラメータの取得
+        const negativeOnly = document.getElementById('cpNegativeOnly').checked;
+        const minPoints = parseInt(document.getElementById('cpMinPoints').value) || 3;
+        const minDurationYears = parseFloat(document.getElementById('cpMinDuration').value) || 0;
+        const startDateVal = document.getElementById('cpStartDate').value;
+        const endDateVal = document.getElementById('cpEndDate').value;
+
+        // 対象期間の絞り込み
+        let targetPoints = allPoints;
+        if (startDateVal) {
+            const sDate = new Date(startDateVal.replace(/-/g, '/'));
+            targetPoints = targetPoints.filter(p => p.date >= sDate);
+        }
+        if (endDateVal) {
+            const eDate = new Date(endDateVal.replace(/-/g, '/') + ' 23:59:59');
+            targetPoints = targetPoints.filter(p => p.date <= eDate);
+        }
+
+        if (targetPoints.length < minPoints * 2 - 1) {
+            alert(`解析対象のデータ点数 (${targetPoints.length}点) が少なすぎます。各区間に最低 ${minPoints} 点必要なため、最低 ${minPoints * 2 - 1} 点のデータが必要です。期間や最小点数の設定を見直してください。`);
+            return;
+        }
+
+        const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
+        const globalMinDate = targetPoints[0].date;
+
+        let minRSS = Infinity;
+        let bestResult = null;
+        let rejectedByPositive = 0;
+        let rejectedByDuration = 0;
+
+        // 前後最低 minPoints 点を含むように分割点を探索
+        for (let k = minPoints - 1; k <= targetPoints.length - minPoints; k++) {
+            const seg1 = targetPoints.slice(0, k + 1);
+            const seg2 = targetPoints.slice(k);
+
+            // 期間制約のチェック
+            const dur1Years = (seg1[seg1.length - 1].date - seg1[0].date) / msPerYear;
+            const dur2Years = (seg2[seg2.length - 1].date - seg2[0].date) / msPerYear;
+
+            if (minDurationYears > 0 && (dur1Years < minDurationYears || dur2Years < minDurationYears)) {
+                rejectedByDuration++;
+                continue;
+            }
+
+            const calc1 = calculateSlopeForSegment(seg1, globalMinDate);
+            const calc2 = calculateSlopeForSegment(seg2, globalMinDate);
+
+            if (!calc1 || !calc2) continue;
+
+            // 負のスロープ限定フィルタ（臨床上、通常eGFR低下を追うため傾きが<=0）
+            if (negativeOnly) {
+                if (calc1.slope > 0 || calc2.slope > 0) {
+                    rejectedByPositive++;
+                    continue;
+                }
+            }
+
+            // 残差平方和 (RSS)
+            let rss1 = 0;
+            seg1.forEach(p => {
+                const x = (p.date - globalMinDate) / msPerYear;
+                const predY = calc1.slope * x + calc1.intercept;
+                rss1 += Math.pow(p.value - predY, 2);
+            });
+
+            let rss2 = 0;
+            seg2.forEach(p => {
+                const x = (p.date - globalMinDate) / msPerYear;
+                const predY = calc2.slope * x + calc2.intercept;
+                rss2 += Math.pow(p.value - predY, 2);
+            });
+
+            const totalRSS = rss1 + rss2;
+            const slopeDiff = calc2.slope - calc1.slope;
+
+            if (totalRSS < minRSS) {
+                minRSS = totalRSS;
+                bestResult = {
+                    date: targetPoints[k].date,
+                    calc1: calc1,
+                    calc2: calc2,
+                    slopeDiff: slopeDiff,
+                    seg1Count: seg1.length,
+                    seg2Count: seg2.length,
+                    dur1Years: dur1Years,
+                    dur2Years: dur2Years,
+                    rss: totalRSS
+                };
+            }
+        }
+
+        const resDiv = document.getElementById('changePointResult');
+        resDiv.style.display = 'block';
+
+        if (bestResult) {
+            const dateStr = formatDateToString(bestResult.date);
+            const diffSign = bestResult.slopeDiff >= 0 ? `+${bestResult.slopeDiff.toFixed(3)}` : bestResult.slopeDiff.toFixed(3);
+            const changeDesc = bestResult.slopeDiff > 0 ? "傾きが緩やか（低下速度の改善または安定化）" : "傾きが急峻（悪化または低下加速）";
+            const badgeColor = bestResult.slopeDiff > 0 ? "#28a745" : "#dc3545";
+
+            let conditionBadge = [];
+            if (negativeOnly) conditionBadge.push("負のスロープ限定");
+            conditionBadge.push(`各区間&ge;${minPoints}点`);
+            if (minDurationYears > 0) conditionBadge.push(`各区間&ge;${minDurationYears}年`);
+
+            resDiv.innerHTML = `
+                <div style="background: white; border: 1px solid #b8daff; border-radius: 4px; padding: 10px;">
+                    <div style="font-weight: bold; margin-bottom: 5px; color: #004085;">
+                        💡 最適変化点（変曲点）: <span style="font-size: 15px; color: #d63384;">${dateStr}</span>
+                    </div>
+                    <div style="font-size: 11px; color: #6c757d; margin-bottom: 6px;">
+                        適用条件: [${conditionBadge.join(', ')}]
+                    </div>
+                    <div style="margin-bottom: 6px; font-size: 12px; color: #495057; line-height: 1.6;">
+                        ・変化前スロープ: <strong>${bestResult.calc1.slope.toFixed(3)}</strong> (n=${bestResult.seg1Count}, ${bestResult.dur1Years.toFixed(1)}年間)<br>
+                        ・変化後スロープ: <strong>${bestResult.calc2.slope.toFixed(3)}</strong> (n=${bestResult.seg2Count}, ${bestResult.dur2Years.toFixed(1)}年間)<br>
+                        ・スロープ変化量: <strong style="color: ${badgeColor}; font-size: 13px;">${diffSign}</strong> (${changeDesc})
+                    </div>
+                    <button type="button" class="btn-detect" style="background-color: #28a745; width: 100%; padding: 8px; font-size: 13px;" onclick="applyChangePoint('${dateStr}')">
+                        ✓ この日付をイベント日に設定して再解析
+                    </button>
+                </div>
+            `;
+        } else {
+            let reason = [];
+            if (rejectedByPositive > 0 && negativeOnly) reason.push(`正のスロープ（+）となる候補が ${rejectedByPositive} 箇所除外されました`);
+            if (rejectedByDuration > 0) reason.push(`期間不足の候補が ${rejectedByDuration} 箇所除外されました`);
+            const reasonText = reason.length > 0 ? `<br><small style="color:#666;">（理由: ${reason.join('、')}）</small>` : '';
+
+            resDiv.innerHTML = `
+                <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px; padding: 10px; color: #856404; font-size: 12px;">
+                    ⚠️ 条件に合致する変化点が検出されませんでした。${reasonText}<br>
+                    「詳細設定」から「最小点数」「最小期間」を緩和するか、「負のスロープのみ」のチェックを外して再試行してください。
+                </div>
+            `;
+        }
+    }
+
+    // 各年度ごとのスロープ（提出用年次推移サマリーグラフ）算出＆描画
+    function calculateYearlySlopes(shouldScroll = false) {
+        const rawText = document.getElementById('dataInput').value;
+        const points = parseRawData(rawText);
+
+        const section = document.getElementById('yearlyAnalysisSection');
+        if (!section) return;
+
+        if (points.length === 0) {
+            if (shouldScroll) alert("検査データが入力されていません。");
+            return;
+        }
+
+        section.style.display = 'block';
+
+        // 年ごとにグループ化
+        const yearGroups = new Map();
+        points.forEach(p => {
+            const yr = p.date.getFullYear();
+            if (!yearGroups.has(yr)) {
+                yearGroups.set(yr, []);
+            }
+            yearGroups.get(yr).push(p);
+        });
+
+        const years = Array.from(yearGroups.keys()).sort((a, b) => a - b);
+        const yearlyData = [];
+        const globalMinDate = points[0].date;
+
+        years.forEach((yr, idx) => {
+            const pts = yearGroups.get(yr);
+            const count = pts.length;
+            const avgVal = (pts.reduce((acc, p) => acc + p.value, 0) / count).toFixed(1);
+            
+            let calc = null;
+            if (count >= 2) {
+                calc = calculateSlopeForSegment(pts, globalMinDate);
+            }
+
+            yearlyData.push({
+                year: yr,
+                count: count,
+                avgVal: avgVal,
+                calc: calc,
+                slope: calc ? calc.slope : null,
+                pts: pts,
+                firstDateStr: formatDateToString(pts[0].date),
+                lastDateStr: formatDateToString(pts[pts.length - 1].date)
+            });
+        });
+
+        // 1. 提出用：年度別スロープ線形回帰グラフの描画
+        drawYearlySlopeChart(points, yearlyData);
+
+        // 2. 年次推移詳細テーブルの生成
+        const tableContainer = document.getElementById('yearlyTableContainer');
+        const yearColors = ["#007bff", "#28a745", "#dc3545", "#fd7e14", "#6f42c1", "#20c997", "#e83e8c", "#17a2b8"];
+        
+        let tableHTML = `
+            <table class="yearly-table">
+                <thead>
+                    <tr>
+                        <th>区分 / 年</th>
+                        <th>採血回数</th>
+                        <th>検査期間</th>
+                        <th>平均eGFR</th>
+                        <th>年間スロープ (mL/min/1.73m²/yr)</th>
+                        <th style="text-align: center;">イベント設定</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        yearlyData.forEach((d, idx) => {
+            const color = yearColors[idx % yearColors.length];
+            let slopeText = "<span style='color:#94a3b8;'>- (点数不足)</span>";
+            let statusBadge = "";
+            if (d.slope !== null) {
+                let badgeText = "緩やか";
+                if (d.slope > 0) {
+                    badgeText = "正の傾き";
+                } else if (d.slope <= -4.0) {
+                    badgeText = "急速低下";
+                } else if (d.slope <= -1.5) {
+                    badgeText = "通常進行";
+                }
+                slopeText = `<strong style="color:${color}; font-size:14px;">${d.slope.toFixed(3)}</strong> <span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:4px;">${badgeText}</span>`;
+            }
+
+            tableHTML += `
+                <tr>
+                    <td>
+                        <span style="display:inline-block; width:12px; height:12px; background-color:${color}; border-radius:2px; vertical-align:middle; margin-right:6px;"></span>
+                        <strong style="color: #1e293b;">${d.year}年</strong>
+                    </td>
+                    <td>${d.count} 回</td>
+                    <td style="font-size: 12px; color: #64748b;">${d.firstDateStr} 〜 ${d.lastDateStr}</td>
+                    <td><strong>${d.avgVal}</strong></td>
+                    <td>${slopeText}</td>
+                    <td style="text-align: center;">
+                        <button type="button" onclick="addEventDateString('${d.firstDateStr}'); executeAnalysis();" 
+                                style="background: #475569; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;"
+                                title="${d.firstDateStr} をイベント発生日に設定">
+                            ${d.year}年開始日を追加
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `
+                </tbody>
+            </table>
+        `;
+        tableContainer.innerHTML = tableHTML;
+
+        // ボタンからの呼び出し時はスムーズスクロール
+        if (shouldScroll) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    // 提出用サマリー：年度別eGFRスロープ推移グラフ（散布図＋年次スロープ回帰直線）
+    function drawYearlySlopeChart(points, yearlyData) {
+        const canvas = document.getElementById('yearlySlopeChart');
+        if (!canvas) return;
+
+        const cWidth = parseInt(document.getElementById('canvasWidth').value) || 1000;
+        canvas.width = cWidth;
+        canvas.height = 420;
+
+        const ctx = canvas.getContext('2d');
+        
+        // 提出画像用に背景を白で塗りつぶし
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const padding = { top: 65, right: 40, bottom: 50, left: 60 };
+        const graphWidth = canvas.width - padding.left - padding.right;
+        const graphHeight = canvas.height - padding.top - padding.bottom;
+
+        const minDate = points[0].date;
+        const maxDate = points[points.length - 1].date;
+        const minX = minDate.getTime();
+        const maxX = maxDate.getTime() === minX ? minX + 86400000 : maxDate.getTime();
+
+        const eGFRValues = points.map(p => p.value);
+        let autoMinY = Math.floor(Math.min(...eGFRValues) - 5);
+        let autoMaxY = Math.ceil(Math.max(...eGFRValues) + 5);
+        if (autoMinY < 0) autoMinY = 0;
+
+        const inputYMax = document.getElementById('yMax').value;
+        const inputYMin = document.getElementById('yMin').value;
+
+        let maxY = inputYMax !== "" ? parseFloat(inputYMax) : autoMaxY;
+        let minY = inputYMin !== "" ? parseFloat(inputYMin) : autoMinY;
+        if (minY >= maxY) maxY = minY + 10;
+
+        const getXPixel = (dateObj) => padding.left + ((dateObj.getTime() - minX) / (maxX - minX)) * graphWidth;
+        const getYPixel = (val) => padding.top + graphHeight - ((val - minY) / (maxY - minY)) * graphHeight;
+
+        // グリッド線とY軸目盛り
+        ctx.strokeStyle = "#e9ecef";
+        ctx.lineWidth = 1;
+        const yRange = maxY - minY;
+        let yStep = 10;
+        if (yRange <= 30) yStep = 5;
+        if (yRange >= 100) yStep = 20;
+
+        for (let yVal = Math.ceil(minY / yStep) * yStep; yVal <= maxY; yVal += yStep) {
+            const yPix = getYPixel(yVal);
+            if (yPix < padding.top || yPix > padding.top + graphHeight) continue;
+            ctx.beginPath(); ctx.moveTo(padding.left, yPix); ctx.lineTo(canvas.width - padding.right, yPix); ctx.stroke();
+            ctx.fillStyle = "#666"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
+            ctx.fillText(yVal, padding.left - 8, yPix + 4);
+        }
+
+        // X軸目盛り
+        const totalDuration = maxX - minX;
+        const tickCount = Math.floor(graphWidth / 150);
+        ctx.textAlign = "center";
+        for (let i = 0; i <= tickCount; i++) {
+            const currentTIckTime = minX + (totalDuration / tickCount) * i;
+            const d = new Date(currentTIckTime);
+            const xPix = getXPixel(d);
+            ctx.fillStyle = "#666";
+            ctx.fillText(d.toLocaleDateString(), xPix, padding.top + graphHeight + 20);
+        }
+
+        // グラフ外枠
+        ctx.strokeStyle = "#ccc";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(padding.left, padding.top, graphWidth, graphHeight);
+
+        const yearColors = ["#007bff", "#28a745", "#dc3545", "#fd7e14", "#6f42c1", "#20c997", "#e83e8c", "#17a2b8"];
+        const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
+
+        // 各年の区切り縦線（破線）の描画
+        yearlyData.forEach((d, idx) => {
+            if (idx > 0) {
+                const borderDate = d.pts[0].date;
+                const bx = getXPixel(borderDate);
+                if (bx >= padding.left && bx <= padding.left + graphWidth) {
+                    ctx.strokeStyle = "#adb5bd";
+                    ctx.lineWidth = 1.2;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(bx, padding.top);
+                    ctx.lineTo(bx, padding.top + graphHeight);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = "#6c757d";
+                    ctx.font = "10px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(`${d.year}年境界`, bx, padding.top - 5);
+                }
+            }
+        });
+
+        // 各年ごとの回帰直線を描画
+        yearlyData.forEach((d, idx) => {
+            const color = yearColors[idx % yearColors.length];
+            if (d.calc && d.pts.length >= 2) {
+                const startD = d.pts[0].date;
+                const endD = d.pts[d.pts.length - 1].date;
+
+                const xStartYears = (startD - minDate) / msPerYear;
+                const yStart = d.calc.slope * xStartYears + d.calc.intercept;
+                const xEndYears = (endD - minDate) / msPerYear;
+                const yEnd = d.calc.slope * xEndYears + d.calc.intercept;
+
+                const x1Pix = getXPixel(startD);
+                const y1Pix = getYPixel(yStart);
+                const x2Pix = getXPixel(endD);
+                const y2Pix = getYPixel(yEnd);
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3.0;
+                ctx.beginPath();
+                ctx.moveTo(x1Pix, y1Pix);
+                ctx.lineTo(x2Pix, y2Pix);
+                ctx.stroke();
+
+                // 直線の中央付近にスロープ値を描画
+                const midX = (x1Pix + x2Pix) / 2;
+                const midY = (y1Pix + y2Pix) / 2;
+                ctx.fillStyle = color;
+                ctx.font = "bold 12px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(`${d.slope.toFixed(2)}`, midX, Math.max(padding.top + 15, midY - 8));
+            }
+        });
+
+        // データ点の描画
+        points.forEach(p => {
+            const px = getXPixel(p.date);
+            const py = getYPixel(p.value);
+            if (py < padding.top || py > padding.top + graphHeight) return;
+
+            const yr = p.date.getFullYear();
+            const yrIdx = yearlyData.findIndex(d => d.year === yr);
+            const ptColor = yrIdx >= 0 ? yearColors[yrIdx % yearColors.length] : "#0056b3";
+
+            ctx.fillStyle = ptColor;
+            ctx.beginPath();
+            ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        });
+
+        // 上部ヘッダー（提出用凡例サマリー）
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "bold 13px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("■ 各年度スロープ (mL/min/1.73m²/year):", padding.left, 24);
+
+        let legendX = padding.left;
+        let legendY = 44;
+        ctx.font = "11px sans-serif";
+
+        yearlyData.forEach((d, idx) => {
+            const color = yearColors[idx % yearColors.length];
+            const slopeStr = d.slope !== null ? `${d.slope.toFixed(2)}` : "不足";
+            const text = `${d.year}年: ${slopeStr} (n=${d.count})`;
+
+            // 凡例カラーボックス
+            ctx.fillStyle = color;
+            ctx.fillRect(legendX, legendY - 9, 10, 10);
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(legendX, legendY - 9, 10, 10);
+
+            // テキスト
+            ctx.fillStyle = "#334155";
+            ctx.textAlign = "left";
+            ctx.fillText(text, legendX + 14, legendY);
+
+            legendX += ctx.measureText(text).width + 30;
+            // はみ出る場合は折り返し
+            if (legendX > canvas.width - padding.right - 100) {
+                legendX = padding.left;
+                legendY += 16;
+            }
+        });
+    }
+
+    // 提出用グラフのPNG画像ダウンロード
+    function downloadYearlyChartPNG() {
+        const canvas = document.getElementById('yearlySlopeChart');
+        if (!canvas) return;
+        const link = document.createElement('a');
+        const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        link.download = `eGFR_yearly_slope_summary_${nowStr}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+
+    // 全ての年次区切り日を一括でイベント発生日に適用
+    function applyAllYearlyEvents() {
+        const rawText = document.getElementById('dataInput').value;
+        const points = parseRawData(rawText);
+        if (points.length === 0) {
+            alert("検査データが入力されていません。");
+            return;
+        }
+
+        const yearGroups = new Map();
+        points.forEach(p => {
+            const yr = p.date.getFullYear();
+            if (!yearGroups.has(yr)) yearGroups.set(yr, []);
+            yearGroups.get(yr).push(p);
+        });
+
+        const years = Array.from(yearGroups.keys()).sort((a, b) => a - b);
+        if (years.length <= 1) {
+            alert("データが1年分しかないため、年次区切りを設定できません。");
+            return;
+        }
+
+        const eventDatesToAdd = [];
+        for (let i = 1; i < years.length; i++) {
+            const yr = years[i];
+            const pts = yearGroups.get(yr);
+            eventDatesToAdd.push(formatDateToString(pts[0].date));
+        }
+
+        updateEventInputFromList(eventDatesToAdd);
+        executeAnalysis();
+
+        // メイン結果エリアへスクロール
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function applyChangePoint(dateStr) {
+        addEventDateString(dateStr);
+        executeAnalysis();
+    }
+
+    // グラフ描画
     function drawCustomCanvasChart(points, eventDates, results, overallCalc, minDate, maxDate) {
         const canvas = document.getElementById('customChart');
         const cWidth = parseInt(document.getElementById('canvasWidth').value) || 1000;
         const cHeight = parseInt(document.getElementById('canvasHeight').value) || 450;
         canvas.width = cWidth;
         canvas.height = cHeight;
+
+        currentChartState.width = cWidth;
+        currentChartState.height = cHeight;
+        currentChartState.points = [];
 
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -378,6 +1328,7 @@
         const getXPixel = (dateObj) => padding.left + ((dateObj.getTime() - minX) / (maxX - minX)) * graphWidth;
         const getYPixel = (val) => padding.top + graphHeight - ((val - minY) / (maxY - minY)) * graphHeight;
 
+        // グリッドとY軸目盛り
         ctx.strokeStyle = "#e9ecef";
         ctx.lineWidth = 1;
         
@@ -394,6 +1345,7 @@
             ctx.fillText(yVal, padding.left - 8, yPix + 4);
         }
 
+        // X軸目盛り
         const totalDuration = maxX - minX;
         const tickCount = Math.floor(graphWidth / 150);
         ctx.textAlign = "center";
@@ -408,6 +1360,7 @@
         ctx.strokeStyle = "#ccc";
         ctx.strokeRect(padding.left, padding.top, graphWidth, graphHeight);
 
+        // イベント日の破線とラベル
         eventDates.forEach((ed, idx) => {
             if (ed.getTime() >= minX && ed.getTime() <= maxX) {
                 const xPix = getXPixel(ed);
@@ -427,6 +1380,7 @@
         const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
         const lineColors = ["#28a745", "#dc3545", "#fd7e14", "#6f42c1", "#17a2b8"];
 
+        // スロープ直線の描画
         if (eventDates.length === 0 && overallCalc) {
             ctx.strokeStyle = "#6c757d"; ctx.lineWidth = 2.5;
             ctx.beginPath();
@@ -454,6 +1408,7 @@
             });
         }
 
+        // データ点の描画＆ホバー用座標キャッシュ
         points.forEach(p => {
             const px = getXPixel(p.date);
             const py = getYPixel(p.value);
@@ -462,8 +1417,93 @@
             ctx.fillStyle = "#0056b3";
             ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 2 * Math.PI); ctx.fill();
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+
+            currentChartState.points.push({
+                date: p.date,
+                value: p.value,
+                pixelX: px,
+                pixelY: py
+            });
+        });
+
+        // ツールチップ表示用に背景スナップショットを保存
+        currentChartState.baseImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    }
+
+    // ツールチップおよびホバーイベントの初期化
+    function setupCanvasTooltip() {
+        const canvas = document.getElementById('customChart');
+        const tooltip = document.getElementById('chartTooltip');
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (!currentChartState.points || currentChartState.points.length === 0) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            let closest = null;
+            let minDist = 14;
+
+            currentChartState.points.forEach(p => {
+                const dist = Math.hypot(p.pixelX - mouseX, p.pixelY - mouseY);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = p;
+                }
+            });
+
+            const ctx = canvas.getContext('2d');
+
+            if (closest) {
+                if (currentChartState.baseImage) {
+                    ctx.putImageData(currentChartState.baseImage, 0, 0);
+                }
+                
+                // ホバー点のアニメーション強調描画
+                ctx.beginPath();
+                ctx.arc(closest.pixelX, closest.pixelY, 7.5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ffc107';
+                ctx.fill();
+                ctx.strokeStyle = '#0056b3';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                // ツールチップ配置計算
+                const containerRect = canvas.parentElement.getBoundingClientRect();
+                const posX = (rect.left - containerRect.left) + (closest.pixelX / scaleX);
+                const posY = (rect.top - containerRect.top) + (closest.pixelY / scaleY);
+
+                tooltip.innerHTML = `
+                    <div style="font-weight:bold; color:#7dd3fc; margin-bottom:3px;">📅 ${formatDateToString(closest.date)}</div>
+                    <div>eGFR: <strong style="font-size:14px; color:#fff;">${closest.value}</strong> <span style="font-size:11px; color:#cbd5e1;">mL/min/1.73m²</span></div>
+                `;
+                tooltip.style.left = posX + 'px';
+                tooltip.style.top = posY + 'px';
+                tooltip.style.display = 'block';
+            } else {
+                if (currentChartState.baseImage) {
+                    ctx.putImageData(currentChartState.baseImage, 0, 0);
+                }
+                tooltip.style.display = 'none';
+            }
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            const ctx = canvas.getContext('2d');
+            if (currentChartState.baseImage) {
+                ctx.putImageData(currentChartState.baseImage, 0, 0);
+            }
+            tooltip.style.display = 'none';
         });
     }
+
+    // 初期化実行
+    window.addEventListener('DOMContentLoaded', () => {
+        setupCanvasTooltip();
+    });
 </script>
 
 </body>
