@@ -890,8 +890,12 @@
         for (var k = 0; k < keys.length; k++) {
             var p = patientData[keys[k]];
             
+            var currentWard = p.currentWard || p.ward;
+            var currentDept = (p.currentDept !== undefined && p.currentDept !== null && p.currentDept !== "") ? p.currentDept : p.department;
+            var currentDoctor = (p.currentDoctor !== undefined && p.currentDoctor !== null && p.currentDoctor !== "") ? p.currentDoctor : p.doctor;
+
             var rowArray = [
-                p.id, p.name, p.age, p.ageGroup, p.ward, p.department, p.doctor,
+                p.id, p.name, p.age, p.ageGroup, currentWard, currentDept, currentDoctor,
                 p.drug, p.freq ? p.freq + "回/日" : "", p.start, p.end, p.sampleDate,
                 p.status === "" ? "未選択" : p.status, 
                 p.tab === "target" ? "対象症例" : (p.tab === "exclude" ? "候補外" : "スクリーニング"),
