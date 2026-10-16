@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wide to Long Converter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base Themes */
+        :root[data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            --card-shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.25);
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --accent-1: #3b82f6;
+            --accent-2: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.25);
+            --success: #10b981;
+            --input-bg: rgba(0, 0, 0, 0.25);
+            --info-box-bg: rgba(59, 130, 246, 0.08);
+            --info-box-border: rgba(59, 130, 246, 0.2);
+            --smart-badge-bg: rgba(139, 92, 246, 0.15);
+            --smart-badge-border: rgba(139, 92, 246, 0.35);
+            --smart-badge-text: #c084fc;
+            --table-header-bg: #1e293b;
+            --table-stripe: rgba(255, 255, 255, 0.02);
+            --radio-ignore-bg: rgba(255, 255, 255, 0.15);
+            --btn-ghost-hover: rgba(255, 255, 255, 0.08);
+            --select-bg: #1e293b;
+            --theme-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23f8fafc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>');
+        }
+
+        :root[data-theme="light"] {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            --card-shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.08);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --accent-1: #2563eb;
+            --accent-2: #7c3aed;
+            --accent-glow: rgba(124, 58, 237, 0.15);
+            --success: #059669;
+            --input-bg: #f8fafc;
+            --info-box-bg: rgba(37, 99, 235, 0.05);
+            --info-box-border: rgba(37, 99, 235, 0.15);
+            --smart-badge-bg: rgba(124, 58, 237, 0.08);
+            --smart-badge-border: rgba(124, 58, 237, 0.25);
+            --smart-badge-text: #7c3aed;
+            --table-header-bg: #f1f5f9;
+            --table-stripe: rgba(0, 0, 0, 0.015);
+            --radio-ignore-bg: #cbd5e1;
+            --btn-ghost-hover: rgba(0, 0, 0, 0.05);
+            --select-bg: #ffffff;
+            --theme-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%231e293b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>');
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        html, body {
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+            color: var(--text-primary);
+            padding: 1rem 2rem 3rem 2rem;
+            line-height: 1.5;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1650px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding: 0 0.25rem;
+        }
+
+        .header-title h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(to right, var(--accent-1), var(--accent-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.1rem;
+        }
+
+        .header-title p.subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .theme-toggle {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: var(--card-shadow);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: var(--card-shadow-hover);
+        }
+
+        .theme-toggle::before {
+            content: '';
+            display: block;
+            width: 20px;
+            height: 20px;
+            background-image: var(--theme-icon);
+            background-size: cover;
+        }
+
+        /* 2-column layout */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        @media (max-width: 1100px) {
+            .layout-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: var(--card-shadow);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            user-select: none;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .card-title-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-1);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .smart-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.65rem;
+            border-radius: 6px;
+            background: var(--smart-badge-bg);
+            color: var(--smart-badge-text);
+            border: 1px solid var(--smart-badge-border);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        /* Collapse / Expand Toggle Button */
+        .toggle-btn {
+            background: transparent;
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 0.3rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-btn:hover {
+            background: var(--btn-ghost-hover);
+            color: var(--text-primary);
+        }
+
+        .toggle-btn svg {
+            transition: transform 0.25s ease;
+        }
+
+        .toggle-btn.collapsed svg {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-body {
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0, 1, 0, 1), opacity 0.25s ease;
+        }
+
+        .collapsible-body.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            margin: 0 !important;
+            pointer-events: none;
+        }
+
+        .desc {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Information description box */
+        .info-box {
+            background: var(--info-box-bg);
+            border: 1px solid var(--info-box-border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.9rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: var(--text-primary);
+        }
+
+        textarea {
+            width: 100%;
+            height: 180px;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+            transition: border-color 0.3s ease, background-color 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-1);
+        }
+
+        textarea::placeholder {
+            color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        /* Toolbar for quick bulk actions */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.9rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .quick-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .quick-actions-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-right: 0.2rem;
+        }
+
+        .btn-chip {
+            background: rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.55rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        :root[data-theme="dark"] .btn-chip {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-chip:hover {
+            background: var(--accent-1);
+            color: #ffffff;
+            border-color: var(--accent-1);
+        }
+
+        .btn-chip.btn-smart {
+            background: var(--smart-badge-bg);
+            color: var(--smart-badge-text);
+            border-color: var(--smart-badge-border);
+            font-weight: 600;
+        }
+
+        .btn-chip.btn-smart:hover {
+            background: var(--accent-2);
+            color: #ffffff;
+            border-color: var(--accent-2);
+        }
+
+        /* Columns Grid - Expands naturally downwards */
+        .columns-container {
+            width: 100%;
+            overflow: visible;
+        }
+
+        .columns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.6rem;
+        }
+
+        .column-item {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.5rem 0.6rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            transition: border-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .column-item:hover {
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .column-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+            text-align: center;
+        }
+
+        /* Segmented Control Radio Buttons */
+        .radio-group {
+            display: flex;
+            background: rgba(0, 0, 0, 0.12);
+            border: 1px solid var(--card-border);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        :root[data-theme="light"] .radio-group {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .radio-group input[type="radio"] {
+            display: none;
+        }
+
+        .radio-group label {
+            flex: 1;
+            text-align: center;
+            padding: 0.3rem 0;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .radio-group label:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+        
+        :root[data-theme="light"] .radio-group label:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        /* ID Selected */
+        .radio-group input[value="id"]:checked + label {
+            background: var(--accent-1);
+            color: #ffffff;
+        }
+        /* Measure Selected */
+        .radio-group input[value="measure"]:checked + label {
+            background: var(--accent-2);
+            color: #ffffff;
+        }
+        /* Ignore Selected */
+        .radio-group input[value="ignore"]:checked + label {
+            background: var(--radio-ignore-bg);
+            color: var(--text-primary);
+        }
+
+        /* Buttons */
+        .btn {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            color: white;
+            border: none;
+            padding: 0.55rem 1.25rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            transition: transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        .btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #059669, #10b981);
+        }
+        .btn-success:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Result Section - Expands naturally downwards */
+        .result-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .preview-limit-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .preview-limit-select {
+            background: var(--select-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--card-border);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .preview-limit-select:focus {
+            outline: none;
+            border-color: var(--accent-1);
+        }
+
+        /* No vertical restriction on preview table - expands naturally */
+        .preview-table-wrapper {
+            overflow-x: auto;
+            border-radius: 6px;
+            border: 1px solid var(--card-border);
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+        }
+
+        th, td {
+            padding: 0.5rem 0.8rem;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+            white-space: nowrap;
+        }
+
+        th {
+            background: var(--table-header-bg);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tr:nth-child(even) {
+            background: var(--table-stripe);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .empty-state svg {
+            margin-bottom: 0.75rem;
+            opacity: 0.4;
+            width: 36px;
+            height: 36px;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--success);
+            color: var(--text-primary);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            transform: translateX(120%);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            font-size: 0.9rem;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        /* Scrollbar aesthetics */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--card-border);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <h1>Wide to Long Converter</h1>
+                <p class="subtitle">線形混合モデル解析用データ変形ツール</p>
+            </div>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"></button>
+        </header>
+
+        <main class="layout-grid">
+            <!-- Left Column: Input and Config -->
+            <div class="col">
+                <!-- Card 1: Data Input (Collapsible) -->
+                <div class="card" id="inputCard">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <h2>1. データの貼り付け</h2>
+                            <span class="badge" id="dataStatsBadge" style="display: none;">未読込</span>
+                        </div>
+                        <button class="toggle-btn" id="toggleInputBtn" title="パネルを折りたたむ/展開">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                            <span id="toggleInputBtnText">折りたたむ</span>
+                        </button>
+                    </div>
+
+                    <div class="collapsible-body" id="inputBody">
+                        <p class="desc">Excelからデータをコピーし、下のテキストエリアに貼り付けてください（1行目は変数名）。</p>
+                        <textarea id="inputData" placeholder="ID&#9;Group&#9;Time1&#9;Time2&#9;Time3&#10;1&#9;A&#9;10.5&#9;12.1&#9;14.3&#10;2&#9;B&#9;9.2&#9;11.0&#9;13.5"></textarea>
+                    </div>
+                </div>
+
+                <!-- Card 2: Role Config (Expands downwards without height restrictions) -->
+                <div class="card" id="configCard" style="display: none;">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <h2>2. 列の役割設定</h2>
+                            <span class="badge" id="columnCountBadge">0 列</span>
+                            <span class="smart-badge" id="smartDetectBadge" style="display: none;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                </svg>
+                                <span id="smartDetectText">自動判定済み</span>
+                            </span>
+                        </div>
+                        <button class="btn" id="convertBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                            変換実行
+                        </button>
+                    </div>
+
+                    <!-- Instruction Box (Preserved exactly as requested) -->
+                    <div class="info-box">
+                        各列の役割を設定してください。<br>
+                        ・<strong>ID/固定変数</strong>: そのまま保持される列（例：ID、グループなど）<br>
+                        ・<strong>変形対象 (Time等)</strong>: 縦に展開される列（例：Time1、Time2など）
+                    </div>
+
+                    <!-- Quick bulk actions toolbar -->
+                    <div class="toolbar">
+                        <div class="quick-actions">
+                            <span class="quick-actions-label">一括選択:</span>
+                            <button class="btn-chip btn-smart" id="smartAutoDetectBtn" title="列名の繰り返しパターンを自動解析して「展開」を設定">✨ 自動解析で設定</button>
+                            <button class="btn-chip" id="bulkDefaultBtn" title="1列目をID、残り全てを展開に設定">1列目ID / 残り展開</button>
+                            <button class="btn-chip" id="bulkAllMeasureBtn" title="すべての列を展開に設定">すべて展開</button>
+                            <button class="btn-chip" id="bulkAllIdBtn" title="すべての列をIDに設定">すべてID</button>
+                            <button class="btn-chip" id="bulkAllIgnoreBtn" title="すべての列を除外に設定">すべて除外</button>
+                        </div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">※各列のボタンをクリックで個別変更可能</span>
+                    </div>
+                    
+                    <!-- Columns container (naturally expands to show all columns) -->
+                    <div class="columns-container">
+                        <div class="columns-grid" id="columnsGrid">
+                            <!-- Column items injected dynamically here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Result (Naturally expands downwards without height restrictions) -->
+            <div class="col">
+                <div class="card" id="resultCard">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <h2>3. 変換結果</h2>
+                            <span id="rowCountLabel" style="font-size: 0.85rem; font-weight: normal; color: var(--text-secondary);"></span>
+                        </div>
+                        <button class="btn btn-success" id="copyBtn" disabled>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            クリップボードにコピー
+                        </button>
+                    </div>
+
+                    <div class="result-controls">
+                        <div id="previewSummaryText">Excel等にそのまま貼り付け可能です。</div>
+                        <div class="preview-limit-wrapper" id="previewLimitWrapper" style="display: none;">
+                            <label for="previewLimitSelect">表示行数:</label>
+                            <select id="previewLimitSelect" class="preview-limit-select">
+                                <option value="50">50行</option>
+                                <option value="100" selected>100行</option>
+                                <option value="500">500行</option>
+                                <option value="1000">1000行</option>
+                                <option value="all">すべて表示</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="preview-table-wrapper" id="tableWrapper">
+                        <div class="empty-state" id="emptyState">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            <p>データを貼り付け、列の役割を設定後に<br>「変換実行」を押すと結果が表示されます。</p>
+                        </div>
+                        <table id="previewTable" style="display: none;">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        クリップボードにコピーしました
+    </div>
+
+    <script>
+        // Theme Management
+        const themeToggle = document.getElementById('themeToggle');
+        function getSavedTheme() {
+            return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        }
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        }
+        setTheme(getSavedTheme());
+        
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+        });
+
+        // DOM Elements
+        const inputData = document.getElementById('inputData');
+        const configCard = document.getElementById('configCard');
+        const columnsGrid = document.getElementById('columnsGrid');
+        const convertBtn = document.getElementById('convertBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const previewTable = document.getElementById('previewTable');
+        const emptyState = document.getElementById('emptyState');
+        const toast = document.getElementById('toast');
+        const rowCountLabel = document.getElementById('rowCountLabel');
+        const dataStatsBadge = document.getElementById('dataStatsBadge');
+        const columnCountBadge = document.getElementById('columnCountBadge');
+        const smartDetectBadge = document.getElementById('smartDetectBadge');
+        const smartDetectText = document.getElementById('smartDetectText');
+        const previewLimitWrapper = document.getElementById('previewLimitWrapper');
+        const previewLimitSelect = document.getElementById('previewLimitSelect');
+        const previewSummaryText = document.getElementById('previewSummaryText');
+
+        // Collapsible Input Elements
+        const toggleInputBtn = document.getElementById('toggleInputBtn');
+        const toggleInputBtnText = document.getElementById('toggleInputBtnText');
+        const inputBody = document.getElementById('inputBody');
+
+        let isInputCollapsed = false;
+
+        function setInputCollapsed(collapsed) {
+            isInputCollapsed = collapsed;
+            if (collapsed) {
+                inputBody.classList.add('collapsed');
+                toggleInputBtn.classList.add('collapsed');
+                toggleInputBtnText.textContent = '展開する';
+            } else {
+                inputBody.classList.remove('collapsed');
+                toggleInputBtn.classList.remove('collapsed');
+                toggleInputBtnText.textContent = '折りたたむ';
+            }
+        }
+
+        toggleInputBtn.addEventListener('click', () => {
+            setInputCollapsed(!isInputCollapsed);
+        });
+
+        // Bulk action buttons
+        const smartAutoDetectBtn = document.getElementById('smartAutoDetectBtn');
+        const bulkDefaultBtn = document.getElementById('bulkDefaultBtn');
+        const bulkAllMeasureBtn = document.getElementById('bulkAllMeasureBtn');
+        const bulkAllIdBtn = document.getElementById('bulkAllIdBtn');
+        const bulkAllIgnoreBtn = document.getElementById('bulkAllIgnoreBtn');
+
+        let parsedData = [];
+        let headers = [];
+        let longDataOutput = '';
+        let currentLongDataArr = [];
+
+        function parseTSV(tsv) {
+            return tsv.trim().split('\n').map(row => row.split('\t'));
+        }
+
+        // ==========================================
+        // Smart Column Detection Algorithm
+        // ==========================================
+        function analyzeColumnPatterns(headerList) {
+            // Find patterns in column names (e.g. repeated words, numbered suffixes, timepoints)
+            // Common time/repeated words pattern: Time1, Time2, Day0, Day7, VAS_0, VAS_4, week1, wk2, pre, post, etc.
+            const stems = {};
+            const cleanHeaderInfo = headerList.map((h, idx) => {
+                const trimmed = h.trim();
+                
+                // Extract stem by removing numbers, time keywords (w, week, day, wk, m, month, pre, post, base, baseline)
+                // 1. Check for trailing numbers: e.g. "Time1" -> "Time", "score_2" -> "score_"
+                // 2. Check for time tokens: "VAS_week4" -> "VAS_", "BP_pre" -> "BP_"
+                let stem = trimmed
+                    .replace(/(?:[_\-\s]?(?:pre|post|base|baseline|week|wk|day|month|m|w))?\d+$/i, '')
+                    .replace(/[_\-\s]?(?:pre|post|baseline|base)$/i, '')
+                    .trim();
+
+                // If removing left nothing or only symbols, fallback
+                if (!stem || /^[^a-zA-Z0-9\u3040-\u30ff\u4e00-\u9fa5]+$/.test(stem)) {
+                    stem = trimmed;
+                }
+
+                if (!stems[stem]) stems[stem] = [];
+                stems[stem].push(idx);
+
+                return { idx, original: trimmed, stem };
+            });
+
+            // Identify candidate repeated groups (stems with 2 or more occurrences)
+            const repeatedIndices = new Set();
+            const matchedStems = [];
+
+            for (const [stem, indices] of Object.entries(stems)) {
+                // If 2 or more columns share this stem (and it's not simply empty or generic)
+                if (indices.length >= 2 && stem.length >= 1) {
+                    indices.forEach(i => repeatedIndices.add(i));
+                    matchedStems.push({ stem, count: indices.length });
+                }
+            }
+
+            // Also check for columns with digits (e.g., T1, T2 or Q1, Q2) if not already matched
+            if (repeatedIndices.size === 0) {
+                const digitCols = [];
+                headerList.forEach((h, idx) => {
+                    if (/\d/.test(h)) digitCols.push(idx);
+                });
+                if (digitCols.length >= 2) {
+                    digitCols.forEach(i => repeatedIndices.add(i));
+                    matchedStems.push({ stem: '数字を含む列', count: digitCols.length });
+                }
+            }
+
+            return {
+                repeatedIndices,
+                matchedStems
+            };
+        }
+
+        inputData.addEventListener('input', () => {
+            const val = inputData.value.trim();
+            if (!val) {
+                configCard.style.display = 'none';
+                dataStatsBadge.style.display = 'none';
+                smartDetectBadge.style.display = 'none';
+                clearResult();
+                return;
+            }
+
+            parsedData = parseTSV(val);
+            if (parsedData.length < 2) return; 
+
+            headers = parsedData[0];
+            const dataRows = parsedData.length - 1;
+
+            // Update stats badge
+            dataStatsBadge.textContent = `${dataRows}行 × ${headers.length}列`;
+            dataStatsBadge.style.display = 'inline-block';
+            columnCountBadge.textContent = `${headers.length} 列`;
+
+            generateConfigUI();
+            configCard.style.display = 'block';
+            clearResult();
+        });
+
+        function clearResult() {
+            longDataOutput = '';
+            currentLongDataArr = [];
+            emptyState.style.display = 'flex';
+            previewTable.style.display = 'none';
+            copyBtn.disabled = true;
+            previewLimitWrapper.style.display = 'none';
+            rowCountLabel.textContent = '';
+            previewSummaryText.textContent = 'Excel等にそのまま貼り付け可能です。';
+        }
+
+        function generateConfigUI() {
+            columnsGrid.innerHTML = '';
+            
+            // Execute pattern analysis
+            const { repeatedIndices, matchedStems } = analyzeColumnPatterns(headers);
+            const hasSmartDetection = repeatedIndices.size > 0;
+
+            if (hasSmartDetection) {
+                const stemNames = matchedStems.map(s => `「${s.stem}」`).join('、');
+                smartDetectText.textContent = `自動検出: ${stemNames} (${repeatedIndices.size}列を展開に設定)`;
+                smartDetectBadge.style.display = 'inline-flex';
+            } else {
+                smartDetectBadge.style.display = 'none';
+            }
+
+            headers.forEach((header, index) => {
+                const div = document.createElement('div');
+                div.className = 'column-item';
+                
+                // Determine default role:
+                // If smart patterns found, use that. Otherwise: 1st col ID, remaining measure.
+                let defaultRole = 'id';
+                if (hasSmartDetection) {
+                    defaultRole = repeatedIndices.has(index) ? 'measure' : 'id';
+                } else {
+                    defaultRole = index === 0 ? 'id' : 'measure';
+                }
+
+                div.innerHTML = `
+                    <div class="column-name" title="${header}">${header || '(無名列)'}</div>
+                    <div class="radio-group">
+                        <input type="radio" name="col_${index}" id="col_${index}_id" value="id" ${defaultRole === 'id' ? 'checked' : ''}>
+                        <label for="col_${index}_id" title="そのままの列として維持">ID</label>
+                        
+                        <input type="radio" name="col_${index}" id="col_${index}_measure" value="measure" ${defaultRole === 'measure' ? 'checked' : ''}>
+                        <label for="col_${index}_measure" title="縦方向のデータに展開">展開</label>
+                        
+                        <input type="radio" name="col_${index}" id="col_${index}_ignore" value="ignore" ${defaultRole === 'ignore' ? 'checked' : ''}>
+                        <label for="col_${index}_ignore" title="結果から除外">除外</label>
+                    </div>
+                `;
+                columnsGrid.appendChild(div);
+            });
+        }
+
+        // Apply Smart Detection on demand
+        smartAutoDetectBtn.addEventListener('click', () => {
+            const { repeatedIndices, matchedStems } = analyzeColumnPatterns(headers);
+            if (repeatedIndices.size > 0) {
+                headers.forEach((_, idx) => {
+                    const targetVal = repeatedIndices.has(idx) ? 'measure' : 'id';
+                    const radio = document.querySelector(`input[name="col_${idx}"][value="${targetVal}"]`);
+                    if (radio) radio.checked = true;
+                });
+                const stemNames = matchedStems.map(s => `「${s.stem}」`).join('、');
+                smartDetectText.textContent = `自動検出: ${stemNames} (${repeatedIndices.size}列を展開に設定)`;
+                smartDetectBadge.style.display = 'inline-flex';
+            } else {
+                alert('共通のキーワードや連番パターンが見つかりませんでした。通常の「1列目ID / 残り展開」をご利用ください。');
+            }
+        });
+
+        // Bulk Selection Handlers
+        bulkDefaultBtn.addEventListener('click', () => {
+            headers.forEach((_, idx) => {
+                const targetVal = idx === 0 ? 'id' : 'measure';
+                const radio = document.querySelector(`input[name="col_${idx}"][value="${targetVal}"]`);
+                if (radio) radio.checked = true;
+            });
+        });
+
+        bulkAllMeasureBtn.addEventListener('click', () => {
+            headers.forEach((_, idx) => {
+                const radio = document.querySelector(`input[name="col_${idx}"][value="measure"]`);
+                if (radio) radio.checked = true;
+            });
+        });
+
+        bulkAllIdBtn.addEventListener('click', () => {
+            headers.forEach((_, idx) => {
+                const radio = document.querySelector(`input[name="col_${idx}"][value="id"]`);
+                if (radio) radio.checked = true;
+            });
+        });
+
+        bulkAllIgnoreBtn.addEventListener('click', () => {
+            headers.forEach((_, idx) => {
+                const radio = document.querySelector(`input[name="col_${idx}"][value="ignore"]`);
+                if (radio) radio.checked = true;
+            });
+        });
+
+        // Convert Logic
+        convertBtn.addEventListener('click', () => {
+            const idCols = [];
+            const measureCols = [];
+
+            headers.forEach((_, idx) => {
+                const checked = document.querySelector(`input[name="col_${idx}"]:checked`);
+                if (checked) {
+                    if (checked.value === 'id') idCols.push(idx);
+                    if (checked.value === 'measure') measureCols.push(idx);
+                }
+            });
+
+            if (measureCols.length === 0) {
+                alert('少なくとも1つの「展開」列を選択してください。');
+                return;
+            }
+
+            const longDataArr = [];
+            const newHeaders = idCols.map(i => headers[i]);
+            newHeaders.push('Variable', 'Value');
+            longDataArr.push(newHeaders.join('\t'));
+
+            let rowCount = 0;
+            for (let i = 1; i < parsedData.length; i++) {
+                const row = parsedData[i];
+                if (row.length === 1 && row[0] === '') continue;
+
+                measureCols.forEach(mCol => {
+                    const newRow = idCols.map(idCol => row[idCol] !== undefined ? row[idCol] : '');
+                    newRow.push(headers[mCol]);
+                    newRow.push(row[mCol] !== undefined ? row[mCol] : '');
+                    longDataArr.push(newRow.join('\t'));
+                    rowCount++;
+                });
+            }
+
+            currentLongDataArr = longDataArr;
+            longDataOutput = longDataArr.join('\n');
+            rowCountLabel.textContent = `(全 ${rowCount} 行)`;
+            
+            previewLimitWrapper.style.display = 'flex';
+            renderPreview();
+            emptyState.style.display = 'none';
+            previewTable.style.display = 'table';
+            copyBtn.disabled = false;
+        });
+
+        // Render preview table dynamically based on user-selected limit
+        function renderPreview() {
+            if (!currentLongDataArr || currentLongDataArr.length === 0) return;
+
+            const thead = previewTable.querySelector('thead');
+            const tbody = previewTable.querySelector('tbody');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            // Header
+            const headerRow = document.createElement('tr');
+            currentLongDataArr[0].split('\t').forEach(cell => {
+                const th = document.createElement('th');
+                th.textContent = cell;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            // Determine limit
+            const totalDataRows = currentLongDataArr.length - 1;
+            const selectedVal = previewLimitSelect.value;
+            let displayCount = totalDataRows;
+
+            if (selectedVal !== 'all') {
+                const limitNum = parseInt(selectedVal, 10);
+                displayCount = Math.min(totalDataRows, limitNum);
+            }
+
+            previewSummaryText.textContent = `全 ${totalDataRows} 行中、プレビューとして ${displayCount} 行を表示しています。`;
+
+            // Efficiently build DOM using DocumentFragment
+            const fragment = document.createDocumentFragment();
+            for (let i = 1; i <= displayCount; i++) {
+                const tr = document.createElement('tr');
+                const cells = currentLongDataArr[i].split('\t');
+                for (let j = 0; j < cells.length; j++) {
+                    const td = document.createElement('td');
+                    td.textContent = cells[j];
+                    tr.appendChild(td);
+                }
+                fragment.appendChild(tr);
+            }
+            tbody.appendChild(fragment);
+        }
+
+        // Handle preview limit change
+        previewLimitSelect.addEventListener('change', () => {
+            renderPreview();
+        });
+
+        copyBtn.addEventListener('click', () => {
+            if (!longDataOutput) return;
+
+            navigator.clipboard.writeText(longDataOutput).then(() => {
+                showToast();
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                const textarea = document.createElement('textarea');
+                textarea.value = longDataOutput;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast();
+            });
+        });
+
+        function showToast() {
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
