@@ -203,6 +203,38 @@
             background-color: #f8fafc;
         }
 
+        /* 外れ値（除外点）管理バーのスタイル */
+        .outlier-control-bar {
+            background: #fff5f5;
+            border: 1px solid #fecaca;
+            border-left: 4px solid #ef4444;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-top: 15px;
+        }
+        .outlier-tag {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .outlier-tag .remove-outlier-btn {
+            cursor: pointer;
+            font-weight: bold;
+            color: #dc2626;
+            border: none;
+            background: none;
+            padding: 0;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .outlier-tag .remove-outlier-btn:hover { color: #7f1d1d; }
+
         /* ツールチップスタイル */
         .chart-tooltip {
             position: absolute;
@@ -376,6 +408,25 @@
                 <div id="resultsContent"></div>
             </div>
 
+            <!-- 外れ値（除外点）管理バー -->
+            <div id="outlierControlBar" class="outlier-control-bar" style="display:none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 13px; font-weight: bold; color: #b91c1c;">
+                        🚫 解析から除外された外れ値 (<span id="excludedCount">0</span>件):
+                    </span>
+                    <button type="button" onclick="clearAllOutliers()" style="background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline;">
+                        すべての除外を解除
+                    </button>
+                </div>
+                <div id="excludedTagsContainer" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 15px; margin-bottom: -15px; padding-right: 5px;">
+                <span style="font-size: 11px; color: #0369a1; background: #f0f9ff; border: 1px solid #bae6fd; padding: 4px 10px; border-radius: 4px;">
+                    💡 <strong>ヒント:</strong> グラフ上の点を<strong>クリック</strong>すると「外れ値」として解析から除外／復元できます
+                </span>
+            </div>
+
             <div class="canvas-container">
                 <div id="chartTooltip" class="chart-tooltip"></div>
                 <canvas id="customChart"></canvas>
@@ -485,9 +536,69 @@
     let lastResults = [];
     let lastOverallCalc = null;
 
+    // 外れ値（除外点）管理用Set ('timestamp_value' 形式のキー)
+    let excludedPointKeys = new Set();
+
+    function getPointKey(p) {
+        if (!p) return '';
+        const ts = p.date instanceof Date ? p.date.getTime() : new Date(p.date).getTime();
+        return `${ts}_${p.value}`;
+    }
+
+    function isExcluded(p) {
+        return excludedPointKeys.has(getPointKey(p));
+    }
+
+    function togglePointExclusion(p) {
+        const key = getPointKey(p);
+        if (excludedPointKeys.has(key)) {
+            excludedPointKeys.delete(key);
+        } else {
+            excludedPointKeys.add(key);
+        }
+        executeAnalysis();
+    }
+
+    function clearAllOutliers() {
+        excludedPointKeys.clear();
+        executeAnalysis();
+    }
+
+    function removeOutlierByKey(key) {
+        excludedPointKeys.delete(key);
+        executeAnalysis();
+    }
+
+    function updateOutlierUI(allPoints) {
+        const bar = document.getElementById('outlierControlBar');
+        const countEl = document.getElementById('excludedCount');
+        const container = document.getElementById('excludedTagsContainer');
+        if (!bar || !countEl || !container) return;
+
+        const excludedPoints = allPoints.filter(p => isExcluded(p));
+        countEl.textContent = excludedPoints.length;
+
+        if (excludedPoints.length === 0) {
+            bar.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        bar.style.display = 'block';
+        container.innerHTML = '';
+        excludedPoints.forEach(p => {
+            const key = getPointKey(p);
+            const dateStr = formatDateToString(p.date);
+            const tag = document.createElement('div');
+            tag.className = 'outlier-tag';
+            tag.innerHTML = `<span><strong>${dateStr}</strong> (${p.value})</span><button type="button" class="remove-outlier-btn" title="除外を解除" onclick="removeOutlierByKey('${key}')">&times;</button>`;
+            container.appendChild(tag);
+        });
+    }
+
     // グラフ上のデータ点管理およびホバー用キャッシュ
     let currentChartState = {
-        points: [],      // { date, value, pixelX, pixelY }
+        points: [],      // { date, value, pixelX, pixelY, isExcluded }
         baseImage: null, // ホバー前のCanvas背景スナップショット
         width: 1000,
         height: 450
@@ -495,6 +606,8 @@
 
     function clearData() {
         document.getElementById('dataInput').value = '';
+        excludedPointKeys.clear();
+        updateOutlierUI([]);
         updateDateDropdown([]);
         document.getElementById('changePointResult').style.display = 'none';
         const yearlySec = document.getElementById('yearlyAnalysisSection');
@@ -683,22 +796,27 @@
 
         updateDateDropdown(points);
         updateEventTagsFromInput();
+        updateOutlierUI(points);
 
         const eventDates = parseEventDates(document.getElementById('eventDates').value);
         const globalMinDate = points[0].date;
         const globalMaxDate = points[points.length - 1].date;
 
+        // 外れ値を除外した計算用有効点
+        const validPoints = points.filter(p => !isExcluded(p));
+        const excludedTotal = points.length - validPoints.length;
+
         const segments = [];
         if (eventDates.length > 0) {
-            let currentPoints = points.filter(p => p.date <= eventDates[0]);
+            let currentPoints = validPoints.filter(p => p.date <= eventDates[0]);
             segments.push({ label: `初期〜第1イベント`, data: currentPoints });
 
             for (let i = 0; i < eventDates.length - 1; i++) {
-                currentPoints = points.filter(p => p.date >= eventDates[i] && p.date <= eventDates[i + 1]);
+                currentPoints = validPoints.filter(p => p.date >= eventDates[i] && p.date <= eventDates[i + 1]);
                 segments.push({ label: `イベント ${i+1} 〜 イベント ${i+2}`, data: currentPoints });
             }
 
-            currentPoints = points.filter(p => p.date >= eventDates[eventDates.length - 1]);
+            currentPoints = validPoints.filter(p => p.date >= eventDates[eventDates.length - 1]);
             segments.push({ label: `最終イベント〜末期`, data: currentPoints });
         }
 
@@ -708,23 +826,27 @@
             count: seg.data.length
         }));
 
-        const overallCalc = calculateSlopeForSegment(points, globalMinDate);
+        const overallCalc = calculateSlopeForSegment(validPoints, globalMinDate);
         
         lastResults = results;
         lastOverallCalc = overallCalc;
 
-        displayResultsHTML(results, overallCalc, eventDates.length);
+        displayResultsHTML(results, overallCalc, eventDates.length, excludedTotal);
         drawCustomCanvasChart(points, eventDates, results, overallCalc, globalMinDate, globalMaxDate);
         calculateYearlySlopes(false);
     }
 
-    function displayResultsHTML(results, overallCalc, eventCount) {
+    function displayResultsHTML(results, overallCalc, eventCount, excludedCount = 0) {
         const div = document.getElementById('resultsContent');
         document.getElementById('resultsSection').style.display = 'block';
         div.innerHTML = "";
 
         if (overallCalc) {
-            div.innerHTML += `<div class="result-item" style="color:#495057;">通算スロープ: ${overallCalc.slope.toFixed(3)}</div>`;
+            let note = "";
+            if (excludedCount > 0) {
+                note = ` <span style="font-size:12px; color:#dc2626; font-weight:normal;">(除外点: ${excludedCount}件)</span>`;
+            }
+            div.innerHTML += `<div class="result-item" style="color:#495057;">通算スロープ: ${overallCalc.slope.toFixed(3)}${note}</div>`;
         }
 
         if (eventCount > 0) {
@@ -735,7 +857,7 @@
                 if (r.calc) {
                     div.innerHTML += `<div class="result-item" style="color:${color};">${r.label}: ${r.calc.slope.toFixed(3)} <span style="font-size:12px; color:#666; font-weight:normal;">(n=${r.count})</span></div>`;
                 } else {
-                    div.innerHTML += `<div class="result-item" style="color:#999;">${r.label}: 計算不可 (データ不足)</div>`;
+                    div.innerHTML += `<div class="result-item" style="color:#999;">${r.label}: 計算不可 (有効データ不足)</div>`;
                 }
             });
         }
@@ -783,10 +905,11 @@
     // スロープ変化点の自動解析アルゴリズム（高度な設定と臨床的制約対応）
     function detectSlopeChangePoint() {
         const rawText = document.getElementById('dataInput').value;
-        const allPoints = parseRawData(rawText);
+        const rawPoints = parseRawData(rawText);
+        const allPoints = rawPoints.filter(p => !isExcluded(p));
 
         if (allPoints.length < 4) {
-            alert("変化点の自動検出には、少なくとも4点以上の検査データが必要です。");
+            alert(`変化点の自動検出には、少なくとも4点以上の有効な検査データが必要です。(現在: 有効 ${allPoints.length}点 / 除外 ${rawPoints.length - allPoints.length}点)`);
             return;
         }
 
@@ -895,6 +1018,9 @@
             if (negativeOnly) conditionBadge.push("負のスロープ限定");
             conditionBadge.push(`各区間&ge;${minPoints}点`);
             if (minDurationYears > 0) conditionBadge.push(`各区間&ge;${minDurationYears}年`);
+            if (rawPoints.length > allPoints.length) {
+                conditionBadge.push(`除外点:${rawPoints.length - allPoints.length}件`);
+            }
 
             resDiv.innerHTML = `
                 <div style="background: white; border: 1px solid #b8daff; border-radius: 4px; padding: 10px;">
@@ -932,56 +1058,70 @@
     // 各年度ごとのスロープ（提出用年次推移サマリーグラフ）算出＆描画
     function calculateYearlySlopes(shouldScroll = false) {
         const rawText = document.getElementById('dataInput').value;
-        const points = parseRawData(rawText);
+        const allPoints = parseRawData(rawText);
 
         const section = document.getElementById('yearlyAnalysisSection');
         if (!section) return;
 
-        if (points.length === 0) {
+        if (allPoints.length === 0) {
             if (shouldScroll) alert("検査データが入力されていません。");
             return;
         }
 
         section.style.display = 'block';
 
-        // 年ごとにグループ化
-        const yearGroups = new Map();
-        points.forEach(p => {
+        // 有効点（除外点を除く）
+        const validPoints = allPoints.filter(p => !isExcluded(p));
+
+        // 年ごとにグループ化（全点と有効点）
+        const yearAllGroups = new Map();
+        const yearValidGroups = new Map();
+
+        allPoints.forEach(p => {
             const yr = p.date.getFullYear();
-            if (!yearGroups.has(yr)) {
-                yearGroups.set(yr, []);
-            }
-            yearGroups.get(yr).push(p);
+            if (!yearAllGroups.has(yr)) yearAllGroups.set(yr, []);
+            yearAllGroups.get(yr).push(p);
         });
 
-        const years = Array.from(yearGroups.keys()).sort((a, b) => a - b);
+        validPoints.forEach(p => {
+            const yr = p.date.getFullYear();
+            if (!yearValidGroups.has(yr)) yearValidGroups.set(yr, []);
+            yearValidGroups.get(yr).push(p);
+        });
+
+        const years = Array.from(yearAllGroups.keys()).sort((a, b) => a - b);
         const yearlyData = [];
-        const globalMinDate = points[0].date;
+        const globalMinDate = allPoints[0].date;
 
         years.forEach((yr, idx) => {
-            const pts = yearGroups.get(yr);
-            const count = pts.length;
-            const avgVal = (pts.reduce((acc, p) => acc + p.value, 0) / count).toFixed(1);
+            const allPtsInYr = yearAllGroups.get(yr) || [];
+            const validPtsInYr = yearValidGroups.get(yr) || [];
+            const count = validPtsInYr.length;
+            const excludedInYr = allPtsInYr.length - count;
+            const avgVal = count > 0 ? (validPtsInYr.reduce((acc, p) => acc + p.value, 0) / count).toFixed(1) : "-";
             
             let calc = null;
             if (count >= 2) {
-                calc = calculateSlopeForSegment(pts, globalMinDate);
+                calc = calculateSlopeForSegment(validPtsInYr, globalMinDate);
             }
 
             yearlyData.push({
                 year: yr,
                 count: count,
+                excludedCount: excludedInYr,
+                totalCount: allPtsInYr.length,
                 avgVal: avgVal,
                 calc: calc,
                 slope: calc ? calc.slope : null,
-                pts: pts,
-                firstDateStr: formatDateToString(pts[0].date),
-                lastDateStr: formatDateToString(pts[pts.length - 1].date)
+                pts: validPtsInYr,
+                allPts: allPtsInYr,
+                firstDateStr: formatDateToString(allPtsInYr[0].date),
+                lastDateStr: formatDateToString(allPtsInYr[allPtsInYr.length - 1].date)
             });
         });
 
-        // 1. 提出用：年度別スロープ線形回帰グラフの描画
-        drawYearlySlopeChart(points, yearlyData);
+        // 1. 提出用：年度別スロープ線形回帰グラフの描画（全点を渡して除外点を視覚化）
+        drawYearlySlopeChart(allPoints, yearlyData);
 
         // 2. 年次推移詳細テーブルの生成
         const tableContainer = document.getElementById('yearlyTableContainer');
@@ -1005,7 +1145,6 @@
         yearlyData.forEach((d, idx) => {
             const color = yearColors[idx % yearColors.length];
             let slopeText = "<span style='color:#94a3b8;'>- (点数不足)</span>";
-            let statusBadge = "";
             if (d.slope !== null) {
                 let badgeText = "緩やか";
                 if (d.slope > 0) {
@@ -1018,13 +1157,18 @@
                 slopeText = `<strong style="color:${color}; font-size:14px;">${d.slope.toFixed(3)}</strong> <span style="font-size:11px; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:4px;">${badgeText}</span>`;
             }
 
+            let countHTML = `${d.count} 回`;
+            if (d.excludedCount > 0) {
+                countHTML += ` <span style="font-size:11px; color:#dc2626; font-weight:normal;">(除外${d.excludedCount})</span>`;
+            }
+
             tableHTML += `
                 <tr>
                     <td>
                         <span style="display:inline-block; width:12px; height:12px; background-color:${color}; border-radius:2px; vertical-align:middle; margin-right:6px;"></span>
                         <strong style="color: #1e293b;">${d.year}年</strong>
                     </td>
-                    <td>${d.count} 回</td>
+                    <td>${countHTML}</td>
                     <td style="font-size: 12px; color: #64748b;">${d.firstDateStr} 〜 ${d.lastDateStr}</td>
                     <td><strong>${d.avgVal}</strong></td>
                     <td>${slopeText}</td>
@@ -1129,7 +1273,8 @@
         // 各年の区切り縦線（破線）の描画
         yearlyData.forEach((d, idx) => {
             if (idx > 0) {
-                const borderDate = d.pts[0].date;
+                const borderDate = (d.allPts && d.allPts.length > 0) ? d.allPts[0].date : (d.pts.length > 0 ? d.pts[0].date : null);
+                if (!borderDate) return;
                 const bx = getXPixel(borderDate);
                 if (bx >= padding.left && bx <= padding.left + graphWidth) {
                     ctx.strokeStyle = "#adb5bd";
@@ -1183,23 +1328,37 @@
             }
         });
 
-        // データ点の描画
+        // データ点の描画（除外点は赤枠×印で表示）
         points.forEach(p => {
             const px = getXPixel(p.date);
             const py = getYPixel(p.value);
             if (py < padding.top || py > padding.top + graphHeight) return;
 
-            const yr = p.date.getFullYear();
-            const yrIdx = yearlyData.findIndex(d => d.year === yr);
-            const ptColor = yrIdx >= 0 ? yearColors[yrIdx % yearColors.length] : "#0056b3";
+            if (isExcluded(p)) {
+                // 除外点: 赤枠の×印
+                ctx.strokeStyle = "#dc2626";
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.arc(px, py, 6, 0, 2 * Math.PI);
+                ctx.stroke();
 
-            ctx.fillStyle = ptColor;
-            ctx.beginPath();
-            ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(px - 3.5, py - 3.5); ctx.lineTo(px + 3.5, py + 3.5);
+                ctx.moveTo(px + 3.5, py - 3.5); ctx.lineTo(px - 3.5, py + 3.5);
+                ctx.stroke();
+            } else {
+                const yr = p.date.getFullYear();
+                const yrIdx = yearlyData.findIndex(d => d.year === yr);
+                const ptColor = yrIdx >= 0 ? yearColors[yrIdx % yearColors.length] : "#0056b3";
+
+                ctx.fillStyle = ptColor;
+                ctx.beginPath();
+                ctx.arc(px, py, 4.5, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+            }
         });
 
         // 上部ヘッダー（提出用凡例サマリー）
@@ -1236,6 +1395,23 @@
                 legendY += 16;
             }
         });
+
+        // 除外点が存在する場合は凡例に追加
+        const totalExcludedCount = points.filter(p => isExcluded(p)).length;
+        if (totalExcludedCount > 0) {
+            ctx.strokeStyle = "#dc2626";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(legendX + 5, legendY - 4, 5, 0, 2 * Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(legendX + 2, legendY - 7); ctx.lineTo(legendX + 8, legendY - 1);
+            ctx.moveTo(legendX + 8, legendY - 7); ctx.lineTo(legendX + 2, legendY - 1);
+            ctx.stroke();
+
+            ctx.fillStyle = "#dc2626";
+            ctx.fillText(`除外点: ${totalExcludedCount}件`, legendX + 14, legendY);
+        }
     }
 
     // 提出用グラフのPNG画像ダウンロード
@@ -1412,17 +1588,34 @@
         points.forEach(p => {
             const px = getXPixel(p.date);
             const py = getYPixel(p.value);
-            if(py < padding.top || py > padding.top + graphHeight) return;
+            if (py < padding.top || py > padding.top + graphHeight) return;
             
-            ctx.fillStyle = "#0056b3";
-            ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 2 * Math.PI); ctx.fill();
-            ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+            const excluded = isExcluded(p);
+
+            if (excluded) {
+                // 除外点: 赤枠の×印
+                ctx.strokeStyle = "#dc2626";
+                ctx.lineWidth = 1.8;
+                ctx.beginPath();
+                ctx.arc(px, py, 6, 0, 2 * Math.PI);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(px - 3.5, py - 3.5); ctx.lineTo(px + 3.5, py + 3.5);
+                ctx.moveTo(px + 3.5, py - 3.5); ctx.lineTo(px - 3.5, py + 3.5);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = "#0056b3";
+                ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 2 * Math.PI); ctx.fill();
+                ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+            }
 
             currentChartState.points.push({
                 date: p.date,
                 value: p.value,
                 pixelX: px,
-                pixelY: py
+                pixelY: py,
+                isExcluded: excluded
             });
         });
 
@@ -1430,14 +1623,13 @@
         currentChartState.baseImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
     }
 
-    // ツールチップおよびホバーイベントの初期化
+    // ツールチップおよびクリック・ホバーイベントの初期化
     function setupCanvasTooltip() {
         const canvas = document.getElementById('customChart');
         const tooltip = document.getElementById('chartTooltip');
 
-        canvas.addEventListener('mousemove', function(e) {
-            if (!currentChartState.points || currentChartState.points.length === 0) return;
-
+        function getClosestPoint(e) {
+            if (!currentChartState.points || currentChartState.points.length === 0) return null;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
@@ -1454,10 +1646,16 @@
                     closest = p;
                 }
             });
+            return closest;
+        }
 
+        canvas.addEventListener('mousemove', function(e) {
+            const closest = getClosestPoint(e);
             const ctx = canvas.getContext('2d');
 
             if (closest) {
+                canvas.style.cursor = 'pointer';
+
                 if (currentChartState.baseImage) {
                     ctx.putImageData(currentChartState.baseImage, 0, 0);
                 }
@@ -1465,25 +1663,48 @@
                 // ホバー点のアニメーション強調描画
                 ctx.beginPath();
                 ctx.arc(closest.pixelX, closest.pixelY, 7.5, 0, 2 * Math.PI);
-                ctx.fillStyle = '#ffc107';
-                ctx.fill();
-                ctx.strokeStyle = '#0056b3';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
+                if (closest.isExcluded) {
+                    ctx.fillStyle = '#f87171';
+                    ctx.fill();
+                    ctx.strokeStyle = '#dc2626';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = '#ffc107';
+                    ctx.fill();
+                    ctx.strokeStyle = '#0056b3';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
 
                 // ツールチップ配置計算
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
                 const containerRect = canvas.parentElement.getBoundingClientRect();
                 const posX = (rect.left - containerRect.left) + (closest.pixelX / scaleX);
                 const posY = (rect.top - containerRect.top) + (closest.pixelY / scaleY);
 
+                const statusBadge = closest.isExcluded 
+                    ? '<span style="background:#dc2626; color:white; font-size:10px; padding:1px 5px; border-radius:3px; margin-left:6px;">外れ値除外中</span>' 
+                    : '';
+                const actionHint = closest.isExcluded 
+                    ? '<div style="margin-top:6px; font-size:11px; color:#4ade80; border-top:1px dashed #475569; padding-top:4px;">🖱️ クリックで除外を解除（復元）</div>' 
+                    : '<div style="margin-top:6px; font-size:11px; color:#f87171; border-top:1px dashed #475569; padding-top:4px;">🖱️ クリックで外れ値として除外</div>';
+
                 tooltip.innerHTML = `
-                    <div style="font-weight:bold; color:#7dd3fc; margin-bottom:3px;">📅 ${formatDateToString(closest.date)}</div>
+                    <div style="font-weight:bold; color:#7dd3fc; margin-bottom:3px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>📅 ${formatDateToString(closest.date)}</span>
+                        ${statusBadge}
+                    </div>
                     <div>eGFR: <strong style="font-size:14px; color:#fff;">${closest.value}</strong> <span style="font-size:11px; color:#cbd5e1;">mL/min/1.73m²</span></div>
+                    ${actionHint}
                 `;
                 tooltip.style.left = posX + 'px';
                 tooltip.style.top = posY + 'px';
                 tooltip.style.display = 'block';
             } else {
+                canvas.style.cursor = 'default';
                 if (currentChartState.baseImage) {
                     ctx.putImageData(currentChartState.baseImage, 0, 0);
                 }
@@ -1491,7 +1712,16 @@
             }
         });
 
+        // グラフクリックで外れ値トグル切り替え
+        canvas.addEventListener('click', function(e) {
+            const closest = getClosestPoint(e);
+            if (closest) {
+                togglePointExclusion(closest);
+            }
+        });
+
         canvas.addEventListener('mouseleave', function() {
+            canvas.style.cursor = 'default';
             const ctx = canvas.getContext('2d');
             if (currentChartState.baseImage) {
                 ctx.putImageData(currentChartState.baseImage, 0, 0);
