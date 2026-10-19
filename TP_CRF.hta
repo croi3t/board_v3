@@ -9,17 +9,19 @@
         ID="pkStudyApp" 
         APPLICATIONNAME="PK_Study_CRF" 
         WINDOWSTATE="normal"
-        SCROLL="yes"
+        SCROLL="no"
         SINGLEINSTANCE="yes"
     >
 
     <style>
-        body { font-family: 'Meiryo', sans-serif; font-size: 13px; background: #f4f7f8; margin: 15px; }
-        .container { width: 100%; margin: auto; }
-        .alert-section { background: #ffeb3b; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; border-left: 5px solid #f44336; }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #f4f7f8; }
+        body { font-family: 'Meiryo', sans-serif; font-size: 13px; }
+        .container { width: 100%; height: 100%; box-sizing: border-box; padding: 8px 12px 6px 12px; }
+        #app-header-area { width: 100%; }
+        .alert-section { background: #ffeb3b; padding: 6px 10px; border-radius: 5px; margin-bottom: 6px; display: none; border-left: 5px solid #f44336; }
         table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); table-layout: fixed; }
         th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: middle; word-wrap: break-word; }
-        th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
+        th { background: #2c3e50; color: white; position: relative; top: 0px; z-index: 10; font-size: 12px; box-shadow: 0 2px 3px rgba(0,0,0,0.3); }
         
         .sort-icon { font-size: 10px; color: #7f8c8d; margin-left: 3px; }
         
@@ -49,18 +51,23 @@
         .fetch-btn:disabled { background: #ccc; cursor: not-allowed; }
         .export-btn { cursor: pointer; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; font-size: 12px; margin-left: 20px;}
         
-        .tab-container { margin-bottom: 10px; border-bottom: 2px solid #2c3e50; padding-bottom: 2px; }
-        .tab-btn { cursor: pointer; padding: 8px 16px; border: 1px solid #2c3e50; border-bottom: none; background: #ecf0f1; border-radius: 5px 5px 0 0; font-weight: bold; color: #7f8c8d; display: inline-block; }
+        .tab-container { margin-bottom: 6px; border-bottom: 2px solid #2c3e50; padding-bottom: 2px; }
+        .tab-btn { cursor: pointer; padding: 7px 15px; border: 1px solid #2c3e50; border-bottom: none; background: #ecf0f1; border-radius: 5px 5px 0 0; font-weight: bold; color: #7f8c8d; display: inline-block; font-size: 12px; }
         .tab-btn.active { background: #2c3e50; color: white; }
         
-        .search-box { float: right; padding: 5px; border: 1px solid #ccc; border-radius: 3px; margin-top: 2px; font-size: 12px; width: 180px; }
+        .search-box { float: right; padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; margin-top: 1px; font-size: 12px; width: 170px; }
+        .filter-toggle-btn { cursor: pointer; padding: 4px 10px; background: #34495e; color: white; border: none; border-radius: 3px; font-size: 11px; margin-right: 10px; font-weight: bold; float: right; margin-top: 2px; }
+        .filter-toggle-btn:hover { background: #1a252f; }
         
-        .ward-filter-section { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 3px; margin-bottom: 10px; clear: both; line-height: 1.8; }
-        .ward-label { display: inline-block; margin-right: 15px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+        #filterPanelWrap { margin-bottom: 4px; }
+        .ward-filter-section { background: white; border: 1px solid #ccc; padding: 6px 10px; border-radius: 3px; clear: both; line-height: 1.6; }
+        .ward-label { display: inline-block; margin-right: 12px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+        
+        #tableScrollWrap, #crfTableScrollWrap { width: 100%; overflow-y: scroll; overflow-x: auto; border: 1px solid #ccc; background: white; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .remarks-input { width: 100%; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 11px; resize: vertical; min-height: 45px; font-family: inherit; overflow-y: hidden; }
 
         /* Summary Dashboard */
-        .summary-dashboard { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        .summary-dashboard { background: white; border: 1px solid #ccc; padding: 10px; border-radius: 5px; box-sizing: border-box; overflow-y: auto; }
         .summary-table { width: 95%; margin-bottom: 15px; border-collapse: collapse; }
         .summary-table th, .summary-table td { border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 12px; }
         .summary-table th { background: #34495e; color: white; }
@@ -75,49 +82,77 @@
         .ms-content label { display: block; padding: 2px 0; color: black; font-size: 11px; font-weight: normal; cursor: pointer; white-space: nowrap; }
         .ms-content label:hover { background-color: #f1f1f1; }
         .ms-close { display: block; width: 100%; font-size:10px; margin-top:5px; cursor:pointer; }
+
+        /* Guide View Styles */
+        .guide-container { padding: 10px 5px; max-width: 1200px; margin: auto; }
+        .guide-card { background: white; border: 1px solid #dcdde1; border-radius: 6px; padding: 18px 22px; margin-bottom: 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .guide-title { font-size: 15px; font-weight: bold; color: #2c3e50; border-left: 5px solid #2980b9; padding-left: 10px; margin-top: 0; margin-bottom: 12px; }
+        .guide-sub-title { font-size: 13px; font-weight: bold; color: #34495e; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dashed #bdc3c7; padding-bottom: 4px; }
+        .guide-table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 12px; font-size: 12px; }
+        .guide-table th, .guide-table td { border: 1px solid #bdc3c7; padding: 8px 10px; text-align: left; vertical-align: middle; }
+        .guide-table th { background: #34495e; color: white; font-weight: bold; text-align: center; }
+        .guide-badge-box { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; color: white; margin-right: 4px; }
+        .guide-alert-box { background: #fff3cd; border-left: 4px solid #f39c12; padding: 10px 14px; border-radius: 4px; font-size: 12px; color: #856404; margin-top: 10px; line-height: 1.6; }
+        .guide-info-box { background: #e8f4f8; border-left: 4px solid #3498db; padding: 10px 14px; border-radius: 4px; font-size: 12px; color: #2980b9; margin-top: 10px; line-height: 1.6; }
+        .guide-step { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; background: #2980b9; color: white; border-radius: 50%; font-weight: bold; font-size: 12px; margin-right: 6px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 style="margin-top:0;">対象抗菌薬 PopPK解析 進捗管理ツール</h2>
+    <!-- 固定ヘッダー領域（タイトル、アラート、ファイル操作バー、タブ一覧、病棟絞り込み） -->
+    <div id="app-header-area">
+        <h2 style="margin: 0 0 4px 0; font-size: 15px; color: #2c3e50;">対象抗菌薬 PopPK解析 進捗管理ツール</h2>
 
-    <div id="todayAlert" class="alert-section">
-        <strong>【当日採血アラート】 本日（2点採血）の予定患者がいます</strong>
-        <ul id="alertList" style="margin: 5px 0 0 0;"></ul>
-    </div>
+        <div id="todayAlert" class="alert-section" style="padding: 6px 10px; margin-bottom: 6px;">
+            <strong>【当日採血アラート】 本日（2点採血）の予定患者がいます</strong>
+            <ul id="alertList" style="margin: 3px 0 0 0; padding-left: 20px;"></ul>
+        </div>
 
-    <div style="margin-bottom: 15px; background: white; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
-        <label style="font-weight: bold; font-size: 12px;">1. 処方統計データ（Excel または CSV）を読み込む：</label>
-        <input type="file" id="dataFile" accept=".csv, .xls, .xlsx" style="font-size: 12px;">
-        <button class="export-btn" onclick="exportToCSV()">現在の管理一覧をCSV出力</button>
-        <button onclick="clearData()" style="float: right; color: red; font-size: 11px;">全データ初期化</button>
-    </div>
+        <div id="freezeAlert" class="alert-section" style="padding: 6px 10px; margin-bottom: 6px; background: #fff3e0; border-left: 5px solid #ff9800; display: none;">
+            <strong style="color: #e65100;">【冷凍検体 提出リマインド】 冷凍後1か月（提出期限）が近づいている検体があります（1週間前〜）</strong>
+            <ul id="freezeAlertList" style="margin: 3px 0 0 0; padding-left: 20px; color: #d84315;"></ul>
+        </div>
 
-    <div class="tab-container">
-        <div id="tab-screening" class="tab-btn active" onclick="switchTab('screening')">スクリーニング</div>
-        <div id="tab-target" class="tab-btn" onclick="switchTab('target')">対象症例</div>
-        <div id="tab-exclude" class="tab-btn" onclick="switchTab('exclude')">候補外</div>
-        <div id="tab-summary" class="tab-btn" onclick="switchTab('summary')" style="background:#e8f4f8; border-color:#3498db; color:#2980b9;">集計・進捗</div>
-        <div id="tab-crf" class="tab-btn" onclick="switchTab('crf')" style="background:#e8f8ec; border-color:#27ae60; color:#27ae60;">CRF編集</div>
-        
-        <span id="header-tools">
-            <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
-            <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
-            <button onclick="fetchMissingAges()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #e67e22; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">未取得の年齢を再取得</button>
-            <button id="wardFetchBtn" onclick="checkCurrentInfo()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #2980b9; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">最新情報（病棟/科/医）を再取得</button>
-        </span>
-    </div>
+        <div style="margin-bottom: 6px; background: white; padding: 5px 10px; border-radius: 4px; border: 1px solid #ddd;">
+            <label style="font-weight: bold; font-size: 12px;">1. 処方統計データ（Excel または CSV）を読み込む：</label>
+            <input type="file" id="dataFile" accept=".csv, .xls, .xlsx" style="font-size: 12px;">
+            <button class="export-btn" onclick="exportToCSV()" style="padding: 4px 10px; font-size: 11px;">現在の管理一覧をCSV出力</button>
+            <button onclick="clearData()" style="float: right; color: red; font-size: 11px; margin-top: 2px;">全データ初期化</button>
+        </div>
 
-    <div id="wardFilterContainer" class="ward-filter-section"></div>
+        <div class="tab-container">
+            <div id="tab-screening" class="tab-btn active" onclick="switchTab('screening')">スクリーニング</div>
+            <div id="tab-target" class="tab-btn" onclick="switchTab('target')">対象症例</div>
+            <div id="tab-exclude" class="tab-btn" onclick="switchTab('exclude')">候補外</div>
+            <div id="tab-summary" class="tab-btn" onclick="switchTab('summary')" style="background:#e8f4f8; border-color:#3498db; color:#2980b9;">集計・進捗</div>
+            <div id="tab-crf" class="tab-btn" onclick="switchTab('crf')" style="background:#e8f8ec; border-color:#27ae60; color:#27ae60;">CRF編集</div>
+            <div id="tab-guide" class="tab-btn" onclick="switchTab('guide')" style="background:#fef9e7; border-color:#f39c12; color:#d35400;">研究ガイド</div>
+            
+            <span id="header-tools">
+                <input type="text" id="searchInput" class="search-box" onkeyup="renderTable()" placeholder="ID、氏名で絞り込み...">
+                <button onclick="fetchAllBloodDates()" style="float: right; margin-right: 15px; margin-top: 2px; padding: 5px 12px; background: #8e44ad; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">表示リストを一括取得</button>
+                <button id="wardFetchBtn" onclick="checkCurrentInfo()" style="float: right; margin-right: 10px; margin-top: 2px; padding: 5px 12px; background: #2980b9; color: white; border: none; border-radius: 3px; font-size: 12px; cursor: pointer; font-weight: bold;">最新情報（病棟/科/医）を再取得</button>
+                <button id="btnToggleFilter" onclick="toggleFilterPanel()" class="filter-toggle-btn">▲ 絞り込みを閉じる</button>
+            </span>
+        </div>
 
-    <div style="font-size: 11px; color: #555; text-align: right; margin-bottom: 5px;">
-        ※ステータス: 同未=同意未, 同済=同意済, 採血=採血済, 処理=処理済, 冷凍=冷凍, 提出=提出済<br>
-        ※確認状況: TD=医師ToDo済, 署名=医師署名済, 連絡=検査連絡済, 回覧=検査CoMedix回覧済
-    </div>
+        <!-- 折りたたみ可能な病棟絞り込み・ステータス注記パネル -->
+        <div id="filterPanelWrap">
+            <div id="wardFilterContainer" class="ward-filter-section" style="margin-bottom: 4px; padding: 6px 10px; line-height: 1.6;"></div>
+            <div style="font-size: 11px; color: #555; text-align: right; margin-bottom: 4px; padding-right: 5px;">
+                ※ステータス: 同未=同意未, 同済=同意済, 採血=採血済, 処理=処理済, 冷凍=冷凍, 提出=提出済 &nbsp;|&nbsp;
+                ※確認状況: TD=医師ToDo済, 署名=医師署名済, 連絡=検査連絡済, 回覧=検査CoMedix回覧済
+            </div>
+        </div>
+    </div><!-- /#app-header-area -->
+
+    <!-- メインコンテンツ領域（各タブのスクロール領域） -->
+    <div id="app-main-area">
 
     <div id="table-view">
-        <table id="patientTable">
+        <div id="tableScrollWrap" onscroll="fixTableHeader()">
+            <table id="patientTable">
             <thead>
                 <tr>
                     <th style="width: 65px; cursor: pointer;" onclick="sortTable('id')">患者ID <span id="sort-icon-id" class="sort-icon">↕</span></th>
@@ -155,13 +190,347 @@
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
+        </div>
     </div>
     
     <div id="summary-view" class="summary-dashboard" style="display:none;">
     </div>
     
-    <div id="crf-view" class="summary-dashboard" style="display:none; overflow-x:auto;">
+    <div id="crf-view" class="summary-dashboard" style="display:none; overflow:hidden; box-sizing:border-box; padding:10px;">
     </div>
+
+    <div id="guide-view" class="summary-dashboard" style="display:none; padding:15px; background:#f4f7f8;">
+        <div class="guide-container">
+
+            <!-- Card 1: 対象抗菌薬 薬物動態 (PK) & 検体安定性リファレンス -->
+            <div class="guide-card">
+                <h3 class="guide-title">1. 対象抗菌薬の薬物動態（PK）パラメータ・定常状態到達時間</h3>
+                <p style="color:#555; font-size:12px; margin-top:0;">本研究における対象3薬剤の排泄経路、半減期（t<sub>1/2</sub>）、定常状態到達時間の目安および推奨採血タイミングです。</p>
+                <table class="guide-table">
+                    <thead>
+                        <tr>
+                            <th style="width:18%;">項目</th>
+                            <th style="width:27%;">セフトリアキソン (CTRX)<br><span style="font-size:10px; font-weight:normal;">ロセフィン等</span></th>
+                            <th style="width:27%;">ユナスピン (ABPC/SBT)<br><span style="font-size:10px; font-weight:normal;">アンピシリン・スルバクタム</span></th>
+                            <th style="width:28%;">タゾピペ (TAZ/PIPC)<br><span style="font-size:10px; font-weight:normal;">タゾバクタム・ピペラシリン</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="background:#ecf0f1; font-weight:bold;">主な排泄経路</td>
+                            <td><strong>腎排泄 (約50〜60%) + 胆汁排泄 (約40〜50%)</strong><br><span style="color:#666; font-size:11px;">デュアル排泄のため腎不全単独でも極端な蓄積は生じにくい</span></td>
+                            <td><strong>腎排泄 (約70〜80%)</strong><br><span style="color:#666; font-size:11px;">糸球体濾過および尿細管分泌。腎機能低下に依存してクリアランスが低下</span></td>
+                            <td><strong>腎排泄 (約60〜80%)</strong><br><span style="color:#666; font-size:11px;">主に尿中排泄。腎機能低下に伴い排泄が著明に遅延</span></td>
+                        </tr>
+                        <tr>
+                            <td style="background:#ecf0f1; font-weight:bold;">半減期 (t<sub>1/2</sub>)<br>健常成人</td>
+                            <td><strong>約 7 〜 8 時間</strong><br><span style="color:#666; font-size:11px;">タンパク結合率が高い（85〜95%）ため比較的長い</span></td>
+                            <td><strong>約 1 時間</strong><br><span style="color:#666; font-size:11px;">ABPC: 約1.0h / SBT: 約1.0h</span></td>
+                            <td><strong>約 0.7 〜 1.2 時間</strong><br><span style="color:#666; font-size:11px;">PIPC: 約1.0h / TAZ: 約1.0h</span></td>
+                        </tr>
+                        <tr>
+                            <td style="background:#ecf0f1; font-weight:bold;">半減期 (t<sub>1/2</sub>)<br>高齢者・腎機能低下時</td>
+                            <td><strong>約 12 〜 16 時間以上</strong><br><span style="color:#d35400; font-size:11px; font-weight:bold;">※超高齢者や肝腎併障害で著明に延長</span></td>
+                            <td><strong>約 2 〜 5 時間</strong><br><span style="color:#d35400; font-size:11px; font-weight:bold;">※末期腎不全（Ccr&lt;10）で 8〜10時間程度</span></td>
+                            <td><strong>約 2 〜 4 時間以上</strong><br><span style="color:#d35400; font-size:11px; font-weight:bold;">※透析患者・重度腎不全で 4〜6時間程度</span></td>
+                        </tr>
+                        <tr>
+                            <td style="background:#ecf0f1; font-weight:bold;">定常状態到達時間<br><span style="font-size:10px; font-weight:normal;">(4〜5 × t<sub>1/2</sub> の目安)</span></td>
+                            <td style="background:#fef9e7;">
+                                <strong style="color:#c0392b; font-size:13px;">約 2 〜 3 日 (48〜72時間)</strong><br>
+                                <span style="font-size:11px; color:#555;">通常1日1回（または1日2回）投与。<br>確実な定常状態下での採血は<strong>投与3日目以降</strong>が目安。</span>
+                            </td>
+                            <td style="background:#fef9e7;">
+                                <strong style="color:#c0392b; font-size:13px;">約 12 〜 24 時間 (半日〜1日)</strong><br>
+                                <span style="font-size:11px; color:#555;">通常1日2〜4回投与。<br>半減期が短いため<strong>投与2日目（2〜3回目投与後）</strong>には定常状態に到達。</span>
+                            </td>
+                            <td style="background:#fef9e7;">
+                                <strong style="color:#c0392b; font-size:13px;">約 10 〜 16 時間 (半日〜翌日)</strong><br>
+                                <span style="font-size:11px; color:#555;">通常1日3〜4回投与。<br>腎低下例でも<strong>投与2日目</strong>には定常状態に到達。</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="background:#ecf0f1; font-weight:bold;">推奨採血点<br>(PopPKモデル構築用)</td>
+                            <td>
+                                ・<strong>ピーク (点滴終了後):</strong> 終了30分〜1時間後<br>
+                                ・<strong>トラフ (次回投与直前):</strong> 次回点滴開始30分以内
+                            </td>
+                            <td>
+                                ・<strong>ピーク (点滴終了後):</strong> 終了30分後<br>
+                                ・<strong>トラフ (次回投与直前):</strong> 次回点滴開始30分以内
+                            </td>
+                            <td>
+                                ・<strong>ピーク (点滴終了後):</strong> 終了30分後<br>
+                                ・<strong>トラフ (次回投与直前):</strong> 次回点滴開始30分以内
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Card 2: 抗菌薬TDM血清・血漿検体の物理化学的安定性 & 分析前工程（Preanalytical Phase）標準化リファレンス -->
+            <div class="guide-card">
+                <h3 class="guide-title">2. 抗菌薬TDM血清・血漿検体の物理化学的安定性・分析前工程（Preanalytical Phase）標準化リファレンス</h3>
+                <p style="color:#555; font-size:12px; margin-top:0;">最新の学術研究レポート「セフトリアキソン、タゾバクタム・ピペラシリン、アンピシリン・スルバクタムのTDM血清・血漿検体における物理化学的安定性に関する統合研究報告書」に基づく、生体マトリックス（ヒト血清・血漿）中における各温度帯別の安定性データ、凍結相分解動態、および臨床検体取扱い基準（SOP）です。</p>
+
+                <!-- 学術的意義と分解リスク -->
+                <div style="margin-bottom:12px; padding:10px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:4px; font-size:12px; line-height:1.7; color:#1e3a8a;">
+                    <strong>🔬 TDM分析前工程（Preanalytical Phase）における血清・血漿検体安定性の重要性:</strong><br>
+                    β-ラクタム系抗菌薬の有効性指標（<em>f</em>T<sub>&gt;MIC</sub>）の最適化には血中濃度の高精度な測定が不可欠です。しかし、高歪みな4員環β-ラクタム構造は生体試料マトリックス中で容易に加水分解を受けます。採血後の遠心・搬送・凍結保管等の分析前工程で適切な温度管理が行われない場合、<strong>系統的な負のバイアス（薬物血中濃度の過小評価）</strong>が発生し、過剰投与による毒性発現や不適切な減量による治療失敗を招くリスクが生じます。
+                </div>
+
+                <!-- 薬物ごとの詳細要点 -->
+                <h4 class="guide-sub-title">A. 各抗菌薬の物理化学的特性と分解動態サマリー</h4>
+                
+                <div style="margin-bottom:12px; padding:10px 14px; background:#f8f9fa; border:1px solid #e2e8f0; border-radius:4px;">
+                    <div style="font-weight:bold; color:#2c3e50; font-size:13px; margin-bottom:4px;">① セフトリアキソン (CTRX)</div>
+                    <ul style="margin:0; padding-left:20px; font-size:12px; line-height:1.7; color:#333;">
+                        <li><strong>高い物理化学的耐性：</strong> トリアジンジオン環がβ-ラクタム環の電子密度を安定化しており、ペニシリン系に比べ強力な分解耐性を持ちます。</li>
+                        <li><strong>温度帯別安定性：</strong> 室温（約20℃）で<strong>24時間安定</strong>（回収率85〜115%内）。冷蔵（4〜6℃）で<strong>7日間安定</strong>。弱凍結（−20℃）で<strong>14〜30日間安定</strong>。超低温（−80℃）では<strong>100日間〜12ヶ月間（最長1年）安定</strong>。</li>
+                        <li><strong>凍結融解耐性：</strong> 3〜5サイクルの凍結融解に耐性（著明な低下なし）。抗凝固剤（ヘパリン、EDTA、クエン酸塩）の違いや中等度溶血による影響も軽微。</li>
+                        <li><strong style="color:#b91c1c;">前処理上の重要留意点（強酸性抽出の厳禁）：</strong> CTRXは強酸性環境（pH &lt; 2.5、例: 2%ギ酸）で急速に加水分解し、48時間以内に95%が分解失活します。除蛋白・抽出工程では強酸を避け、中性〜弱酸性バッファーを使用してください（中性系抽出液中のオートサンプラー4〜18℃で65時間〜7日間安定）。</li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom:12px; padding:10px 14px; background:#fffbeb; border:1px solid #fef3c7; border-radius:4px;">
+                    <div style="font-weight:bold; color:#92400e; font-size:13px; margin-bottom:4px;">② タゾバクタム・ピペラシリン (TAZ/PIPC) 【※室温2時間厳守・保管期限6ヶ月】</div>
+                    <ul style="margin:0; padding-left:20px; font-size:12px; line-height:1.7; color:#333;">
+                        <li><strong>熱分解の顕著性：</strong> ピペラシリン（PIPC）は開環しやすい側鎖構造を有し、熱エネルギー依存的な加水分解速度が極めて大です。</li>
+                        <li><strong style="color:#b91c1c;">室温保存安定性は「最大2時間」が限界：</strong> 24時間放置された血漿検体では<strong>PIPCが49.0%</strong>、<strong>TAZが37.7%</strong>分解消失します。全血室温は4時間維持されますが、採血後は直ちに氷冷し2時間以内の遠心・分離・冷凍が必須です。</li>
+                        <li><strong>冷蔵・凍結安定性：</strong> 冷蔵（4〜6℃）で23〜24時間、弱凍結（−20℃）で10〜14日間（最大30日）安定。</li>
+                        <li><strong style="color:#b91c1c;">−80℃超低温での保管期限上限は「最長6ヶ月間」：</strong> 他の抗菌薬が−80℃で1年以上安定であるのに対し、PIPCは超低温下でも6ヶ月を超えると緩慢な分解が進行するため、検体保管期限は最長6ヶ月に厳格制限されます。</li>
+                        <li><strong>凍結融解耐性：</strong> 3サイクルまで安定。除蛋白後のオートサンプラー（4℃）内で24時間安定。</li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom:12px; padding:10px 14px; background:#fef2f2; border:1px solid #fecaca; border-radius:4px;">
+                    <div style="font-weight:bold; color:#b91c1c; font-size:13px; margin-bottom:4px;">③ アンピシリン・スルバクタム (ABPC/SBT、ユナスピン) 【※−20℃弱凍結不適・−30℃以下必須】</div>
+                    <ul style="margin:0; padding-left:20px; font-size:12px; line-height:1.7; color:#333;">
+                        <li><strong>分解律速要因：</strong> スルバクタム（SBT）は骨格的に頑健ですが、アンピシリン（ABPC）の急速な自己分解および凍結相での変則的な劣化挙動が全体の律速となります。</li>
+                        <li><strong>室温・冷蔵安定性：</strong> 室温（約20℃）で<strong>1〜4時間</strong>（4時間で95〜98%、以降直線的に急低下）。冷蔵（4〜6℃）で<strong>23〜24時間</strong>（90%以上保持）。</li>
+                        <li><strong style="color:#b91c1c;">−20℃（弱凍結）は著しく不安定（分解加速の逆転現象）：</strong> 通常の冷蔵よりも分解が加速し、わずか<strong>4日間の保存で最大30%低下</strong>、<strong>11日間で10%以上分解</strong>します。国際ガイドラインでも血漿中ABPCの−20℃保管は「最大7日以内」に厳格制限されています。</li>
+                        <li><strong style="color:#166534;">−30℃以下〜−80℃（深冷・超低温）で完全安定化：</strong> 保管温度を−30℃以下にすることで不凍相が消失し、−80℃では<strong>30日間〜6ヶ月間にわたり95〜104%の残存率</strong>が維持されます。</li>
+                        <li><strong style="color:#b91c1c;">凍結融解耐性と小分け分注（Aliquoting）の必須化：</strong> 3サイクルの凍結融解で回収率は82〜99%に低下し、<strong>4サイクル目以降で顕著に劣化</strong>します。分注なしでの反復融解は厳禁です。</li>
+                    </ul>
+                </div>
+
+                <!-- 定量比較表 -->
+                <h4 class="guide-sub-title">B. 低温・凍結環境における対象3製剤（5成分）の物理化学的安定性 定量比較表</h4>
+                <table class="guide-table">
+                    <thead>
+                        <tr>
+                            <th style="width:14%;">薬剤・成分名</th>
+                            <th style="width:13%;">室温保存<br><span style="font-size:10px; font-weight:normal;">(約20℃)</span></th>
+                            <th style="width:13%;">冷蔵保存<br><span style="font-size:10px; font-weight:normal;">(4〜6℃)</span></th>
+                            <th style="width:15%;">弱凍結保存<br><span style="font-size:10px; font-weight:normal;">(−20℃)</span></th>
+                            <th style="width:16%;">深冷・超低温<br><span style="font-size:10px; font-weight:normal;">(−30℃ / −80℃)</span></th>
+                            <th style="width:13%;">凍結融解<br>耐性</th>
+                            <th style="width:16%;">分析前処理・マトリックス留意点</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="background:#f8fafc; font-weight:bold; text-align:center;">
+                                セフトリアキソン<br><span style="color:#2563eb;">(CTRX)</span>
+                            </td>
+                            <td>24時間安定<br><span style="font-size:11px; color:#166534;">(回収率85–115%)</span></td>
+                            <td>7日間安定</td>
+                            <td>14日〜30日間安定</td>
+                            <td style="background:#f0fdf4; color:#166534; font-weight:bold;">−80℃:<br>100日〜12ヶ月安定</td>
+                            <td>3〜5サイクル耐性</td>
+                            <td style="font-size:11px; color:#b91c1c;">強酸(pH&lt;2.5)で48h内に95%分解。中性バッファー抽出必須</td>
+                        </tr>
+                        <tr style="border-top:1px solid #cbd5e1;">
+                            <td style="background:#f8fafc; font-weight:bold; text-align:center;">
+                                ピペラシリン<br><span style="color:#2563eb;">(PIPC)</span>
+                            </td>
+                            <td style="background:#fee2e2; color:#b91c1c; font-weight:bold;">2時間限定<br><span style="font-size:11px;">(24hで49.0%分解)</span></td>
+                            <td>23〜24時間安定</td>
+                            <td>10日〜14日間安定<br><span style="font-size:10px; color:#666;">(最大30日)</span></td>
+                            <td style="background:#fffbeb; color:#92400e; font-weight:bold;">−80℃:<br>3〜6ヶ月間安定<br><span style="font-size:10px; color:#b91c1c;">(※上限6ヶ月厳守)</span></td>
+                            <td>3サイクル耐性</td>
+                            <td style="font-size:11px;">室温熱分解が大。採血後直ちに氷冷し2h内遠心・冷凍必須</td>
+                        </tr>
+                        <tr>
+                            <td style="background:#f8fafc; font-weight:bold; text-align:center;">
+                                タゾバクタム<br><span style="color:#2563eb;">(TAZ)</span>
+                            </td>
+                            <td style="background:#fee2e2; color:#b91c1c; font-weight:bold;">2時間限定<br><span style="font-size:11px;">(24hで37.7%分解)</span></td>
+                            <td>24時間安定</td>
+                            <td>14日〜30日間安定</td>
+                            <td style="background:#fffbeb; color:#92400e; font-weight:bold;">−80℃:<br>3〜6ヶ月間安定</td>
+                            <td>3サイクル耐性</td>
+                            <td style="font-size:11px;">PIPCと同等の分解速度を示すため配合剤として同一凍結管理</td>
+                        </tr>
+                        <tr style="border-top:1px solid #cbd5e1;">
+                            <td style="background:#fef2f2; font-weight:bold; text-align:center; color:#991b1b;">
+                                アンピシリン<br><span style="color:#dc2626;">(ABPC)</span>
+                            </td>
+                            <td style="background:#fee2e2; color:#b91c1c; font-weight:bold;">1〜4時間限定<br><span style="font-size:11px;">(以降直線的に低下)</span></td>
+                            <td>23〜24時間安定<br><span style="font-size:10px; color:#666;">(90%以上保持)</span></td>
+                            <td style="background:#fee2e2; color:#b91c1c; font-weight:bold;">不安定・不適！<br><span style="font-size:10px;">(4日で最大30%低下、11日で&gt;10%分解。最大7日厳守)</span></td>
+                            <td style="background:#f0fdf4; color:#166534; font-weight:bold;">−30℃〜−80℃:<br>30日〜6ヶ月安定<br><span style="font-size:10px;">(残存率95–104%)</span></td>
+                            <td style="background:#fee2e2; color:#b91c1c; font-weight:bold;">3サイクル(82–99%)<br><span style="font-size:10px;">4回以降顕著に劣化</span></td>
+                            <td style="font-size:11px; color:#b91c1c;">不凍相・凍結濃縮による分解加速。−30℃以下急速冷凍が必須</td>
+                        </tr>
+                        <tr>
+                            <td style="background:#fef2f2; font-weight:bold; text-align:center; color:#991b1b;">
+                                スルバクタム<br><span style="color:#dc2626;">(SBT)</span>
+                            </td>
+                            <td>24時間概ね安定</td>
+                            <td>24時間以上安定</td>
+                            <td>14日〜30日間安定</td>
+                            <td style="background:#f0fdf4; color:#166534; font-weight:bold;">−80℃:<br>30日間以上安定</td>
+                            <td>3サイクル耐性</td>
+                            <td style="font-size:11px;">ABPCより構造的に頑健。全体の安定性は律速のABPCに依存</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- メカニズム解説 -->
+                <h4 class="guide-sub-title">C. 凍結相におけるβ-ラクタム環加水分解メカニズム（不凍液相マイクロ環境と凍結濃縮現象）</h4>
+                <div style="padding:12px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:4px; font-size:12px; line-height:1.75; color:#334155;">
+                    <div style="font-weight:bold; color:#1e293b; margin-bottom:6px;">【なぜ−20℃保存でアンピシリンの分解が加速するのか？】</div>
+                    通常の化学反応論（アレニウス則）では温度低下に伴い分解速度が低下しますが、水性マトリックス中のアンピシリン等では−20℃前後の弱凍結相で異常な分解加速（逆転現象）が生じます。
+                    <ol style="margin:4px 0 8px 0; padding-left:20px;">
+                        <li><strong>凍結濃縮現象（Cryo-concentration）：</strong> 氷点下に達すると純粋な水分子が先に氷結晶化し、薬物・塩類（Na<sup>+</sup>, Cl<sup>−</sup>）・血漿プロトンが結晶境界の未凍結微小ポケット（不凍液相マイクロ環境）へ過剰に濃縮・排除されます。</li>
+                        <li><strong>局所衝突頻度の急増とpH偏倚：</strong> 濃縮ポケット内で薬物分子と水酸化物イオン等の局所濃度が跳ね上がり、共存塩類の高イオン強度と局所pH偏倚によってβ-ラクタム環カルボニル炭素への加水分解活性化エネルギーが実質的に低下します。</li>
+                        <li><strong>自己触媒的アミノリシス（Aminolysis）：</strong> アンピシリン側鎖の一次アミノ基が隣接するアミノペニシリン分子のβ-ラクタム環を攻撃し、ジケトピペラジン誘導体の形成や二量化・重合反応が濃縮環境下で特異的に爆発進行します。</li>
+                        <li><strong>−30℃以下および−80℃での完全抑止：</strong> 保存温度を−30℃以下、とりわけ共融ガラス転移温度（T<sub>g</sub>' ≈ −80℃）以下に冷却すると不凍マイクロポケット自体が完全に固化・ガラス化（Solidification）し、分子の並進拡散運動が停止するため分解反応が完全に停止します。</li>
+                    </ol>
+                    <div style="font-size:11px; color:#b91c1c; font-weight:bold;">※一般的な−20℃家庭用・小型冷凍庫での中長期検体保管は、深刻な系統的陰性誤差（過小評価）を惹起する最大の要因です。</div>
+                </div>
+
+                <!-- SOP提言 -->
+                <div class="guide-alert-box" style="margin-top:14px;">
+                    <strong>💡 TDM臨床検査業務・研究における検体管理・前処理標準運用プロトコル（SOP提言）:</strong><br>
+                    1. <strong>採血後管理と室温暴露制限:</strong> 採血後は直ちに氷冷（−10〜+2℃）状態を維持し、<strong>2時間以内に冷却遠心分離</strong>（3,000 rpm × 10分等）を実施。全血および血清・血漿の室温暴露時間は厳格に<strong>「最大2時間以内」</strong>と管理。<br>
+                    2. <strong>保管温度帯の階層化基準:</strong><br>
+                    &nbsp;&nbsp;・<strong>24時間以内に測定:</strong> 4〜6℃（冷蔵）で十分な安定性を担保。<br>
+                    &nbsp;&nbsp;・<strong>数日〜1週間以内の一時保管:</strong> CTRXのみ−20℃可。PIPC・ABPCは−20℃保管を最大7日以内に限定（極力当初から−30℃以下へ）。<br>
+                    &nbsp;&nbsp;・<strong>7日超の中長期保管 / バッチ測定:</strong> <strong>全薬剤で「−80℃（超低温フリーザー）」が必須</strong>。この際、<strong>PIPCの保管期限上限は最長6ヶ月間を厳守</strong>（CTRX・ABPCは6ヶ月〜1年間安定）。<br>
+                    3. <strong>小分け分注（Aliquoting）の標準化:</strong> 凍結前にクライオチューブへ測定用・バックアップ用に小分け分注し、4サイクル以上で著明劣化する凍結融解（Freezing-Thawing）の反復を徹底回避。<br>
+                    4. <strong>前処理時のpH管理 & オートサンプラー運用:</strong> CTRXは強酸性（pH &lt; 2.5）で急激失活するため、中性〜弱酸性バッファー抽出を徹底。オートサンプラー（4℃）待機は24時間以内に測定完了。
+                </div>
+
+                <!-- 参考文献一覧アコーディオン -->
+                <div style="margin-top:15px; border-top:1px dashed #cbd5e1; padding-top:10px;">
+                    <button onclick="toggleRefList()" id="btnToggleRef" style="cursor:pointer; background:#f1f5f9; border:1px solid #cbd5e1; padding:5px 12px; border-radius:4px; font-size:11px; font-weight:bold; color:#334155;">▼ 参考文献一覧を表示 (TDM血清・血漿検体安定性 25文献)</button>
+                    <div id="refListContainer" style="display:none; margin-top:10px; background:#ffffff; border:1px solid #e2e8f0; border-radius:4px; padding:12px 16px; font-size:11px; color:#475569; line-height:1.8; max-height:320px; overflow-y:auto;">
+                        <ol style="margin:0; padding-left:20px;">
+                            <li>Guideline - Medicine - Antimicrobial Therapeutic Drug Monitoring | Herston Infectious Diseases Institute | Metro North Health, <a href="https://metronorth.health.qld.gov.au/infectious-diseases-institute/wp-content/uploads/sites/33/2023/06/medguide-antimicrobial-tdm.pdf" target="_blank">PDF Link</a></li>
+                            <li>Development and Validation of a High-Performance Liquid Chromatography–Ultraviolet Spectrometry Method for Ampicillin and Its Application in Routine Therapeutic Drug Monitoring of Intensive Care Patients - ResearchGate, <a href="https://www.researchgate.net/publication/384109724_Development_and_Validation_of_a_High-Performance_Liquid_Chromatography-Ultraviolet_Spectrometry_Method_for_Ampicillin_and_its_Application_in_Routine_Therapeutic_Drug_Monitoring_of_Intensive_Care_Patie" target="_blank">Link</a></li>
+                            <li>Quantification of Cefepime, Meropenem, Piperacillin, and Tazobactam in Human Plasma Using a Sensitive and Robust Liquid Chromatography-Tandem Mass Spectrometry Method - ASM Journals (AAC), <a href="https://journals.asm.org/doi/pdf/10.1128/aac.00861-18" target="_blank">PDF Link</a></li>
+                            <li>Stability of 10 Beta-Lactam Antibiotics in Human Plasma at Different Storage Conditions - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10497202/" target="_blank">PMC Link</a></li>
+                            <li>Antibiotic Stability in Solution: What Powder Labels Don't Tell You - AuSaMicS, <a href="https://ausamics.com.au/blogs/lab-guides/antibiotic-stability-in-solution-what-powder-labels-dont-tell-you" target="_blank">Article Link</a></li>
+                            <li>Preanalytical Stability of 13 Antibiotics in Biological Samples: A Crucial Factor for Therapeutic Drug Monitoring - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11274111/" target="_blank">PMC Link</a></li>
+                            <li>Stability of 10 Beta-Lactam Antibiotics in Human Plasma at Different Storage Conditions - Erasmus University Rotterdam Repository, <a href="https://pure.eur.nl/ws/files/101002457/Stability_of_10_Beta-Lactam_Antibiotics_in_Human_Plasma_at_Different_Storage_Conditions.pdf" target="_blank">PDF Link</a></li>
+                            <li>Determination of ceftriaxone in human plasma using liquid chromatography–tandem mass spectrometry - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9379334/" target="_blank">PMC Link</a></li>
+                            <li>Preanalytical Stability of 13 Antibiotics in Biological Samples: A Crucial Factor for Therapeutic Drug Monitoring - MDPI (Antibiotics), <a href="https://www.mdpi.com/2079-6382/13/7/675" target="_blank">MDPI Link</a></li>
+                            <li>Preanalytical Stability of 13 Antibiotics in Biological Samples: A Crucial Factor for Therapeutic Drug Monitoring - ResearchGate, <a href="https://www.researchgate.net/publication/382490732_Preanalytical_Stability_of_13_Antibiotics_in_Biological_Samples_A_Crucial_Factor_for_Therapeutic_Drug_Monitoring" target="_blank">Link</a></li>
+                            <li>Liquid chromatography–tandem mass spectrometry for the simultaneous quantitation of ceftriaxone, metronidazole and hydroxymetronidazole in plasma from seriously ill, severely malnourished children - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5801568/" target="_blank">PMC Link</a></li>
+                            <li>Therapeutic drug monitoring of beta-lactam antibiotics–Influence of sample handling and storage - Journal of Pharmaceutical and Biomedical Analysis, <a href="https://www.ovid.com/journals/jpaba/pdf/10.1016/j.jpba.2017.05.037~therapeutic-drug-monitoring-of-beta-lactam-antibiotics" target="_blank">Link</a></li>
+                            <li>A Validated UHPLC–MS/MS Method to Quantify Eight Antibiotics in Quantitative Dried Blood Spots in Support of Pharmacokinetic Studies in Neonates - MDPI, <a href="https://www.mdpi.com/2079-6382/12/2/199" target="_blank">MDPI Link</a></li>
+                            <li>Development of a Novel Multipenicillin Assay and Assessment of the Impact of Analyte Degradation: Lessons for Scavenged Sampling in Antimicrobial Pharmacokinetic Study Design - ASM Journals (AAC), <a href="https://journals.asm.org/doi/10.1128/aac.01540-17" target="_blank">ASM Link</a></li>
+                            <li>Assessment of the stability of antimicrobials and resistance genes during short- and long-term storage condition: accounting for uncertainties in bioanalytical workflows - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10556160/" target="_blank">PMC Link</a></li>
+                            <li>Liquid chromatography with tandem mass spectrometric method for determination of 52 antibiotics in human whole blood and urine and application to forensic cases - ResearchGate, <a href="https://www.researchgate.net/publication/379962408_Liquid_chromatography_with_tandem_mass_spectrometric_method_for_determination_of_52_antibiotics_in_human_whole_blood_and_urine_and_application_to_forensic_cases" target="_blank">Link</a></li>
+                            <li>A Laboratory Protocol for Routine Therapeutic Drug Monitoring of Beta-Lactams Antimicrobials in Horses and Dogs - MDPI, <a href="https://www.mdpi.com/2079-6382/14/4/390" target="_blank">MDPI Link</a></li>
+                            <li>Pharmacokinetics of ceftriaxone in plasma and bone of patients undergoing hip or knee surgery - Journal of Pharmacy and Pharmacology, <a href="https://www.ovid.com/journals/jpap/pdf/10.1111/jphp.12282~pharmacokinetics-of-ceftriaxone-in-plasma-and-bone-of" target="_blank">Link</a></li>
+                            <li>Prediction of Unbound Ceftriaxone Concentration in Children: Simple Bioanalysis Method and Basic Mathematical Equation - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7927823/" target="_blank">PMC Link</a></li>
+                            <li>Development of a UHPLC-UV/Vis Method for Simultaneously Determining Six Beta-Lactam Antibiotics in Plasma: A Tool for the Clinical Implementation of Therapeutic Monitoring of Beta-Lactams - MDPI, <a href="https://www.mdpi.com/2079-6382/14/6/613" target="_blank">MDPI Link</a></li>
+                            <li>Piperacillin sodium, tazobactam sodium injection, powder, for solution - DailyMed - NIH, <a href="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=fc4d1e35-23eb-4654-8691-ae5bfd50a48a" target="_blank">DailyMed Link</a></li>
+                            <li>ZOSYN (piperacillin and tazobactam for injection) - FDA Accessdata Prescribing Information, <a href="https://www.accessdata.fda.gov/drugsatfda_docs/label/2009/065386lbl.pdf" target="_blank">FDA PDF Link</a></li>
+                            <li>Tazocin 4 EF® PIPERACILLIN/TAZOBACTAM Powder For Solution For Injection Or Infusion CDS AfME - Pfizer Labeling, <a href="https://labeling.pfizer.com/ShowLabeling.aspx?id=16061" target="_blank">Pfizer Link</a></li>
+                            <li>Therapeutic Drug Monitoring of Piperacillin and Tazobactam by RP-HPLC of Residual Blood Specimens - PMC, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5970981/" target="_blank">PMC Link</a></li>
+                            <li>Ampicillin Stability in a Portable Elastomeric Infusion Pump: A Step Forward in Outpatient Parenteral Antimicrobial Therapy - MDPI (Pharmaceutics), <a href="https://www.mdpi.com/1999-4923/15/8/2099" target="_blank">MDPI Link</a></li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: 本ツールの操作マニュアル & 運用フロー -->
+            <div class="guide-card">
+                <h3 class="guide-title">3. 本ツールの機能一覧・操作マニュアル</h3>
+                
+                <h4 class="guide-sub-title">A. 症例管理ワークフロー（タブの役割）</h4>
+                <table class="guide-table">
+                    <tr>
+                        <th style="width:20%;">タブ名称</th>
+                        <th style="width:80%;">主な用途と運用手順</th>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background:#eef2f5;">① スクリーニング</td>
+                        <td>
+                            院内処方データを取り込んだ直後の全候補患者が登録されます。<br>
+                            ・「最新情報再取得」で全病棟を高速チェックし、他病棟へ移動・退院した患者を自動判定します。<br>
+                            ・「表示リストを一括取得」でカルテから年齢や採血予定日を自動収集します。<br>
+                            ・適格基準に合致した患者は「<strong>対象へ</strong>」ボタンで対象症例タブへ移動し、除外例は「<strong>候補外へ</strong>」で整理します。
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background:#eef2f5;">② 対象症例</td>
+                        <td>
+                            同意取得〜採血〜提出まで進める本研究の本登録患者を管理します。<br>
+                            ・患者行の進捗バッジ（同未・同済・採血・処理・冷凍・提出）および医師ToDo・署名・連絡・回覧をクリックして進捗状況を記録します。<br>
+                            ・当日に採血予定がある患者は画面上部に「<strong>当日採血アラート</strong>」が表示されます。
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background:#eef2f5;">③ 候補外</td>
+                        <td>
+                            中止・除外基準に該当した患者や、同意が得られなかった患者の保管場所です。<br>
+                            ・誤って移動した場合でも「<strong>スクへ戻す</strong>」ボタンでいつでもスクリーニングへ復帰できます。
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background:#e8f4f8;">④ 集計・進捗</td>
+                        <td>
+                            対象症例タブのデータを基に、3薬剤（セフトリアキソン、ユナスピン、タゾピペ）× 3年齢区分（非高齢者、高齢者、超高齢者）ごとの進捗状況（ステータス別症例数）を自動集計・ダッシュボード表示します。
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background:#e8f8ec;">⑤ CRF編集</td>
+                        <td>
+                            ステータスが「提出済」または「冷凍」となった患者のみが自動抽出されるCRF（症例報告書）データシートです。<br>
+                            ・「＋列を追加」「編集」「削除」「◀/▶並び替え」で臨床検査値（血清クレアチニン、eGFR、Alb等）や患者背景の入力列を自由にカスタマイズできます。<br>
+                            ・入力したCRFデータは「CRFをCSV出力」ボタンでいつでもExcel形式で書き出し可能です。
+                        </td>
+                    </tr>
+                </table>
+
+                <h4 class="guide-sub-title">B. 上部ボタン・各種ツール機能の使い方</h4>
+                <ul style="font-size:12px; line-height:1.8; margin-top:5px; padding-left:20px; color:#333;">
+                    <li><strong>処方統計データ読み込み (Excel/CSV):</strong> 院内の注射処方統計ファイルをドラッグまたは選択して取り込みます。同一患者・同一薬剤で連続している処方は自動的に統合されます。</li>
+                    <li><strong>最新情報（病棟/科/医）を再取得:</strong> 全11病棟（3A・3B, NICU, 3C, 4B, 4C, 5A, 5B, 5C, 6A, 6B, 6C）の名簿を裏で高速確認（約3〜5秒）し、転棟（例: 3C→6A）を自動検知します。名簿にない患者は「他病棟/退院」として自動更新されます。</li>
+                    <li><strong>表示リストを一括取得:</strong> 現在画面に表示されている患者全員のカルテ情報を巡回し、生年月日（実年齢）と次回採血予定日（生化学・一般等のオーダ）を自動取得します。</li>
+                    <li><strong>一括確認(年齢+採血) (各行のボタン):</strong> 特定の患者1名のみの生年月日・採血予定日、および最新の診療科・主治医を取得します。</li>
+                    <li><strong>現在の管理一覧をCSV出力:</strong> 画面上で絞り込んでいるタブ・病棟・年齢区分・薬剤・ステータス・検索キーワードの条件を100%保持したままCSV（Shift_JIS）を出力し、自動的にExcelで起動します。最新の病棟・診療科・主治医の変更も反映されます。</li>
+                </ul>
+
+                <h4 class="guide-sub-title">C. ステータス・確認状況バッジの定義</h4>
+                <div style="font-size:12px; line-height:1.8; margin-top:5px;">
+                    <div style="margin-bottom:8px;">
+                        <strong>【進捗ステータス】</strong><br>
+                        <span class="guide-badge-box" style="background:#f1c40f;">同未</span> 同意未取得（説明準備中） &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#3498db;">同済</span> 同意取得済 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#e74c3c;">採血</span> 採血完了 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#9b59b6;">処理</span> 遠心・分注処理完了 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#1abc9c;">冷凍</span> -80℃冷凍保管中 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#2ecc71;">提出</span> 測定提出完了（CRF対象）
+                    </div>
+                    <div>
+                        <strong>【確認状況（医師・検査連携）】</strong><br>
+                        <span class="guide-badge-box" style="background:#34495e;">TD</span> 医師ToDo入力済 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#34495e;">署名</span> 医師同意書署名受領済 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#34495e;">連絡</span> 検査室（採血時対応）事前連絡済 &nbsp;|&nbsp;
+                        <span class="guide-badge-box" style="background:#34495e;">回覧</span> 検査科CoMedix回覧・確認済
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    </div><!-- /#app-main-area -->
 </div>
 
 <script>
@@ -259,6 +628,11 @@
                             // Normalize existing ward data
                             if (p.ward) {
                                 p.ward = toHalfWidth(String(p.ward)).toUpperCase().replace(/^\s+|\s+$/g, '');
+                                if (p.ward === "3A" || p.ward === "3B") p.ward = "3A・3B";
+                            }
+                            if (p.currentWard) {
+                                p.currentWard = toHalfWidth(String(p.currentWard)).toUpperCase().replace(/^\s+|\s+$/g, '');
+                                if (p.currentWard === "3A" || p.currentWard === "3B") p.currentWard = "3A・3B";
                             }
                             
                             if (p.drug && p.drug.indexOf(" / ") !== -1) {
@@ -528,6 +902,7 @@
             var doctor = cols.length > 8 && cols[8] ? String(cols[8]).replace(/^\s+|\s+$/g, '') : "";
             var ward = cols.length > 9 && cols[9] ? String(cols[9]).replace(/^\s+|\s+$/g, '') : "";
             ward = toHalfWidth(ward).toUpperCase();
+            if (ward === "3A" || ward === "3B") ward = "3A・3B";
 
             if (!id) continue;
             
@@ -628,6 +1003,110 @@
         alert("データの取り込みが完了しました。\n有効データ行数: " + addedCount);
     }
 
+    var isFilterPanelOpen = true;
+
+    function toggleFilterPanel() {
+        var panel = document.getElementById("filterPanelWrap");
+        var btn = document.getElementById("btnToggleFilter");
+        if (!panel) return;
+        isFilterPanelOpen = !isFilterPanelOpen;
+        if (isFilterPanelOpen) {
+            panel.style.display = "block";
+            if (btn) btn.innerText = "▲ 絞り込みを閉じる";
+        } else {
+            panel.style.display = "none";
+            if (btn) btn.innerText = "▼ 病棟絞り込みを開く";
+        }
+        setTimeout(updateLayoutHeights, 30);
+    }
+
+    function toggleRefList() {
+        var container = document.getElementById("refListContainer");
+        var btn = document.getElementById("btnToggleRef");
+        if (!container) return;
+        if (container.style.display === "none") {
+            container.style.display = "block";
+            if (btn) btn.innerText = "▲ 参考文献一覧を閉じる (25文献)";
+        } else {
+            container.style.display = "none";
+            if (btn) btn.innerText = "▼ 参考文献一覧を表示 (TDM血清・血漿検体安定性 25文献)";
+        }
+    }
+
+    function fixTableHeader() {
+        var wrap = document.getElementById("tableScrollWrap");
+        if (!wrap) return;
+        var st = wrap.scrollTop;
+        var table = document.getElementById("patientTable");
+        if (!table) return;
+        var ths = table.getElementsByTagName("th");
+        for (var i = 0; i < ths.length; i++) {
+            ths[i].style.top = st + "px";
+        }
+    }
+
+    function fixCrfTableHeader() {
+        var wrap = document.getElementById("crfTableScrollWrap");
+        if (!wrap) return;
+        var st = wrap.scrollTop;
+        var table = document.getElementById("crfTable");
+        if (!table) return;
+        var ths = table.getElementsByTagName("th");
+        for (var i = 0; i < ths.length; i++) {
+            ths[i].style.top = st + "px";
+        }
+    }
+
+    function updateLayoutHeights() {
+        var headerArea = document.getElementById("app-header-area");
+        if (!headerArea) return;
+        
+        var winH = document.documentElement.clientHeight || window.innerHeight;
+        var headerH = headerArea.offsetHeight;
+        var topOffset = headerArea.offsetTop || 8;
+        var avH = winH - topOffset - headerH - 10;
+        if (avH < 150) avH = 150;
+
+        // 1. テーブルスクロール領域（スクリーニング、対象症例、候補外）
+        var tableWrap = document.getElementById("tableScrollWrap");
+        if (tableWrap) {
+            tableWrap.style.height = avH + "px";
+            fixTableHeader();
+        }
+
+        // 2. 集計ビュー
+        var summaryView = document.getElementById("summary-view");
+        if (summaryView) {
+            summaryView.style.height = avH + "px";
+        }
+
+        // 3. CRFビュー
+        var crfView = document.getElementById("crf-view");
+        if (crfView) {
+            crfView.style.height = avH + "px";
+            var crfCtrl = document.getElementById("crf-controls-area");
+            var ctrlH = crfCtrl ? (crfCtrl.offsetHeight + 10) : 45;
+            var crfWrap = document.getElementById("crfTableScrollWrap");
+            if (crfWrap) {
+                var crfAvH = avH - ctrlH - 20;
+                if (crfAvH < 120) crfAvH = 120;
+                crfWrap.style.height = crfAvH + "px";
+                fixCrfTableHeader();
+            }
+        }
+
+        // 4. 研究ガイドビュー
+        var guideView = document.getElementById("guide-view");
+        if (guideView) {
+            guideView.style.height = avH + "px";
+        }
+    }
+
+    function updateTableContainerHeight() {
+        updateLayoutHeights();
+    }
+    window.onresize = updateLayoutHeights;
+
     function switchTab(tabName) {
         currentTab = tabName;
         document.getElementById("tab-screening").className = (tabName === "screening") ? "tab-btn active" : "tab-btn";
@@ -635,31 +1114,48 @@
         document.getElementById("tab-exclude").className = (tabName === "exclude") ? "tab-btn active" : "tab-btn";
         document.getElementById("tab-summary").className = (tabName === "summary") ? "tab-btn active" : "tab-btn";
         document.getElementById("tab-crf").className = (tabName === "crf") ? "tab-btn active" : "tab-btn";
+        var tabGuide = document.getElementById("tab-guide");
+        if (tabGuide) tabGuide.className = (tabName === "guide") ? "tab-btn active" : "tab-btn";
 
-        var wardContainer = document.getElementById("wardFilterContainer");
+        var filterPanel = document.getElementById("filterPanelWrap");
         var headerTools = document.getElementById("header-tools");
+        var guideView = document.getElementById("guide-view");
         
         if (tabName === "summary") {
             document.getElementById("table-view").style.display = "none";
             document.getElementById("crf-view").style.display = "none";
+            if (guideView) guideView.style.display = "none";
             document.getElementById("summary-view").style.display = "block";
-            if(wardContainer) wardContainer.style.display = "none";
+            if(filterPanel) filterPanel.style.display = "none";
             if(headerTools) headerTools.style.display = "none";
             renderSummary();
+            setTimeout(updateLayoutHeights, 30);
         } else if (tabName === "crf") {
             document.getElementById("table-view").style.display = "none";
             document.getElementById("summary-view").style.display = "none";
+            if (guideView) guideView.style.display = "none";
             document.getElementById("crf-view").style.display = "block";
-            if(wardContainer) wardContainer.style.display = "none";
+            if(filterPanel) filterPanel.style.display = "none";
             if(headerTools) headerTools.style.display = "none";
             renderCRF();
+            setTimeout(updateLayoutHeights, 30);
+        } else if (tabName === "guide") {
+            document.getElementById("table-view").style.display = "none";
+            document.getElementById("summary-view").style.display = "none";
+            document.getElementById("crf-view").style.display = "none";
+            if (guideView) guideView.style.display = "block";
+            if(filterPanel) filterPanel.style.display = "none";
+            if(headerTools) headerTools.style.display = "none";
+            setTimeout(updateLayoutHeights, 30);
         } else {
             document.getElementById("summary-view").style.display = "none";
             document.getElementById("crf-view").style.display = "none";
+            if (guideView) guideView.style.display = "none";
             document.getElementById("table-view").style.display = "block";
-            if(wardContainer) wardContainer.style.display = "block";
+            if(filterPanel) filterPanel.style.display = isFilterPanelOpen ? "block" : "none";
             if(headerTools) headerTools.style.display = "inline";
             renderTable();
+            setTimeout(updateLayoutHeights, 30);
         }
     }
 
@@ -668,11 +1164,32 @@
         saveAndRender();
     }
 
+    function parseDateStr(str) {
+        if (!str) return null;
+        var parts = str.split("-");
+        if (parts.length !== 3) return null;
+        var y = parseInt(parts[0], 10);
+        var m = parseInt(parts[1], 10) - 1;
+        var d = parseInt(parts[2], 10);
+        if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+        return new Date(y, m, d);
+    }
+
     function updateStatus(key, valStr) {
         if (patientData[key].status === valStr) {
             patientData[key].status = ""; // Toggle off to unselected
         } else {
             patientData[key].status = valStr;
+            if (valStr === "冷凍") {
+                var d = new Date();
+                var y = d.getFullYear();
+                var m = d.getMonth() + 1;
+                var day = d.getDate();
+                var todayStr = y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+                if (!patientData[key].freezeDate || patientData[key].freezeDate === "") {
+                    patientData[key].freezeDate = (patientData[key].sampleDate && patientData[key].sampleDate !== "") ? patientData[key].sampleDate : todayStr;
+                }
+            }
         }
         saveAndRender();
     }
@@ -686,8 +1203,12 @@
     }
 
     function updateSampleDate(key, dateVal) {
+        var oldDate = patientData[key].sampleDate;
         patientData[key].sampleDate = dateVal;
         patientData[key].bloodDetail = "手動";
+        if (patientData[key].status === "冷凍" && (!patientData[key].freezeDate || patientData[key].freezeDate === oldDate)) {
+            patientData[key].freezeDate = dateVal;
+        }
         saveAndRender();
     }
 
@@ -844,6 +1365,10 @@
         for (var key in patientData) {
             if (patientData.hasOwnProperty(key) && patientData[key].ward) {
                 var w = patientData[key].ward;
+                if (w === "3A" || w === "3B") {
+                    w = "3A・3B";
+                    patientData[key].ward = "3A・3B";
+                }
                 var found = false;
                 for(var j=0; j<predefinedOrder.length; j++) {
                     if (predefinedOrder[j] === w) { found = true; break; }
@@ -873,8 +1398,6 @@
         }
         
         if (!hasWard) html += '<span style="font-size:11px; color:#999;">（データなし）</span>';
-        
-        html += '<span style="font-size:11px; color:#777; margin-left:20px; float:right;">[注] 同未:同意未, 同済:同意済, 採血:採血済, 処理:処理済, 提出:提出済, 冷凍:冷凍</span>';
         container.innerHTML = html;
     }
 
@@ -884,7 +1407,7 @@
             return;
         }
 
-        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与回数,投与開始,投与終了,採血予定日,ステータス,タブ,備考\n";
+        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与回数,投与開始,投与終了,採血予定日,冷凍日,ステータス,タブ,備考\n";
         
         var keys = getFilteredKeys();
         for (var k = 0; k < keys.length; k++) {
@@ -897,6 +1420,7 @@
             var rowArray = [
                 p.id, p.name, p.age, p.ageGroup, currentWard, currentDept, currentDoctor,
                 p.drug, p.freq ? p.freq + "回/日" : "", p.start, p.end, p.sampleDate,
+                p.freezeDate || "",
                 p.status === "" ? "未選択" : p.status, 
                 p.tab === "target" ? "対象症例" : (p.tab === "exclude" ? "候補外" : "スクリーニング"),
                 p.remarks
@@ -1081,6 +1605,8 @@
         var tbody = document.getElementById('tableBody');
         var alertList = document.getElementById('alertList');
         var alertSection = document.getElementById('todayAlert');
+        var freezeAlertList = document.getElementById('freezeAlertList');
+        var freezeAlertSection = document.getElementById('freezeAlert');
         var searchInput = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toUpperCase() : "";
         
         var checkboxes = document.getElementsByClassName('ward-cb');
@@ -1096,10 +1622,49 @@
         var m = d.getMonth() + 1;
         var day = d.getDate();
         var todayStr = y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+        var todayObj = new Date(y, m - 1, day);
         
         tbody.innerHTML = "";
         alertList.innerHTML = "";
         var alertCount = 0;
+
+        if (freezeAlertList) freezeAlertList.innerHTML = "";
+        var freezeAlertCount = 0;
+
+        // 冷凍検体の提出リマインド判定（対象症例タブ時）
+        if (currentTab === "target") {
+            for (var pk in patientData) {
+                if (!patientData.hasOwnProperty(pk)) continue;
+                var pp = patientData[pk];
+                if (pp.status === "冷凍") {
+                    var fDateStr = pp.freezeDate || pp.sampleDate;
+                    if (fDateStr) {
+                        var fDate = parseDateStr(fDateStr);
+                        if (fDate) {
+                            var diffDays = Math.floor((todayObj.getTime() - fDate.getTime()) / (24 * 60 * 60 * 1000));
+                            // 1週間前（23日経過以降）または1か月（30日）超過
+                            if (diffDays >= 23) {
+                                freezeAlertCount++;
+                                if (freezeAlertList) {
+                                    var li = document.createElement("li");
+                                    var remDays = 30 - diffDays;
+                                    var statusText = "";
+                                    if (remDays < 0) {
+                                        statusText = "<span style='color:#c0392b; font-weight:bold;'>【1か月超過】 " + Math.abs(remDays) + "日超過 (" + diffDays + "日経過)</span>";
+                                    } else if (remDays === 0) {
+                                        statusText = "<span style='color:#e67e22; font-weight:bold;'>【本日が1か月期限】 (30日経過)</span>";
+                                    } else {
+                                        statusText = "<span style='color:#d35400; font-weight:bold;'>【まもなく1か月】 残り" + remDays + "日 (" + diffDays + "日経過)</span>";
+                                    }
+                                    li.innerHTML = "<strong>" + escapeHtml(pp.id) + " " + escapeHtml(pp.name) + "様</strong> (" + escapeHtml(pp.drug) + ", 冷凍日: " + escapeHtml(fDateStr) + ") &nbsp;&rarr;&nbsp; " + statusText;
+                                    freezeAlertList.appendChild(li);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         var idCounts = {};
         var idInTarget = {};
@@ -1261,6 +1826,10 @@
         }
 
         alertSection.style.display = alertCount > 0 ? "block" : "none";
+        if (freezeAlertSection) {
+            freezeAlertSection.style.display = (freezeAlertCount > 0 && currentTab === "target") ? "block" : "none";
+        }
+        setTimeout(updateLayoutHeights, 30);
     }
 
     function zeroPadId(id) {
@@ -1847,12 +2416,13 @@
         }
     }
     function renderCRF() {
-        var html = '<div style="margin-bottom:10px;">';
-        html += '<h3 style="margin-top:0;">提出済・冷凍患者用 CRFデータシート</h3>';
+        var html = '<div id="crf-controls-area" style="margin-bottom:8px;">';
+        html += '<h3 style="margin-top:0; margin-bottom:6px;">提出済・冷凍患者用 CRFデータシート</h3>';
         html += '<button onclick="addCrfColumn()" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">＋ 列を追加</button> ';
         html += '<button onclick="exportCRFToCSV()" class="export-btn" style="background:#27ae60;">CRFをCSV出力</button>';
         html += '</div>';
 
+        html += '<div id="crfTableScrollWrap" onscroll="fixCrfTableHeader()">';
         html += '<table id="crfTable" style="table-layout: auto; min-width: 100%;">';
         html += '<thead><tr>';
         html += '<th style="min-width: 50px;">並び替え</th>';
@@ -1912,7 +2482,10 @@
         }
         
         html += '</tbody></table>';
+        html += '</div>';
         document.getElementById('crf-view').innerHTML = html;
+        updateLayoutHeights();
+        fixCrfTableHeader();
         saveDataToFile();
     }
 
@@ -2090,6 +2663,12 @@
     updateHeaderFilters(true);
     updateWardCheckboxes();
     renderTable();
+    updateLayoutHeights();
+    setTimeout(updateLayoutHeights, 50);
+    setTimeout(updateLayoutHeights, 200);
+    window.onload = function() {
+        updateLayoutHeights();
+    };
 </script>
 </body>
 </html>
