@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像 ⇄ Base64 / HTML 相互変換ツール</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary: #475569;
+            --secondary-hover: #334155;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --radius: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-subtitle {
+            margin: 4px 0 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .shortcut-badge {
+            background: #e2e8f0;
+            color: #334155;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        kbd {
+            background: #fff;
+            border: 1px solid #94a3b8;
+            border-bottom-width: 2px;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+
+        /* 2カラムレイアウト */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (max-width: 980px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-decode {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        /* ドロップゾーン */
+        .drop-zone {
+            border: 2px dashed #94a3b8;
+            border-radius: var(--radius);
+            padding: 28px 20px;
+            text-align: center;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-bottom: 16px;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            background: #eff6ff;
+            border-color: var(--primary);
+        }
+
+        .drop-zone-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 6px;
+            color: var(--text);
+        }
+
+        .drop-zone-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* フォーマット選択バー */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            background: #f1f5f9;
+            padding: 10px 12px;
+            border-radius: 8px;
+        }
+
+        .format-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .format-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--secondary);
+            margin-right: 4px;
+        }
+
+        .format-btn {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .format-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .format-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        /* ボタン共通 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary-hover);
+        }
+
+        .btn-outline {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            background: #f1f5f9;
+        }
+
+        .btn-danger {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: #fecaca;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+
+        /* 画像アイテムカード一覧 */
+        .items-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+        }
+
+        .items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .item-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            background: #fff;
+        }
+
+        .item-top {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 12px;
+            align-items: flex-start;
+        }
+
+        /* 透過確認用チェッカーボード背景 */
+        .thumb-box {
+            width: 96px;
+            height: 96px;
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff;
+            background-image:
+                linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+                linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+                linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+            cursor: zoom-in;
+        }
+
+        .thumb-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .item-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin: 0 0 6px;
+            word-break: break-all;
+        }
+
+        .stats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 10px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .stat-pill {
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #334155;
+            font-family: monospace;
+        }
+
+        textarea {
+            width: 100%;
+            height: 95px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.82rem;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #f8fafc;
+            color: var(--text);
+            resize: vertical;
+            margin-bottom: 8px;
+        }
+
+        textarea:focus {
+            outline: 2px solid var(--primary);
+            background: #fff;
+        }
+
+        .decode-textarea {
+            height: 130px;
+            background: #fff;
+        }
+
+        .card-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* デコード側プレビュー */
+        .decoded-preview-box {
+            width: 100%;
+            max-height: 280px;
+            min-height: 140px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            background-color: #fff;
+            background-image:
+                linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+                linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+                linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+            cursor: zoom-in;
+        }
+
+        .decoded-preview-box img {
+            max-width: 100%;
+            max-height: 256px;
+            object-fit: contain;
+        }
+
+        .filename-input-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .filename-input-group label {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .filename-input {
+            flex: 1;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 28px 16px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        /* トースト通知 */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+            transition: all 0.2s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 拡大モーダル */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 24px;
+            cursor: zoom-out;
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-backdrop img {
+            max-width: 92vw;
+            max-height: 90vh;
+            border-radius: 6px;
+            background-color: #fff;
+            background-image:
+                linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+                linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+                linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>🖼️ 画像 ⇄ Base64 / HTML 相互変換ツール</h1>
+            <p class="header-subtitle">画像のBase64エンコード（HTML・CSS・Markdown出力）と、コードからの画像復元・保存を1画面で行えます。</p>
+        </div>
+        <div class="shortcut-badge">
+            💡 画面上で <kbd>Ctrl</kbd> + <kbd>V</kbd> でクリップボードの画像・コードを直接貼り付け可能
+        </div>
+    </header>
+
+    <div class="main-grid">
+        <!-- ==================== 左カラム：画像 → コード（エンコード） ==================== -->
+        <section class="panel" aria-labelledby="encodeTitle">
+            <div class="panel-header">
+                <h2 class="panel-title" id="encodeTitle">
+                    <span>📤 画像 → コード変換</span>
+                    <span class="badge">エンコード</span>
+                </h2>
+                <div class="action-group" id="encodeBulkActions" style="display: none;">
+                    <button type="button" class="btn btn-sm" id="copyAllEncodedBtn">すべてコピー</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="clearEncodedBtn">すべてクリア</button>
+                </div>
+            </div>
+
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-title">ここに画像をドロップ、またはクリックして選択（複数可）</div>
+                <div class="drop-zone-sub">または画面キャプチャ等をそのまま <kbd>Ctrl</kbd>+<kbd>V</kbd> で貼り付け（PNG / JPEG / WebP / GIF / SVG 等）</div>
+                <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+            </div>
+
+            <div class="toolbar">
+                <div class="format-group" role="group" aria-label="出力フォーマット">
+                    <span class="format-label">出力形式:</span>
+                    <button type="button" class="format-btn active" data-format="img">&lt;img&gt; タグ</button>
+                    <button type="button" class="format-btn" data-format="datauri">Data URI</button>
+                    <button type="button" class="format-btn" data-format="raw">Base64のみ</button>
+                    <button type="button" class="format-btn" data-format="css">CSS url()</button>
+                    <button type="button" class="format-btn" data-format="markdown">Markdown</button>
+                </div>
+            </div>
+
+            <div class="items-header" id="encodeSummary" style="display: none;">
+                <span id="encodeCountText">0件の画像</span>
+                <span id="encodeTotalSizeText"></span>
+            </div>
+
+            <div id="encodedList" class="items-list">
+                <div class="empty-state" id="encodeEmptyState">
+                    まだ画像が読み込まれていません。<br>上のエリアに画像をドロップするか、ファイルを選択してください。
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 右カラム：コード → 画像（デコード） ==================== -->
+        <section class="panel" aria-labelledby="decodeTitle">
+            <div class="panel-header">
+                <h2 class="panel-title" id="decodeTitle">
+                    <span>📥 コード → 画像へ戻す</span>
+                    <span class="badge badge-decode">デコード</span>
+                </h2>
+                <div class="action-group">
+                    <button type="button" class="btn btn-outline btn-sm" id="sampleDecodeBtn">サンプルを入力</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="clearDecodeBtn">クリア</button>
+                </div>
+            </div>
+
+            <label for="decodeInput" style="display:block; font-size:0.88rem; font-weight:600; margin-bottom:6px;">
+                HTMLの <code>&lt;img&gt;</code> タグ、Data URI (<code>data:image/...</code>)、CSS、またはBase64文字列を貼り付け：
+            </label>
+            <textarea
+                id="decodeInput"
+                class="decode-textarea"
+                placeholder='例: <img src="data:image/png;base64,iVBORw0KGgo..."> または data:image/png;base64,... または iVBORw0KGgo...'
+            ></textarea>
+
+            <div class="toolbar" style="margin-top: 4px;">
+                <div class="action-group">
+                    <button type="button" class="btn btn-sm" id="decodeBtn">🔄 コードから画像を復元</button>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">※貼り付け時に自動でも変換されます（複数画像コードの一括抽出にも対応）</span>
+                </div>
+                <div class="action-group" id="decodeBulkActions" style="display: none;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="downloadAllDecodedBtn">💾 すべて保存</button>
+                </div>
+            </div>
+
+            <div id="decodeError" class="error-box"></div>
+
+            <div id="decodedList" class="items-list">
+                <div class="empty-state" id="decodeEmptyState">
+                    上のテキストエリアにBase64コードやHTMLタグを貼り付けると、<br>ここに復元された画像のプレビューと保存ボタンが表示されます。
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <!-- 画像拡大プレビューモーダル -->
+    <div id="imageModal" class="modal-backdrop" title="クリックして閉じる">
+        <img id="modalImg" src="" alt="拡大プレビュー">
+    </div>
+
+    <script>
+        // ==================== 状態管理 ====================
+        let encodedItems = []; // { id, name, mime, fileSize, width, height, dataUri, rawBase64 }
+        let decodedItems = []; // { id, name, mime, ext, byteSize, width, height, dataUri }
+        let currentFormat = 'img';
+
+        // DOM要素
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const encodedList = document.getElementById('encodedList');
+        const encodeEmptyState = document.getElementById('encodeEmptyState');
+        const encodeBulkActions = document.getElementById('encodeBulkActions');
+        const encodeSummary = document.getElementById('encodeSummary');
+        const encodeCountText = document.getElementById('encodeCountText');
+        const encodeTotalSizeText = document.getElementById('encodeTotalSizeText');
+        const copyAllEncodedBtn = document.getElementById('copyAllEncodedBtn');
+        const clearEncodedBtn = document.getElementById('clearEncodedBtn');
+        const formatBtns = document.querySelectorAll('.format-btn');
+
+        const decodeInput = document.getElementById('decodeInput');
+        const decodeBtn = document.getElementById('decodeBtn');
+        const sampleDecodeBtn = document.getElementById('sampleDecodeBtn');
+        const clearDecodeBtn = document.getElementById('clearDecodeBtn');
+        const decodeError = document.getElementById('decodeError');
+        const decodedList = document.getElementById('decodedList');
+        const decodeEmptyState = document.getElementById('decodeEmptyState');
+        const decodeBulkActions = document.getElementById('decodeBulkActions');
+        const downloadAllDecodedBtn = document.getElementById('downloadAllDecodedBtn');
+
+        const toast = document.getElementById('toast');
+        const imageModal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+
+        // ==================== ユーティリティ ====================
+        let toastTimer = null;
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2200);
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || bytes <= 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+            const val = bytes / Math.pow(1024, i);
+            return `${val.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function openModal(src) {
+            modalImg.src = src;
+            imageModal.classList.add('open');
+        }
+
+        imageModal.addEventListener('click', () => {
+            imageModal.classList.remove('open');
+            modalImg.src = '';
+        });
+
+        // ==================== エンコード機能（画像 → コード） ====================
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleFiles(e.target.files);
+                fileInput.value = '';
+            }
+        });
+
+        // Ctrl+V でクリップボードから画像を直接エンコード
+        window.addEventListener('paste', (e) => {
+            const items = e.clipboardData && e.clipboardData.items;
+            if (!items) return;
+
+            const imageFiles = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.startsWith('image/')) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '');
+                        const timestamp = new Date().toTimeString().slice(0, 8).replace(/:/g, '');
+                        const namedFile = new File([blob], `clipboard-${timestamp}.${ext}`, { type: blob.type });
+                        imageFiles.push(namedFile);
+                    }
+                }
+            }
+
+            if (imageFiles.length > 0) {
+                e.preventDefault();
+                handleFiles(imageFiles);
+                showToast(`📋 クリップボードから画像 ${imageFiles.length} 件を読み込みました`);
+            }
+        });
+
+        function handleFiles(fileList) {
+            const files = Array.from(fileList);
+            let skipped = 0;
+
+            files.forEach((file) => {
+                if (!file.type.startsWith('image/')) {
+                    skipped++;
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const dataUri = e.target.result;
+                    const commaIdx = dataUri.indexOf(',');
+                    const rawBase64 = commaIdx !== -1 ? dataUri.slice(commaIdx + 1) : dataUri;
+
+                    const img = new Image();
+                    img.onload = () => {
+                        encodedItems.unshift({
+                            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+                            name: file.name,
+                            mime: file.type || 'image/png',
+                            fileSize: file.size,
+                            width: img.naturalWidth,
+                            height: img.naturalHeight,
+                            dataUri,
+                            rawBase64
+                        });
+                        renderEncodedList();
+                    };
+                    img.onerror = () => {
+                        encodedItems.unshift({
+                            id: String(Date.now() + Math.random()),
+                            name: file.name,
+                            mime: file.type || 'image/png',
+                            fileSize: file.size,
+                            width: 0,
+                            height: 0,
+                            dataUri,
+                            rawBase64
+                        });
+                        renderEncodedList();
+                    };
+                    img.src = dataUri;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            if (skipped > 0) {
+                showToast(`⚠️ 画像以外のファイル ${skipped} 件をスキップしました`);
+            }
+        }
+
+        function formatEncodedOutput(item, format) {
+            switch (format) {
+                case 'img':
+                    return `<img src="${item.dataUri}" alt="${escapeHtml(item.name)}">`;
+                case 'datauri':
+                    return item.dataUri;
+                case 'raw':
+                    return item.rawBase64;
+                case 'css':
+                    return `background-image: url("${item.dataUri}");`;
+                case 'markdown':
+                    return `![${item.name}](${item.dataUri})`;
+                default:
+                    return item.dataUri;
+            }
+        }
+
+        formatBtns.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                formatBtns.forEach((b) => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFormat = btn.dataset.format;
+                renderEncodedList();
+            });
+        });
+
+        function renderEncodedList() {
+            if (encodedItems.length === 0) {
+                encodedList.innerHTML = '';
+                encodedList.appendChild(encodeEmptyState);
+                encodeEmptyState.style.display = 'block';
+                encodeBulkActions.style.display = 'none';
+                encodeSummary.style.display = 'none';
+                return;
+            }
+
+            encodeEmptyState.style.display = 'none';
+            encodeBulkActions.style.display = 'flex';
+            encodeSummary.style.display = 'flex';
+
+            const totalOriginalBytes = encodedItems.reduce((sum, item) => sum + item.fileSize, 0);
+            const totalBase64Chars = encodedItems.reduce((sum, item) => sum + item.dataUri.length, 0);
+            encodeCountText.textContent = `${encodedItems.length} 件の画像`;
+            encodeTotalSizeText.textContent = `合計元サイズ: ${formatBytes(totalOriginalBytes)} / 総コード長: ${totalBase64Chars.toLocaleString()} 文字`;
+
+            encodedList.innerHTML = '';
+
+            encodedItems.forEach((item) => {
+                const codeText = formatEncodedOutput(item, currentFormat);
+                const card = document.createElement('div');
+                card.className = 'item-card';
+
+                const dimText = item.width && item.height ? `${item.width} × ${item.height} px` : 'サイズ不明';
+
+                card.innerHTML = `
+                    <div class="item-top">
+                        <div class="thumb-box" title="クリックして拡大表示">
+                            <img src="${item.dataUri}" alt="${escapeHtml(item.name)}">
+                        </div>
+                        <div class="item-meta">
+                            <p class="item-name">${escapeHtml(item.name)}</p>
+                            <div class="stats-grid">
+                                <span class="stat-pill">形式: ${escapeHtml(item.mime)}</span>
+                                <span class="stat-pill">解像度: ${dimText}</span>
+                                <span class="stat-pill">元サイズ: ${formatBytes(item.fileSize)}</span>
+                                <span class="stat-pill">コード長: ${codeText.length.toLocaleString()} 文字 (${formatBytes(codeText.length)})</span>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea readonly aria-label="${escapeHtml(item.name)} の変換コード"></textarea>
+                    <div class="card-actions">
+                        <div class="action-group">
+                            <button type="button" class="btn btn-sm copy-single-btn">📋 コードをコピー</button>
+                            <button type="button" class="btn btn-outline btn-sm send-to-decode-btn">➡️ デコード欄で試す</button>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm remove-single-btn">削除</button>
+                    </div>
+                `;
+
+                const textarea = card.querySelector('textarea');
+                textarea.value = codeText;
+
+                textarea.addEventListener('click', () => textarea.select());
+
+                card.querySelector('.thumb-box').addEventListener('click', () => openModal(item.dataUri));
+
+                card.querySelector('.copy-single-btn').addEventListener('click', () => {
+                    navigator.clipboard.writeText(codeText).then(() => {
+                        showToast(`✅ 「${item.name}」のコードをコピーしました`);
+                    });
+                });
+
+                card.querySelector('.send-to-decode-btn').addEventListener('click', () => {
+                    decodeInput.value = codeText;
+                    processDecodeInput();
+                    showToast('➡️ 右側のデコード欄へコードを転送しました');
+                });
+
+                card.querySelector('.remove-single-btn').addEventListener('click', () => {
+                    encodedItems = encodedItems.filter((x) => x.id !== item.id);
+                    renderEncodedList();
+                });
+
+                encodedList.appendChild(card);
+            });
+        }
+
+        copyAllEncodedBtn.addEventListener('click', () => {
+            if (encodedItems.length === 0) return;
+            const allCodes = encodedItems.map((item) => formatEncodedOutput(item, currentFormat)).join('\n');
+            navigator.clipboard.writeText(allCodes).then(() => {
+                showToast(`✅ 全 ${encodedItems.length} 件のコードを一括コピーしました`);
+            });
+        });
+
+        clearEncodedBtn.addEventListener('click', () => {
+            encodedItems = [];
+            renderEncodedList();
+            showToast('🗑️ エンコード一覧をクリアしました');
+        });
+
+        // ==================== デコード機能（コード → 画像） ====================
+        // 先頭バイト/文字列からMIMEタイプを推定
+        function detectMimeFromBase64(b64) {
+            const trimmed = b64.trim();
+            if (trimmed.startsWith('iVBORw0KGgo')) return 'image/png';
+            if (trimmed.startsWith('/9j/')) return 'image/jpeg';
+            if (trimmed.startsWith('R0lGOD')) return 'image/gif';
+            if (trimmed.startsWith('UklGR')) return 'image/webp';
+            if (trimmed.startsWith('PHN2Zy') || trimmed.startsWith('PD94bW')) return 'image/svg+xml';
+            if (trimmed.startsWith('Qk')) return 'image/bmp';
+            if (trimmed.startsWith('AAABAA')) return 'image/x-icon';
+            return 'image/png';
+        }
+
+        function mimeToExt(mime) {
+            const map = {
+                'image/png': 'png',
+                'image/jpeg': 'jpg',
+                'image/jpg': 'jpg',
+                'image/webp': 'webp',
+                'image/gif': 'gif',
+                'image/svg+xml': 'svg',
+                'image/bmp': 'bmp',
+                'image/x-icon': 'ico',
+                'image/avif': 'avif'
+            };
+            return map[mime.toLowerCase()] || 'png';
+        }
+
+        function estimateBytesFromBase64(b64) {
+            const clean = b64.replace(/[\r\n\s]/g, '');
+            const padding = (clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0);
+            return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
+        }
+
+        // 入力テキストから1つまたは複数の画像Data URIを抽出
+        function extractImagesFromText(rawText) {
+            const text = rawText.trim();
+            if (!text) return [];
+
+            const results = [];
+            const seenUris = new Set();
+
+            // 1. <img ...> タグから src と alt を抽出
+            const imgTagRegex = /<img\b[^>]*>/gi;
+            let tagMatch;
+            while ((tagMatch = imgTagRegex.exec(text)) !== null) {
+                const tagStr = tagMatch[0];
+                const srcMatch = tagStr.match(/src\s*=\s*["']([^"']+)["']/i);
+                const altMatch = tagStr.match(/alt\s*=\s*["']([^"']+)["']/i);
+                if (srcMatch && srcMatch[1].startsWith('data:image/')) {
+                    const uri = srcMatch[1].trim();
+                    if (!seenUris.has(uri)) {
+                        seenUris.add(uri);
+                        results.push({ dataUri: uri, suggestedName: altMatch ? altMatch[1] : null });
+                    }
+                }
+            }
+
+            // 2. テキスト中の data:image/...;base64,... をすべて抽出
+            const dataUriRegex = /data:(image\/[a-zA-Z0-9.+_-]+);base64,([A-Za-z0-9+/=\s]+)/g;
+            let uriMatch;
+            while ((uriMatch = dataUriRegex.exec(text)) !== null) {
+                const mime = uriMatch[1];
+                const cleanB64 = uriMatch[2].replace(/[\r\n\s]/g, '');
+                const normalizedUri = `data:${mime};base64,${cleanB64}`;
+                // 既に<img>タグ経由で同じデータを登録済みかチェック
+                let alreadyAdded = false;
+                for (const existing of seenUris) {
+                    if (existing.replace(/[\r\n\s]/g, '') === normalizedUri) {
+                        alreadyAdded = true;
+                        break;
+                    }
+                }
+                if (!alreadyAdded) {
+                    seenUris.add(normalizedUri);
+                    results.push({ dataUri: normalizedUri, suggestedName: null });
+                }
+            }
+
+            // 3. まだ見つからない場合、生のBase64文字列として解析を試みる
+            if (results.length === 0) {
+                // src="..." や url(...) の中身だけ取り出す
+                let candidate = text;
+                const quoteMatch = candidate.match(/["'](data:image\/[^"']+|[\s\S]+)["']/);
+                if (quoteMatch && quoteMatch[1].length > 16) {
+                    candidate = quoteMatch[1];
+                }
+                const cleanB64 = candidate.replace(/[\r\n\s"']/g, '');
+                // Base64妥当性チェック
+                if (cleanB64.length >= 16 && /^[A-Za-z0-9+/]+={0,2}$/.test(cleanB64)) {
+                    const mime = detectMimeFromBase64(cleanB64);
+                    results.push({
+                        dataUri: `data:${mime};base64,${cleanB64}`,
+                        suggestedName: null
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        function processDecodeInput() {
+            const text = decodeInput.value.trim();
+            decodeError.style.display = 'none';
+            decodeError.textContent = '';
+
+            if (!text) {
+                decodedItems = [];
+                renderDecodedList();
+                return;
+            }
+
+            const extracted = extractImagesFromText(text);
+            if (extracted.length === 0) {
+                decodeError.textContent = '⚠️ 有効なBase64画像データまたは <img> タグが見つかりませんでした。コードを確認してください。';
+                decodeError.style.display = 'block';
+                decodedItems = [];
+                renderDecodedList();
+                return;
+            }
+
+            decodedItems = [];
+            let loadedCount = 0;
+            let errorCount = 0;
+
+            extracted.forEach((entry, index) => {
+                const headerMatch = entry.dataUri.match(/^data:(image\/[a-zA-Z0-9.+_-]+);base64,(.*)$/);
+                const mime = headerMatch ? headerMatch[1] : 'image/png';
+                const b64Part = headerMatch ? headerMatch[2] : '';
+                const ext = mimeToExt(mime);
+                const byteSize = estimateBytesFromBase64(b64Part);
+
+                let baseName = entry.suggestedName
+                    ? entry.suggestedName.replace(/\.[a-zA-Z0-9]+$/, '')
+                    : `restored-image-${index + 1}`;
+                const fileName = `${baseName}.${ext}`;
+
+                const img = new Image();
+                img.onload = () => {
+                    decodedItems.push({
+                        id: String(Date.now() + '-' + index),
+                        index,
+                        name: fileName,
+                        mime,
+                        ext,
+                        byteSize,
+                        width: img.naturalWidth,
+                        height: img.naturalHeight,
+                        dataUri: entry.dataUri
+                    });
+                    loadedCount++;
+                    if (loadedCount + errorCount === extracted.length) {
+                        decodedItems.sort((a, b) => a.index - b.index);
+                        renderDecodedList();
+                    }
+                };
+                img.onerror = () => {
+                    errorCount++;
+                    if (loadedCount + errorCount === extracted.length) {
+                        if (loadedCount === 0) {
+                            decodeError.textContent = '⚠️ Base64文字列は検出されましたが、画像として破損しているか非対応の形式です。';
+                            decodeError.style.display = 'block';
+                        }
+                        decodedItems.sort((a, b) => a.index - b.index);
+                        renderDecodedList();
+                    }
+                };
+                img.src = entry.dataUri;
+            });
+        }
+
+        function renderDecodedList() {
+            if (decodedItems.length === 0) {
+                decodedList.innerHTML = '';
+                decodedList.appendChild(decodeEmptyState);
+                decodeEmptyState.style.display = 'block';
+                decodeBulkActions.style.display = 'none';
+                return;
+            }
+
+            decodeEmptyState.style.display = 'none';
+            decodeBulkActions.style.display = decodedItems.length > 1 ? 'flex' : 'none';
+            decodedList.innerHTML = '';
+
+            decodedItems.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+
+                card.innerHTML = `
+                    <div class="decoded-preview-box" title="クリックして拡大表示">
+                        <img src="${item.dataUri}" alt="${escapeHtml(item.name)}">
+                    </div>
+                    <div class="stats-grid" style="margin-bottom: 10px;">
+                        <span class="stat-pill">形式: ${escapeHtml(item.mime)}</span>
+                        <span class="stat-pill">解像度: ${item.width} × ${item.height} px</span>
+                        <span class="stat-pill">推定ファイルサイズ: ${formatBytes(item.byteSize)}</span>
+                    </div>
+                    <div class="filename-input-group">
+                        <label>保存ファイル名:</label>
+                        <input type="text" class="filename-input" value="${escapeHtml(item.name)}">
+                    </div>
+                    <div class="card-actions">
+                        <div class="action-group">
+                            <button type="button" class="btn btn-sm download-img-btn">💾 画像をダウンロード</button>
+                            <button type="button" class="btn btn-outline btn-sm copy-img-btn">📋 画像自体をコピー</button>
+                            <button type="button" class="btn btn-outline btn-sm copy-datauri-btn">🔗 Data URIをコピー</button>
+                        </div>
+                    </div>
+                `;
+
+                const nameInput = card.querySelector('.filename-input');
+                nameInput.addEventListener('input', () => {
+                    item.name = nameInput.value.trim() || `restored-image.${item.ext}`;
+                });
+
+                card.querySelector('.decoded-preview-box').addEventListener('click', () => openModal(item.dataUri));
+
+                card.querySelector('.download-img-btn').addEventListener('click', () => {
+                    downloadDataUri(item.dataUri, item.name);
+                    showToast(`💾 「${item.name}」をダウンロードしました`);
+                });
+
+                card.querySelector('.copy-img-btn').addEventListener('click', async () => {
+                    try {
+                        const pngBlob = await convertDataUriToPngBlob(item.dataUri);
+                        await navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': pngBlob })
+                        ]);
+                        showToast('📋 画像をクリップボードにコピーしました（他のアプリに貼り付け可能）');
+                    } catch (err) {
+                        showToast('⚠️ このブラウザ環境では画像の直接コピーが制限されています。ダウンロードをご利用ください。');
+                    }
+                });
+
+                card.querySelector('.copy-datauri-btn').addEventListener('click', () => {
+                    navigator.clipboard.writeText(item.dataUri).then(() => {
+                        showToast('✅ Data URIをクリップボードにコピーしました');
+                    });
+                });
+
+                decodedList.appendChild(card);
+            });
+        }
+
+        function downloadDataUri(dataUri, filename) {
+            const a = document.createElement('a');
+            a.href = dataUri;
+            a.download = filename || 'decoded-image.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function convertDataUriToPngBlob(dataUri) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || 100;
+                    canvas.height = img.naturalHeight || 100;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Blob変換失敗'));
+                    }, 'image/png');
+                };
+                img.onerror = reject;
+                img.src = dataUri;
+            });
+        }
+
+        decodeInput.addEventListener('input', () => {
+            processDecodeInput();
+        });
+
+        decodeBtn.addEventListener('click', () => {
+            processDecodeInput();
+        });
+
+        clearDecodeBtn.addEventListener('click', () => {
+            decodeInput.value = '';
+            processDecodeInput();
+            showToast('🗑️ デコード入力をクリアしました');
+        });
+
+        downloadAllDecodedBtn.addEventListener('click', () => {
+            decodedItems.forEach((item, idx) => {
+                setTimeout(() => {
+                    downloadDataUri(item.dataUri, item.name);
+                }, idx * 150);
+            });
+            showToast(`💾 全 ${decodedItems.length} 件の画像をダウンロードしました`);
+        });
+
+        // サンプルアイコン生成（カラフルなSVGアイコンをPNG Base64化して試せるようにする）
+        sampleDecodeBtn.addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 160;
+            canvas.height = 160;
+            const ctx = canvas.getContext('2d');
+
+            // グラデーション背景の角丸アイコンを描画
+            const grad = ctx.createLinearGradient(0, 0, 160, 160);
+            grad.addColorStop(0, '#3b82f6');
+            grad.addColorStop(1, '#8b5cf6');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(10, 10, 140, 140, 28);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Base64', 80, 68);
+            ctx.font = '18px sans-serif';
+            ctx.fillText('Sample OK!', 80, 104);
+
+            const sampleDataUri = canvas.toDataURL('image/png');
+            decodeInput.value = `<img src="${sampleDataUri}" alt="sample-badge.png">`;
+            processDecodeInput();
+            showToast('✨ サンプルの <img> コードを入力して画像を復元しました');
+        });
+    </script>
+</body>
+</html>
