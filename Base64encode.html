@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>画像 ⇄ Base64 / HTML 相互変換ツール</title>
+    <title>ファイル・画像 ⇄ Base64 / HTML 相互変換ツール</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -265,7 +265,7 @@
             font-size: 0.8rem;
         }
 
-        /* 画像アイテムカード一覧 */
+        /* アイテムカード一覧 */
         .items-header {
             display: flex;
             justify-content: space-between;
@@ -304,6 +304,7 @@
             border-radius: 6px;
             overflow: hidden;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             background-color: #fff;
@@ -314,13 +315,34 @@
                 linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
             background-size: 16px 16px;
             background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+        }
+
+        .thumb-box.is-image {
             cursor: zoom-in;
+        }
+
+        .thumb-box.is-file {
+            background-image: none;
+            background-color: #f8fafc;
         }
 
         .thumb-box img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+        }
+
+        .file-icon-emoji {
+            font-size: 2.2rem;
+            line-height: 1.1;
+        }
+
+        .file-icon-ext {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--secondary);
+            text-transform: uppercase;
+            margin-top: 2px;
         }
 
         .item-meta {
@@ -393,16 +415,17 @@
         /* デコード側プレビュー */
         .decoded-preview-box {
             width: 100%;
-            max-height: 280px;
-            min-height: 140px;
+            max-height: 320px;
+            min-height: 120px;
             border: 1px solid var(--border);
             border-radius: 6px;
             overflow: hidden;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             margin-bottom: 12px;
-            padding: 10px;
+            padding: 12px;
             background-color: #fff;
             background-image:
                 linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
@@ -411,13 +434,34 @@
                 linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
             background-size: 16px 16px;
             background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+        }
+
+        .decoded-preview-box.is-image {
             cursor: zoom-in;
+        }
+
+        .decoded-preview-box.is-file {
+            background-image: none;
+            background-color: #f8fafc;
         }
 
         .decoded-preview-box img {
             max-width: 100%;
-            max-height: 256px;
+            max-height: 260px;
             object-fit: contain;
+        }
+
+        .decoded-preview-box iframe {
+            width: 100%;
+            height: 260px;
+            border: none;
+            background: #fff;
+        }
+
+        .decoded-preview-box audio,
+        .decoded-preview-box video {
+            max-width: 100%;
+            max-height: 240px;
         }
 
         .filename-input-group {
@@ -523,20 +567,20 @@
 
     <header>
         <div>
-            <h1>🖼️ 画像 ⇄ Base64 / HTML 相互変換ツール</h1>
-            <p class="header-subtitle">画像のBase64エンコード（HTML・CSS・Markdown出力）と、コードからの画像復元・保存を1画面で行えます。</p>
+            <h1>🗂️ ファイル・画像 ⇄ Base64 / HTML 相互変換ツール</h1>
+            <p class="header-subtitle">画像だけでなく、PowerPoint (<code>.pptx</code>)・PDF・Word・Excel・音声・動画・ZIP等のあらゆるファイルをBase64コード化＆復元できます。</p>
         </div>
         <div class="shortcut-badge">
-            💡 画面上で <kbd>Ctrl</kbd> + <kbd>V</kbd> でクリップボードの画像・コードを直接貼り付け可能
+            💡 パワポのスライドや画面スクショも <kbd>Ctrl</kbd> + <kbd>V</kbd> で直接貼り付け可能
         </div>
     </header>
 
     <div class="main-grid">
-        <!-- ==================== 左カラム：画像 → コード（エンコード） ==================== -->
+        <!-- ==================== 左カラム：ファイル・画像 → コード（エンコード） ==================== -->
         <section class="panel" aria-labelledby="encodeTitle">
             <div class="panel-header">
                 <h2 class="panel-title" id="encodeTitle">
-                    <span>📤 画像 → コード変換</span>
+                    <span>📤 ファイル・画像 → コード変換</span>
                     <span class="badge">エンコード</span>
                 </h2>
                 <div class="action-group" id="encodeBulkActions" style="display: none;">
@@ -546,15 +590,19 @@
             </div>
 
             <div class="drop-zone" id="dropZone">
-                <div class="drop-zone-title">ここに画像をドロップ、またはクリックして選択（複数可）</div>
-                <div class="drop-zone-sub">または画面キャプチャ等をそのまま <kbd>Ctrl</kbd>+<kbd>V</kbd> で貼り付け（PNG / JPEG / WebP / GIF / SVG 等）</div>
-                <input type="file" id="fileInput" accept="image/*" multiple style="display: none;">
+                <div class="drop-zone-title">ここにファイルや画像をドロップ、またはクリックして選択（複数可）</div>
+                <div class="drop-zone-sub">
+                    対応: 画像 (PNG/JPG/WebP/SVG)、PowerPoint (<code>.pptx</code>)、PDF、Word (<code>.docx</code>)、Excel (<code>.xlsx</code>)、音声・動画、ZIP など全ファイル<br>
+                    （PowerPoint上でコピーしたスライドや画面キャプチャはそのまま <kbd>Ctrl</kbd>+<kbd>V</kbd> で画像として貼り付け可能）
+                </div>
+                <input type="file" id="fileInput" multiple style="display: none;">
             </div>
 
             <div class="toolbar">
                 <div class="format-group" role="group" aria-label="出力フォーマット">
                     <span class="format-label">出力形式:</span>
-                    <button type="button" class="format-btn active" data-format="img">&lt;img&gt; タグ</button>
+                    <button type="button" class="format-btn active" data-format="html" title="画像は<img>、PDFは<iframe>、PPTX等のファイルはダウンロード用<a>タグを出力">HTMLタグ (自動)</button>
+                    <button type="button" class="format-btn" data-format="download" title="クリックでファイルを保存できる <a download> タグ">&lt;a download&gt;</button>
                     <button type="button" class="format-btn" data-format="datauri">Data URI</button>
                     <button type="button" class="format-btn" data-format="raw">Base64のみ</button>
                     <button type="button" class="format-btn" data-format="css">CSS url()</button>
@@ -563,22 +611,22 @@
             </div>
 
             <div class="items-header" id="encodeSummary" style="display: none;">
-                <span id="encodeCountText">0件の画像</span>
+                <span id="encodeCountText">0件のファイル</span>
                 <span id="encodeTotalSizeText"></span>
             </div>
 
             <div id="encodedList" class="items-list">
                 <div class="empty-state" id="encodeEmptyState">
-                    まだ画像が読み込まれていません。<br>上のエリアに画像をドロップするか、ファイルを選択してください。
+                    まだファイルが読み込まれていません。<br>上のエリアに画像やPowerPoint・PDFファイル等をドロップしてください。
                 </div>
             </div>
         </section>
 
-        <!-- ==================== 右カラム：コード → 画像（デコード） ==================== -->
+        <!-- ==================== 右カラム：コード → ファイル・画像（デコード） ==================== -->
         <section class="panel" aria-labelledby="decodeTitle">
             <div class="panel-header">
                 <h2 class="panel-title" id="decodeTitle">
-                    <span>📥 コード → 画像へ戻す</span>
+                    <span>📥 コード → ファイル・画像へ戻す</span>
                     <span class="badge badge-decode">デコード</span>
                 </h2>
                 <div class="action-group">
@@ -588,18 +636,18 @@
             </div>
 
             <label for="decodeInput" style="display:block; font-size:0.88rem; font-weight:600; margin-bottom:6px;">
-                HTMLの <code>&lt;img&gt;</code> タグ、Data URI (<code>data:image/...</code>)、CSS、またはBase64文字列を貼り付け：
+                HTMLタグ (<code>&lt;img&gt;</code> / <code>&lt;a&gt;</code> / <code>&lt;iframe&gt;</code>)、Data URI (<code>data:...</code>)、またはBase64文字列を貼り付け：
             </label>
             <textarea
                 id="decodeInput"
                 class="decode-textarea"
-                placeholder='例: <img src="data:image/png;base64,iVBORw0KGgo..."> または data:image/png;base64,... または iVBORw0KGgo...'
+                placeholder='例: <img src="data:image/png;base64,..."> / <a href="data:application/...;base64,..." download="slide.pptx"> / Data URI / 生のBase64文字列'
             ></textarea>
 
             <div class="toolbar" style="margin-top: 4px;">
                 <div class="action-group">
-                    <button type="button" class="btn btn-sm" id="decodeBtn">🔄 コードから画像を復元</button>
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">※貼り付け時に自動でも変換されます（複数画像コードの一括抽出にも対応）</span>
+                    <button type="button" class="btn btn-sm" id="decodeBtn">🔄 コードからファイルを復元</button>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">※貼り付け時に自動判定・複数一括抽出にも対応</span>
                 </div>
                 <div class="action-group" id="decodeBulkActions" style="display: none;">
                     <button type="button" class="btn btn-secondary btn-sm" id="downloadAllDecodedBtn">💾 すべて保存</button>
@@ -610,7 +658,7 @@
 
             <div id="decodedList" class="items-list">
                 <div class="empty-state" id="decodeEmptyState">
-                    上のテキストエリアにBase64コードやHTMLタグを貼り付けると、<br>ここに復元された画像のプレビューと保存ボタンが表示されます。
+                    上のテキストエリアにBase64コードやHTMLタグを貼り付けると、<br>ここに復元された画像・PDF・PowerPoint等のプレビューと保存ボタンが表示されます。
                 </div>
             </div>
         </section>
@@ -626,9 +674,9 @@
 
     <script>
         // ==================== 状態管理 ====================
-        let encodedItems = []; // { id, name, mime, fileSize, width, height, dataUri, rawBase64 }
-        let decodedItems = []; // { id, name, mime, ext, byteSize, width, height, dataUri }
-        let currentFormat = 'img';
+        let encodedItems = []; // { id, name, mime, ext, fileSize, width, height, dataUri, rawBase64, isImage }
+        let decodedItems = []; // { id, index, name, mime, ext, byteSize, width, height, dataUri, isImage }
+        let currentFormat = 'html';
 
         // DOM要素
         const dropZone = document.getElementById('dropZone');
@@ -657,6 +705,88 @@
         const imageModal = document.getElementById('imageModal');
         const modalImg = document.getElementById('modalImg');
 
+        // ==================== MIME / 拡張子マッピング ====================
+        const EXT_TO_MIME = {
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            webp: 'image/webp',
+            gif: 'image/gif',
+            svg: 'image/svg+xml',
+            bmp: 'image/bmp',
+            ico: 'image/x-icon',
+            avif: 'image/avif',
+            pdf: 'application/pdf',
+            pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            ppt: 'application/vnd.ms-powerpoint',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            doc: 'application/msword',
+            xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            xls: 'application/vnd.ms-excel',
+            zip: 'application/zip',
+            mp3: 'audio/mpeg',
+            wav: 'audio/wav',
+            mp4: 'video/mp4',
+            webm: 'video/webm',
+            json: 'application/json',
+            csv: 'text/csv',
+            txt: 'text/plain',
+            html: 'text/html'
+        };
+
+        const MIME_TO_EXT = {
+            'image/png': 'png',
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/webp': 'webp',
+            'image/gif': 'gif',
+            'image/svg+xml': 'svg',
+            'image/bmp': 'bmp',
+            'image/x-icon': 'ico',
+            'image/vnd.microsoft.icon': 'ico',
+            'image/avif': 'avif',
+            'application/pdf': 'pdf',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+            'application/vnd.ms-powerpoint': 'ppt',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+            'application/msword': 'doc',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+            'application/vnd.ms-excel': 'xls',
+            'application/zip': 'zip',
+            'application/x-zip-compressed': 'zip',
+            'audio/mpeg': 'mp3',
+            'audio/mp3': 'mp3',
+            'audio/wav': 'wav',
+            'video/mp4': 'mp4',
+            'video/webm': 'webm',
+            'application/json': 'json',
+            'text/csv': 'csv',
+            'text/plain': 'txt',
+            'text/html': 'html'
+        };
+
+        function getFileIconInfo(mime, ext) {
+            const e = (ext || '').toLowerCase();
+            const m = (mime || '').toLowerCase();
+            if (m.startsWith('image/')) return { emoji: '🖼️', label: e || 'IMG' };
+            if (e === 'pptx' || e === 'ppt' || m.includes('presentation') || m.includes('powerpoint')) {
+                return { emoji: '📊', label: e || 'PPTX' };
+            }
+            if (e === 'docx' || e === 'doc' || m.includes('word')) {
+                return { emoji: '📝', label: e || 'DOCX' };
+            }
+            if (e === 'xlsx' || e === 'xls' || m.includes('spreadsheet') || m.includes('excel')) {
+                return { emoji: '📗', label: e || 'XLSX' };
+            }
+            if (e === 'pdf' || m === 'application/pdf') {
+                return { emoji: '📕', label: 'PDF' };
+            }
+            if (m.startsWith('audio/')) return { emoji: '🎵', label: e || 'AUDIO' };
+            if (m.startsWith('video/')) return { emoji: '🎬', label: e || 'VIDEO' };
+            if (e === 'zip' || m.includes('zip')) return { emoji: '🗜️', label: 'ZIP' };
+            return { emoji: '📄', label: e || 'FILE' };
+        }
+
         // ==================== ユーティリティ ====================
         let toastTimer = null;
         function showToast(message) {
@@ -665,7 +795,7 @@
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => {
                 toast.classList.remove('show');
-            }, 2200);
+            }, 2400);
         }
 
         function formatBytes(bytes) {
@@ -694,7 +824,7 @@
             modalImg.src = '';
         });
 
-        // ==================== エンコード機能（画像 → コード） ====================
+        // ==================== エンコード機能（ファイル・画像 → コード） ====================
         dropZone.addEventListener('click', () => fileInput.click());
 
         dropZone.addEventListener('dragover', (e) => {
@@ -721,88 +851,129 @@
             }
         });
 
-        // Ctrl+V でクリップボードから画像を直接エンコード
+        // Ctrl+V でクリップボードから画像・ファイルを直接エンコード
         window.addEventListener('paste', (e) => {
             const items = e.clipboardData && e.clipboardData.items;
             if (!items) return;
 
-            const imageFiles = [];
+            const pastedFiles = [];
             for (let i = 0; i < items.length; i++) {
-                if (items[i].type.startsWith('image/')) {
+                if (items[i].kind === 'file') {
                     const blob = items[i].getAsFile();
                     if (blob) {
-                        const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '');
+                        const ext = mimeToExt(blob.type || 'image/png');
                         const timestamp = new Date().toTimeString().slice(0, 8).replace(/:/g, '');
-                        const namedFile = new File([blob], `clipboard-${timestamp}.${ext}`, { type: blob.type });
-                        imageFiles.push(namedFile);
+                        const fileName = blob.name && blob.name !== 'image.png'
+                            ? blob.name
+                            : `clipboard-${timestamp}.${ext}`;
+                        const namedFile = new File([blob], fileName, { type: blob.type || 'image/png' });
+                        pastedFiles.push(namedFile);
                     }
                 }
             }
 
-            if (imageFiles.length > 0) {
+            if (pastedFiles.length > 0) {
                 e.preventDefault();
-                handleFiles(imageFiles);
-                showToast(`📋 クリップボードから画像 ${imageFiles.length} 件を読み込みました`);
+                handleFiles(pastedFiles);
+                showToast(`📋 クリップボードから ${pastedFiles.length} 件のデータを読み込みました`);
             }
         });
 
         function handleFiles(fileList) {
             const files = Array.from(fileList);
-            let skipped = 0;
 
             files.forEach((file) => {
-                if (!file.type.startsWith('image/')) {
-                    skipped++;
-                    return;
-                }
+                const extMatch = file.name.match(/\.([a-zA-Z0-9]+)$/);
+                const ext = extMatch ? extMatch[1].toLowerCase() : '';
+                const mime = file.type || EXT_TO_MIME[ext] || 'application/octet-stream';
+                const isImage = mime.startsWith('image/');
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const dataUri = e.target.result;
+                    let dataUri = e.target.result;
+                    // ブラウザがMIMEタイプを空にした場合、拡張子から推定したMIMEに補正
+                    if (dataUri.startsWith('data:;base64,') || dataUri.startsWith('data:application/octet-stream;base64,')) {
+                        const commaIdx = dataUri.indexOf(',');
+                        if (commaIdx !== -1 && mime !== 'application/octet-stream') {
+                            dataUri = `data:${mime};base64,${dataUri.slice(commaIdx + 1)}`;
+                        }
+                    }
+
                     const commaIdx = dataUri.indexOf(',');
                     const rawBase64 = commaIdx !== -1 ? dataUri.slice(commaIdx + 1) : dataUri;
 
-                    const img = new Image();
-                    img.onload = () => {
-                        encodedItems.unshift({
-                            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-                            name: file.name,
-                            mime: file.type || 'image/png',
-                            fileSize: file.size,
-                            width: img.naturalWidth,
-                            height: img.naturalHeight,
-                            dataUri,
-                            rawBase64
-                        });
-                        renderEncodedList();
-                    };
-                    img.onerror = () => {
+                    if (isImage) {
+                        const img = new Image();
+                        img.onload = () => {
+                            encodedItems.unshift({
+                                id: String(Date.now() + Math.random()),
+                                name: file.name,
+                                mime,
+                                ext: ext || mimeToExt(mime),
+                                fileSize: file.size,
+                                width: img.naturalWidth,
+                                height: img.naturalHeight,
+                                dataUri,
+                                rawBase64,
+                                isImage: true
+                            });
+                            renderEncodedList();
+                        };
+                        img.onerror = () => {
+                            encodedItems.unshift({
+                                id: String(Date.now() + Math.random()),
+                                name: file.name,
+                                mime,
+                                ext: ext || mimeToExt(mime),
+                                fileSize: file.size,
+                                width: 0,
+                                height: 0,
+                                dataUri,
+                                rawBase64,
+                                isImage: true
+                            });
+                            renderEncodedList();
+                        };
+                        img.src = dataUri;
+                    } else {
                         encodedItems.unshift({
                             id: String(Date.now() + Math.random()),
                             name: file.name,
-                            mime: file.type || 'image/png',
+                            mime,
+                            ext: ext || mimeToExt(mime),
                             fileSize: file.size,
                             width: 0,
                             height: 0,
                             dataUri,
-                            rawBase64
+                            rawBase64,
+                            isImage: false
                         });
                         renderEncodedList();
-                    };
-                    img.src = dataUri;
+                    }
                 };
                 reader.readAsDataURL(file);
             });
-
-            if (skipped > 0) {
-                showToast(`⚠️ 画像以外のファイル ${skipped} 件をスキップしました`);
-            }
         }
 
         function formatEncodedOutput(item, format) {
+            const safeName = escapeHtml(item.name);
             switch (format) {
-                case 'img':
-                    return `<img src="${item.dataUri}" alt="${escapeHtml(item.name)}">`;
+                case 'html':
+                    if (item.isImage) {
+                        return `<img src="${item.dataUri}" alt="${safeName}">`;
+                    }
+                    if (item.mime === 'application/pdf') {
+                        return `<iframe src="${item.dataUri}" width="100%" height="600px" title="${safeName}"></iframe>`;
+                    }
+                    if (item.mime.startsWith('audio/')) {
+                        return `<audio controls src="${item.dataUri}"></audio>`;
+                    }
+                    if (item.mime.startsWith('video/')) {
+                        return `<video controls width="100%" src="${item.dataUri}"></video>`;
+                    }
+                    return `<a href="${item.dataUri}" download="${safeName}">${safeName} をダウンロード</a>`;
+                case 'download':
+                    return `<a href="${item.dataUri}" download="${safeName}">${safeName} をダウンロード</a>`;
                 case 'datauri':
                     return item.dataUri;
                 case 'raw':
@@ -810,7 +981,9 @@
                 case 'css':
                     return `background-image: url("${item.dataUri}");`;
                 case 'markdown':
-                    return `![${item.name}](${item.dataUri})`;
+                    return item.isImage
+                        ? `![${item.name}](${item.dataUri})`
+                        : `[${item.name}](${item.dataUri})`;
                 default:
                     return item.dataUri;
             }
@@ -841,7 +1014,7 @@
 
             const totalOriginalBytes = encodedItems.reduce((sum, item) => sum + item.fileSize, 0);
             const totalBase64Chars = encodedItems.reduce((sum, item) => sum + item.dataUri.length, 0);
-            encodeCountText.textContent = `${encodedItems.length} 件の画像`;
+            encodeCountText.textContent = `${encodedItems.length} 件のファイル`;
             encodeTotalSizeText.textContent = `合計元サイズ: ${formatBytes(totalOriginalBytes)} / 総コード長: ${totalBase64Chars.toLocaleString()} 文字`;
 
             encodedList.innerHTML = '';
@@ -851,18 +1024,25 @@
                 const card = document.createElement('div');
                 card.className = 'item-card';
 
-                const dimText = item.width && item.height ? `${item.width} × ${item.height} px` : 'サイズ不明';
+                const iconInfo = getFileIconInfo(item.mime, item.ext);
+                const dimPill = item.isImage && item.width && item.height
+                    ? `<span class="stat-pill">解像度: ${item.width} × ${item.height} px</span>`
+                    : '';
+
+                const thumbContent = item.isImage
+                    ? `<img src="${item.dataUri}" alt="${escapeHtml(item.name)}">`
+                    : `<span class="file-icon-emoji">${iconInfo.emoji}</span><span class="file-icon-ext">${escapeHtml(iconInfo.label)}</span>`;
 
                 card.innerHTML = `
                     <div class="item-top">
-                        <div class="thumb-box" title="クリックして拡大表示">
-                            <img src="${item.dataUri}" alt="${escapeHtml(item.name)}">
+                        <div class="thumb-box ${item.isImage ? 'is-image' : 'is-file'}" title="${item.isImage ? 'クリックして拡大表示' : escapeHtml(item.name)}">
+                            ${thumbContent}
                         </div>
                         <div class="item-meta">
                             <p class="item-name">${escapeHtml(item.name)}</p>
                             <div class="stats-grid">
-                                <span class="stat-pill">形式: ${escapeHtml(item.mime)}</span>
-                                <span class="stat-pill">解像度: ${dimText}</span>
+                                <span class="stat-pill">種類: ${escapeHtml(iconInfo.label)} (${escapeHtml(item.mime)})</span>
+                                ${dimPill}
                                 <span class="stat-pill">元サイズ: ${formatBytes(item.fileSize)}</span>
                                 <span class="stat-pill">コード長: ${codeText.length.toLocaleString()} 文字 (${formatBytes(codeText.length)})</span>
                             </div>
@@ -880,10 +1060,11 @@
 
                 const textarea = card.querySelector('textarea');
                 textarea.value = codeText;
-
                 textarea.addEventListener('click', () => textarea.select());
 
-                card.querySelector('.thumb-box').addEventListener('click', () => openModal(item.dataUri));
+                if (item.isImage) {
+                    card.querySelector('.thumb-box').addEventListener('click', () => openModal(item.dataUri));
+                }
 
                 card.querySelector('.copy-single-btn').addEventListener('click', () => {
                     navigator.clipboard.writeText(codeText).then(() => {
@@ -920,8 +1101,8 @@
             showToast('🗑️ エンコード一覧をクリアしました');
         });
 
-        // ==================== デコード機能（コード → 画像） ====================
-        // 先頭バイト/文字列からMIMEタイプを推定
+        // ==================== デコード機能（コード → ファイル・画像） ====================
+        // 先頭バイト/シグネチャからMIMEタイプを自動判別（Office OpenXML の pptx/docx/xlsx 内部構造も判別）
         function detectMimeFromBase64(b64) {
             const trimmed = b64.trim();
             if (trimmed.startsWith('iVBORw0KGgo')) return 'image/png';
@@ -931,22 +1112,43 @@
             if (trimmed.startsWith('PHN2Zy') || trimmed.startsWith('PD94bW')) return 'image/svg+xml';
             if (trimmed.startsWith('Qk')) return 'image/bmp';
             if (trimmed.startsWith('AAABAA')) return 'image/x-icon';
+            if (trimmed.startsWith('JVBERi0')) return 'application/pdf';
+            if (trimmed.startsWith('0M8R4KGxGuE')) return 'application/vnd.ms-powerpoint'; // 旧Office (.ppt/.doc/.xls)
+            if (trimmed.startsWith('SUQz') || trimmed.startsWith('//N')) return 'audio/mpeg';
+            if (trimmed.startsWith('AAAAIGZ0eXB')) return 'video/mp4';
+
+            // ZIPベース（.pptx, .docx, .xlsx, .zip）の自動判別
+            if (trimmed.startsWith('UEsDB')) {
+                try {
+                    const headSlice = trimmed.slice(0, 2400);
+                    const bin = atob(headSlice);
+                    if (bin.includes('ppt/')) {
+                        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                    }
+                    if (bin.includes('word/')) {
+                        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                    }
+                    if (bin.includes('xl/')) {
+                        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                    }
+                } catch (_) {
+                    // ignore
+                }
+                return 'application/zip';
+            }
+
             return 'image/png';
         }
 
         function mimeToExt(mime) {
-            const map = {
-                'image/png': 'png',
-                'image/jpeg': 'jpg',
-                'image/jpg': 'jpg',
-                'image/webp': 'webp',
-                'image/gif': 'gif',
-                'image/svg+xml': 'svg',
-                'image/bmp': 'bmp',
-                'image/x-icon': 'ico',
-                'image/avif': 'avif'
-            };
-            return map[mime.toLowerCase()] || 'png';
+            if (!mime) return 'bin';
+            const lower = mime.toLowerCase();
+            if (MIME_TO_EXT[lower]) return MIME_TO_EXT[lower];
+            if (lower.includes('presentation') || lower.includes('powerpoint')) return 'pptx';
+            if (lower.includes('wordprocessing') || lower.includes('msword')) return 'docx';
+            if (lower.includes('spreadsheet') || lower.includes('excel')) return 'xlsx';
+            const sub = lower.split('/')[1];
+            return sub ? sub.replace(/\+.*$/, '') : 'bin';
         }
 
         function estimateBytesFromBase64(b64) {
@@ -955,46 +1157,39 @@
             return Math.max(0, Math.floor((clean.length * 3) / 4) - padding);
         }
 
-        // 入力テキストから1つまたは複数の画像Data URIを抽出
-        function extractImagesFromText(rawText) {
+        // 入力テキストから1つまたは複数のData URI（画像・PPTX・PDF・任意のファイル）を抽出
+        function extractFilesFromText(rawText) {
             const text = rawText.trim();
             if (!text) return [];
 
             const results = [];
             const seenUris = new Set();
 
-            // 1. <img ...> タグから src と alt を抽出
-            const imgTagRegex = /<img\b[^>]*>/gi;
+            // 1. HTMLタグ (<img ...>, <a ...>, <iframe ...>, <audio ...>, <video ...>) から src/href と alt/download/title を抽出
+            const tagRegex = /<(img|a|iframe|audio|video|embed|object)\b[^>]*>/gi;
             let tagMatch;
-            while ((tagMatch = imgTagRegex.exec(text)) !== null) {
+            while ((tagMatch = tagRegex.exec(text)) !== null) {
                 const tagStr = tagMatch[0];
-                const srcMatch = tagStr.match(/src\s*=\s*["']([^"']+)["']/i);
-                const altMatch = tagStr.match(/alt\s*=\s*["']([^"']+)["']/i);
-                if (srcMatch && srcMatch[1].startsWith('data:image/')) {
-                    const uri = srcMatch[1].trim();
-                    if (!seenUris.has(uri)) {
-                        seenUris.add(uri);
-                        results.push({ dataUri: uri, suggestedName: altMatch ? altMatch[1] : null });
+                const uriMatch = tagStr.match(/(?:src|href|data)\s*=\s*["'](data:[^"']+)["']/i);
+                const nameMatch = tagStr.match(/(?:download|alt|title)\s*=\s*["']([^"']+)["']/i);
+                if (uriMatch) {
+                    const uri = uriMatch[1].trim();
+                    const normalized = uri.replace(/[\r\n\s]/g, '');
+                    if (!seenUris.has(normalized)) {
+                        seenUris.add(normalized);
+                        results.push({ dataUri: normalized, suggestedName: nameMatch ? nameMatch[1] : null });
                     }
                 }
             }
 
-            // 2. テキスト中の data:image/...;base64,... をすべて抽出
-            const dataUriRegex = /data:(image\/[a-zA-Z0-9.+_-]+);base64,([A-Za-z0-9+/=\s]+)/g;
+            // 2. テキスト中の data:<mime>;base64,... をすべて抽出
+            const dataUriRegex = /data:([a-zA-Z0-9.+_-]+\/[a-zA-Z0-9.+_-]+)?;base64,([A-Za-z0-9+/=\s]+)/g;
             let uriMatch;
             while ((uriMatch = dataUriRegex.exec(text)) !== null) {
-                const mime = uriMatch[1];
                 const cleanB64 = uriMatch[2].replace(/[\r\n\s]/g, '');
+                const mime = uriMatch[1] || detectMimeFromBase64(cleanB64);
                 const normalizedUri = `data:${mime};base64,${cleanB64}`;
-                // 既に<img>タグ経由で同じデータを登録済みかチェック
-                let alreadyAdded = false;
-                for (const existing of seenUris) {
-                    if (existing.replace(/[\r\n\s]/g, '') === normalizedUri) {
-                        alreadyAdded = true;
-                        break;
-                    }
-                }
-                if (!alreadyAdded) {
+                if (!seenUris.has(normalizedUri)) {
                     seenUris.add(normalizedUri);
                     results.push({ dataUri: normalizedUri, suggestedName: null });
                 }
@@ -1002,14 +1197,12 @@
 
             // 3. まだ見つからない場合、生のBase64文字列として解析を試みる
             if (results.length === 0) {
-                // src="..." や url(...) の中身だけ取り出す
                 let candidate = text;
-                const quoteMatch = candidate.match(/["'](data:image\/[^"']+|[\s\S]+)["']/);
+                const quoteMatch = candidate.match(/["'](data:[^"']+|[\s\S]+)["']/);
                 if (quoteMatch && quoteMatch[1].length > 16) {
                     candidate = quoteMatch[1];
                 }
                 const cleanB64 = candidate.replace(/[\r\n\s"']/g, '');
-                // Base64妥当性チェック
                 if (cleanB64.length >= 16 && /^[A-Za-z0-9+/]+={0,2}$/.test(cleanB64)) {
                     const mime = detectMimeFromBase64(cleanB64);
                     results.push({
@@ -1033,9 +1226,9 @@
                 return;
             }
 
-            const extracted = extractImagesFromText(text);
+            const extracted = extractFilesFromText(text);
             if (extracted.length === 0) {
-                decodeError.textContent = '⚠️ 有効なBase64画像データまたは <img> タグが見つかりませんでした。コードを確認してください。';
+                decodeError.textContent = '⚠️ 有効なBase64データまたは HTMLタグが見つかりませんでした。コードを確認してください。';
                 decodeError.style.display = 'block';
                 decodedItems = [];
                 renderDecodedList();
@@ -1043,23 +1236,74 @@
             }
 
             decodedItems = [];
-            let loadedCount = 0;
-            let errorCount = 0;
+            let finishedCount = 0;
 
             extracted.forEach((entry, index) => {
-                const headerMatch = entry.dataUri.match(/^data:(image\/[a-zA-Z0-9.+_-]+);base64,(.*)$/);
-                const mime = headerMatch ? headerMatch[1] : 'image/png';
+                const headerMatch = entry.dataUri.match(/^data:([^;]*);base64,(.*)$/);
                 const b64Part = headerMatch ? headerMatch[2] : '';
+                let mime = (headerMatch && headerMatch[1]) ? headerMatch[1] : detectMimeFromBase64(b64Part);
+
+                // application/octet-stream や application/zip の場合でも中身のシグネチャでより詳細に判別
+                if (mime === 'application/octet-stream' || mime === 'application/zip') {
+                    mime = detectMimeFromBase64(b64Part);
+                }
+
                 const ext = mimeToExt(mime);
                 const byteSize = estimateBytesFromBase64(b64Part);
+                const isImage = mime.startsWith('image/');
 
-                let baseName = entry.suggestedName
-                    ? entry.suggestedName.replace(/\.[a-zA-Z0-9]+$/, '')
-                    : `restored-image-${index + 1}`;
-                const fileName = `${baseName}.${ext}`;
+                let fileName;
+                if (entry.suggestedName) {
+                    fileName = /\.[a-zA-Z0-9]+$/.test(entry.suggestedName)
+                        ? entry.suggestedName
+                        : `${entry.suggestedName}.${ext}`;
+                } else {
+                    fileName = `restored-file-${index + 1}.${ext}`;
+                }
 
-                const img = new Image();
-                img.onload = () => {
+                if (isImage) {
+                    const img = new Image();
+                    img.onload = () => {
+                        decodedItems.push({
+                            id: String(Date.now() + '-' + index),
+                            index,
+                            name: fileName,
+                            mime,
+                            ext,
+                            byteSize,
+                            width: img.naturalWidth,
+                            height: img.naturalHeight,
+                            dataUri: entry.dataUri,
+                            isImage: true
+                        });
+                        finishedCount++;
+                        if (finishedCount === extracted.length) {
+                            decodedItems.sort((a, b) => a.index - b.index);
+                            renderDecodedList();
+                        }
+                    };
+                    img.onerror = () => {
+                        // 画像として読み込めなかった場合もバイナリファイルとしてダウンロード可能にする
+                        decodedItems.push({
+                            id: String(Date.now() + '-' + index),
+                            index,
+                            name: fileName,
+                            mime,
+                            ext,
+                            byteSize,
+                            width: 0,
+                            height: 0,
+                            dataUri: entry.dataUri,
+                            isImage: false
+                        });
+                        finishedCount++;
+                        if (finishedCount === extracted.length) {
+                            decodedItems.sort((a, b) => a.index - b.index);
+                            renderDecodedList();
+                        }
+                    };
+                    img.src = entry.dataUri;
+                } else {
                     decodedItems.push({
                         id: String(Date.now() + '-' + index),
                         index,
@@ -1067,28 +1311,17 @@
                         mime,
                         ext,
                         byteSize,
-                        width: img.naturalWidth,
-                        height: img.naturalHeight,
-                        dataUri: entry.dataUri
+                        width: 0,
+                        height: 0,
+                        dataUri: entry.dataUri,
+                        isImage: false
                     });
-                    loadedCount++;
-                    if (loadedCount + errorCount === extracted.length) {
+                    finishedCount++;
+                    if (finishedCount === extracted.length) {
                         decodedItems.sort((a, b) => a.index - b.index);
                         renderDecodedList();
                     }
-                };
-                img.onerror = () => {
-                    errorCount++;
-                    if (loadedCount + errorCount === extracted.length) {
-                        if (loadedCount === 0) {
-                            decodeError.textContent = '⚠️ Base64文字列は検出されましたが、画像として破損しているか非対応の形式です。';
-                            decodeError.style.display = 'block';
-                        }
-                        decodedItems.sort((a, b) => a.index - b.index);
-                        renderDecodedList();
-                    }
-                };
-                img.src = entry.dataUri;
+                }
             });
         }
 
@@ -1109,13 +1342,50 @@
                 const card = document.createElement('div');
                 card.className = 'item-card';
 
+                const iconInfo = getFileIconInfo(item.mime, item.ext);
+                const dimPill = item.isImage && item.width && item.height
+                    ? `<span class="stat-pill">解像度: ${item.width} × ${item.height} px</span>`
+                    : '';
+
+                let previewHtml = '';
+                if (item.isImage) {
+                    previewHtml = `
+                        <div class="decoded-preview-box is-image" title="クリックして拡大表示">
+                            <img src="${item.dataUri}" alt="${escapeHtml(item.name)}">
+                        </div>
+                    `;
+                } else if (item.mime === 'application/pdf') {
+                    previewHtml = `
+                        <div class="decoded-preview-box is-file">
+                            <iframe src="${item.dataUri}" title="PDFプレビュー"></iframe>
+                        </div>
+                    `;
+                } else if (item.mime.startsWith('audio/')) {
+                    previewHtml = `
+                        <div class="decoded-preview-box is-file">
+                            <audio controls src="${item.dataUri}"></audio>
+                        </div>
+                    `;
+                } else if (item.mime.startsWith('video/')) {
+                    previewHtml = `
+                        <div class="decoded-preview-box is-file">
+                            <video controls src="${item.dataUri}"></video>
+                        </div>
+                    `;
+                } else {
+                    previewHtml = `
+                        <div class="decoded-preview-box is-file">
+                            <span class="file-icon-emoji" style="font-size:3rem;">${iconInfo.emoji}</span>
+                            <span class="file-icon-ext" style="font-size:0.9rem; margin-top:6px;">${escapeHtml(iconInfo.label)} ファイル (${escapeHtml(item.name)})</span>
+                        </div>
+                    `;
+                }
+
                 card.innerHTML = `
-                    <div class="decoded-preview-box" title="クリックして拡大表示">
-                        <img src="${item.dataUri}" alt="${escapeHtml(item.name)}">
-                    </div>
+                    ${previewHtml}
                     <div class="stats-grid" style="margin-bottom: 10px;">
-                        <span class="stat-pill">形式: ${escapeHtml(item.mime)}</span>
-                        <span class="stat-pill">解像度: ${item.width} × ${item.height} px</span>
+                        <span class="stat-pill">種類: ${escapeHtml(iconInfo.label)} (${escapeHtml(item.mime)})</span>
+                        ${dimPill}
                         <span class="stat-pill">推定ファイルサイズ: ${formatBytes(item.byteSize)}</span>
                     </div>
                     <div class="filename-input-group">
@@ -1124,8 +1394,8 @@
                     </div>
                     <div class="card-actions">
                         <div class="action-group">
-                            <button type="button" class="btn btn-sm download-img-btn">💾 画像をダウンロード</button>
-                            <button type="button" class="btn btn-outline btn-sm copy-img-btn">📋 画像自体をコピー</button>
+                            <button type="button" class="btn btn-sm download-file-btn">💾 ファイルをダウンロード</button>
+                            ${item.isImage ? '<button type="button" class="btn btn-outline btn-sm copy-img-btn">📋 画像自体をコピー</button>' : ''}
                             <button type="button" class="btn btn-outline btn-sm copy-datauri-btn">🔗 Data URIをコピー</button>
                         </div>
                     </div>
@@ -1133,26 +1403,30 @@
 
                 const nameInput = card.querySelector('.filename-input');
                 nameInput.addEventListener('input', () => {
-                    item.name = nameInput.value.trim() || `restored-image.${item.ext}`;
+                    item.name = nameInput.value.trim() || `restored-file.${item.ext}`;
                 });
 
-                card.querySelector('.decoded-preview-box').addEventListener('click', () => openModal(item.dataUri));
+                if (item.isImage) {
+                    card.querySelector('.decoded-preview-box').addEventListener('click', () => openModal(item.dataUri));
+                    const copyImgBtn = card.querySelector('.copy-img-btn');
+                    if (copyImgBtn) {
+                        copyImgBtn.addEventListener('click', async () => {
+                            try {
+                                const pngBlob = await convertDataUriToPngBlob(item.dataUri);
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({ 'image/png': pngBlob })
+                                ]);
+                                showToast('📋 画像をクリップボードにコピーしました（他のアプリに貼り付け可能）');
+                            } catch (err) {
+                                showToast('⚠️ このブラウザ環境では画像の直接コピーが制限されています。ダウンロードをご利用ください。');
+                            }
+                        });
+                    }
+                }
 
-                card.querySelector('.download-img-btn').addEventListener('click', () => {
+                card.querySelector('.download-file-btn').addEventListener('click', () => {
                     downloadDataUri(item.dataUri, item.name);
                     showToast(`💾 「${item.name}」をダウンロードしました`);
-                });
-
-                card.querySelector('.copy-img-btn').addEventListener('click', async () => {
-                    try {
-                        const pngBlob = await convertDataUriToPngBlob(item.dataUri);
-                        await navigator.clipboard.write([
-                            new ClipboardItem({ 'image/png': pngBlob })
-                        ]);
-                        showToast('📋 画像をクリップボードにコピーしました（他のアプリに貼り付け可能）');
-                    } catch (err) {
-                        showToast('⚠️ このブラウザ環境では画像の直接コピーが制限されています。ダウンロードをご利用ください。');
-                    }
                 });
 
                 card.querySelector('.copy-datauri-btn').addEventListener('click', () => {
@@ -1165,13 +1439,38 @@
             });
         }
 
+        // Data URI を Blob に変換して確実にダウンロード（大容量のPPTXやPDFでも文字数制限に引っかからない方式）
         function downloadDataUri(dataUri, filename) {
-            const a = document.createElement('a');
-            a.href = dataUri;
-            a.download = filename || 'decoded-image.png';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            try {
+                const commaIdx = dataUri.indexOf(',');
+                const header = dataUri.slice(0, commaIdx);
+                const base64 = dataUri.slice(commaIdx + 1);
+                const mimeMatch = header.match(/data:([^;]+)/);
+                const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: mime });
+                const blobUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename || 'decoded-file';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+            } catch (e) {
+                const a = document.createElement('a');
+                a.href = dataUri;
+                a.download = filename || 'decoded-file';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
         }
 
         function convertDataUriToPngBlob(dataUri) {
@@ -1213,17 +1512,16 @@
                     downloadDataUri(item.dataUri, item.name);
                 }, idx * 150);
             });
-            showToast(`💾 全 ${decodedItems.length} 件の画像をダウンロードしました`);
+            showToast(`💾 全 ${decodedItems.length} 件のファイルをダウンロードしました`);
         });
 
-        // サンプルアイコン生成（カラフルなSVGアイコンをPNG Base64化して試せるようにする）
+        // サンプルアイコン生成
         sampleDecodeBtn.addEventListener('click', () => {
             const canvas = document.createElement('canvas');
             canvas.width = 160;
             canvas.height = 160;
             const ctx = canvas.getContext('2d');
 
-            // グラデーション背景の角丸アイコンを描画
             const grad = ctx.createLinearGradient(0, 0, 160, 160);
             grad.addColorStop(0, '#3b82f6');
             grad.addColorStop(1, '#8b5cf6');
