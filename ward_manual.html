@@ -273,7 +273,8 @@ const State = {
     currentSecId: "sec1", 
     currentPageId: null,
     isConnecting: false,
-    collapsedPages: new Set()
+    collapsedPages: new Set(),
+    lastOpenedPageBySec: {}
 };
 
 const BookManager = {
@@ -404,8 +405,12 @@ const AppCore = (function() {
                 State.currentSecId = "sec1";
             } else if (!State.currentPageId) {
                 State.currentSecId = State.index.sections[0].id;
-                const firstPage = State.index.pages.find(p => p.secId === State.currentSecId);
-                State.currentPageId = firstPage ? firstPage.id : null;
+                const firstPageId = UI.getSectionFirstPageId(State.currentSecId);
+                State.currentPageId = firstPageId;
+                if (firstPageId) {
+                    if (!State.lastOpenedPageBySec) State.lastOpenedPageBySec = {};
+                    State.lastOpenedPageBySec[State.currentSecId] = firstPageId;
+                }
             }
             
             if (!isViewOnly) {
@@ -1008,6 +1013,7 @@ const Editor = {
             toolbar_mode: 'sliding',
             indentation: '16px',
             plugins: 'table lists advlist image autolink accordion searchreplace', 
+            contextmenu: false, // ブラウザ標準の右クリックメニュー（画像をコピー等）を有効化
             toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion acc_menu table image hr | removeformat',
             table_toolbar: 'tableprops tablerowprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
             advlist_bullet_styles: 'square,disc,circle,default',
@@ -1461,6 +1467,20 @@ const Editor = {
 // 3. UI描画エンジン (UI)
 // =========================================================
 const UI = {
+    getSectionFirstPageId: function(secId) {
+        if (!secId || !State.index.pages) return null;
+        const pages = State.index.pages.filter(p => p.secId === secId);
+        if (pages.length === 0) return null;
+        pages.sort((a,b) => {
+            const getOrder = (p) => {
+                if (p.sortOrder !== undefined) return p.sortOrder;
+                return 999999999 + (parseInt(p.id.replace('p_','')) || 0);
+            };
+            return getOrder(a) - getOrder(b);
+        });
+        return pages[0].id;
+    },
+
     performFullSearch: async function() {
         const query = document.getElementById('search-box').value.toLowerCase().trim();
         if (!query) {
@@ -1659,8 +1679,18 @@ const UI = {
                 }
                 State.currentSecId = sec.id;
                 State.searchResults = null; // 検索結果をリセット
-                const firstPage = State.index.pages.find(p => p.secId === sec.id);
-                State.currentPageId = firstPage ? firstPage.id : null;
+
+                // セクションごとに前回開いていたページを復元（なければ並び順の先頭ページ）
+                let targetPageId = State.lastOpenedPageBySec ? State.lastOpenedPageBySec[sec.id] : null;
+                const pageExists = targetPageId && State.index.pages.some(p => p.id === targetPageId && p.secId === sec.id);
+                if (!pageExists) {
+                    targetPageId = UI.getSectionFirstPageId(sec.id);
+                }
+                State.currentPageId = targetPageId;
+                if (targetPageId) {
+                    if (!State.lastOpenedPageBySec) State.lastOpenedPageBySec = {};
+                    State.lastOpenedPageBySec[sec.id] = targetPageId;
+                }
                 
                 State.isLoadingPage = true;
                 try {
@@ -1901,6 +1931,10 @@ const UI = {
                 }
                 
                 State.currentPageId = p.id;
+                if (p.secId) {
+                    if (!State.lastOpenedPageBySec) State.lastOpenedPageBySec = {};
+                    State.lastOpenedPageBySec[p.secId] = p.id;
+                }
                 State.currentLoadError = false;
                 State.isLoadingPage = true;
                 
@@ -1996,6 +2030,8 @@ const UI = {
         };
         AppCore.appendTransaction('UPDATE_PAGE', payload);
         State.currentPageId = id;
+        if (!State.lastOpenedPageBySec) State.lastOpenedPageBySec = {};
+        State.lastOpenedPageBySec[State.currentSecId] = id;
         this.renderAll();
     },
     
