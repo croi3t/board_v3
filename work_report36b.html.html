@@ -1758,10 +1758,18 @@
 
         async function fetchDailyData(dateStr) {
             if (isFallbackMode) {
-                let data = localStorage.getItem(`ward_v26_data_${dateStr}`);
+                let data = localStorage.getItem(`ward_v26_data_${dateStr}`) || localStorage.getItem(`diary_${dateStr}`);
                 return data ? JSON.parse(data) : null;
             } else {
                 if (!dirHandle) return null;
+                // 共有フォルダの実ファイル名 diary_YYYYMMDD.json を読み込む
+                try {
+                    const fileHandle = await dirHandle.getFileHandle(`diary_${dateStr}.json`);
+                    const file = await fileHandle.getFile();
+                    const text = await file.text();
+                    return JSON.parse(text);
+                } catch(e) {}
+                // 旧形式・代替名 ward_v26_data_YYYYMMDD.json もフォールバックで試す
                 try {
                     const fileHandle = await dirHandle.getFileHandle(`ward_v26_data_${dateStr}.json`);
                     const file = await fileHandle.getFile();
@@ -1816,16 +1824,16 @@
             
             document.getElementById("dashTargetSummary").innerText = `目標: 月 ${targetMonthlyHours.toFixed(1)} 時間`;
 
-            let allDatesToFetch = new Set([...monthDates, ...weekDates]);
+            let allDatesToFetch = Array.from(new Set([...monthDates, ...weekDates]));
             
             let dataCache = {};
-            for (let dStr of allDatesToFetch) {
+            await Promise.all(allDatesToFetch.map(async (dStr) => {
                 if (dStr === currentDateStr) {
                     dataCache[dStr] = JSON.parse(JSON.stringify(appData.timelines));
                 } else {
                     dataCache[dStr] = await fetchDailyData(dStr);
                 }
-            }
+            }));
 
             let wards = ['3A', 'NICU', '3C', '4B', '4C', '5A', 'HCU', '5C', '6A', '6B', '6C'];
             let stats = {}; 
@@ -1835,9 +1843,12 @@
                 let daily = dataCache[dStr];
                 if(!daily) return;
                 Object.values(daily).forEach(userBlocks => {
+                    if(!Array.isArray(userBlocks)) return;
                     userBlocks.forEach(b => {
-                        if(b.isTarget && b.ward && stats[b.ward]) {
-                            stats[b.ward].weekMinutes += b.duration;
+                        let isTarget = (b.isTarget === true || b.isTarget === 'true');
+                        let w = b.ward ? b.ward.trim() : '';
+                        if(isTarget && w && stats[w]) {
+                            stats[w].weekMinutes += (Number(b.duration) || 0);
                         }
                     });
                 });
@@ -1847,9 +1858,12 @@
                 let daily = dataCache[dStr];
                 if(!daily) return;
                 Object.values(daily).forEach(userBlocks => {
+                    if(!Array.isArray(userBlocks)) return;
                     userBlocks.forEach(b => {
-                        if(b.isTarget && b.ward && stats[b.ward]) {
-                            stats[b.ward].monthMinutes += b.duration;
+                        let isTarget = (b.isTarget === true || b.isTarget === 'true');
+                        let w = b.ward ? b.ward.trim() : '';
+                        if(isTarget && w && stats[w]) {
+                            stats[w].monthMinutes += (Number(b.duration) || 0);
                         }
                     });
                 });
