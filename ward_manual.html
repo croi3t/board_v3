@@ -1045,6 +1045,159 @@ const Editor = {
             });
             return; 
         }
+
+        // advlistプラグインをカスタム実装で上書き登録
+        // listsプラグインによるトグルボタン上書きを防ぎ、独自のSplitButton（ドロップダウン付き）を確実に有効化する
+        tinymce.PluginManager.add('advlist', function(editor) {
+            const applyListPattern = (type, styleValue, dataVal) => {
+                editor.undoManager.transact(() => {
+                    if (type === 'none') {
+                        editor.execCommand('RemoveList');
+                        return;
+                    }
+                    const isOrdered = type === 'ol';
+                    const targetCmd = isOrdered ? 'InsertOrderedList' : 'InsertUnorderedList';
+                    const targetTag = isOrdered ? 'OL' : 'UL';
+                    
+                    let node = editor.selection.getNode();
+                    let list = node ? node.closest('ol, ul') : null;
+                    
+                    if (!list) {
+                        editor.execCommand(targetCmd);
+                        node = editor.selection.getNode();
+                        list = node ? node.closest('ol, ul') : null;
+                    } else if (list.nodeName !== targetTag) {
+                        editor.execCommand(targetCmd);
+                        node = editor.selection.getNode();
+                        list = node ? node.closest('ol, ul') : null;
+                    }
+                    
+                    if (list) {
+                        const selectedBlocks = editor.selection.getSelectedBlocks ? editor.selection.getSelectedBlocks() : [node];
+                        const selectedLists = selectedBlocks.map(b => b ? b.closest('ol, ul') : null).filter(Boolean);
+                        const uniqueLists = Array.from(new Set([list, ...selectedLists]));
+                        
+                        uniqueLists.forEach(l => {
+                            if (l.nodeName === targetTag) {
+                                editor.dom.setStyle(l, 'list-style-type', styleValue);
+                                if (dataVal) {
+                                    l.setAttribute('data-list-type', dataVal);
+                                } else {
+                                    l.removeAttribute('data-list-type');
+                                }
+                            }
+                        });
+                    }
+                });
+                if (typeof Editor !== 'undefined' && Editor.triggerSave) {
+                    Editor.triggerSave();
+                }
+            };
+
+            editor.ui.registry.addSplitButton('bullist', {
+                icon: 'unordered-list',
+                tooltip: '箇条書き',
+                onAction: () => {
+                    editor.execCommand('InsertUnorderedList');
+                },
+                onItemAction: (api, value) => {
+                    if (value) {
+                        const valMap = {
+                            'disc': () => applyListPattern('ul', 'disc', ''),
+                            'white-circle': () => applyListPattern('ul', 'white-circle', 'white-circle'),
+                            'black-square': () => applyListPattern('ul', 'black-square', 'black-square'),
+                            'white-square': () => applyListPattern('ul', 'white-square', 'white-square'),
+                            'kome': () => applyListPattern('ul', 'kome', 'kome'),
+                            'nakaguro': () => applyListPattern('ul', 'nakaguro', 'nakaguro'),
+                            'arrow': () => applyListPattern('ul', 'arrow', 'arrow'),
+                            'star': () => applyListPattern('ul', 'star', 'star'),
+                            'check': () => applyListPattern('ul', 'check', 'check'),
+                            'hyphen': () => applyListPattern('ul', 'hyphen', 'hyphen'),
+                            'asterisk': () => applyListPattern('ul', 'asterisk', 'asterisk'),
+                            'none': () => applyListPattern('none')
+                        };
+                        if (valMap[value]) valMap[value]();
+                    }
+                },
+                fetch: function (callback) {
+                    const items = [
+                        { type: 'choiceitem', text: '● 黒丸 (標準)', value: 'disc', onAction: () => applyListPattern('ul', 'disc', '') },
+                        { type: 'choiceitem', text: '○ 白丸', value: 'white-circle', onAction: () => applyListPattern('ul', 'white-circle', 'white-circle') },
+                        { type: 'choiceitem', text: '■ 黒四角', value: 'black-square', onAction: () => applyListPattern('ul', 'black-square', 'black-square') },
+                        { type: 'choiceitem', text: '□ 白四角', value: 'white-square', onAction: () => applyListPattern('ul', 'white-square', 'white-square') },
+                        { type: 'choiceitem', text: '※ 注記 (※印)', value: 'kome', onAction: () => applyListPattern('ul', 'kome', 'kome') },
+                        { type: 'choiceitem', text: '・ 中黒', value: 'nakaguro', onAction: () => applyListPattern('ul', 'nakaguro', 'nakaguro') },
+                        { type: 'choiceitem', text: '▶ 矢印 (三角)', value: 'arrow', onAction: () => applyListPattern('ul', 'arrow', 'arrow') },
+                        { type: 'choiceitem', text: '★ 星印', value: 'star', onAction: () => applyListPattern('ul', 'star', 'star') },
+                        { type: 'choiceitem', text: '✔ チェックマーク', value: 'check', onAction: () => applyListPattern('ul', 'check', 'check') },
+                        { type: 'choiceitem', text: '― ダッシュ/ハイフン', value: 'hyphen', onAction: () => applyListPattern('ul', 'hyphen', 'hyphen') },
+                        { type: 'choiceitem', text: '＊ アスタリスク', value: 'asterisk', onAction: () => applyListPattern('ul', 'asterisk', 'asterisk') },
+                        { type: 'separator' },
+                        { type: 'choiceitem', text: '✖ 箇条書きを解除', value: 'none', onAction: () => applyListPattern('none') }
+                    ];
+                    callback(items);
+                },
+                onSetup: (api) => {
+                    const nodeChangeHandler = () => {
+                        const node = editor.selection.getNode();
+                        const list = node ? node.closest('ol, ul') : null;
+                        api.setActive(list !== null && list.nodeName === 'UL');
+                    };
+                    editor.on('NodeChange', nodeChangeHandler);
+                    return () => editor.off('NodeChange', nodeChangeHandler);
+                }
+            });
+
+            editor.ui.registry.addSplitButton('numlist', {
+                icon: 'ordered-list',
+                tooltip: '番号付き箇条書き',
+                onAction: () => {
+                    editor.execCommand('InsertOrderedList');
+                },
+                onItemAction: (api, value) => {
+                    if (value) {
+                        const valMap = {
+                            'decimal': () => applyListPattern('ol', 'decimal', ''),
+                            'circled': () => applyListPattern('ol', 'circled-decimal', 'circled'),
+                            'paren': () => applyListPattern('ol', 'paren-decimal', 'paren'),
+                            'bracket': () => applyListPattern('ol', 'bracket-decimal', 'bracket'),
+                            'katakana': () => applyListPattern('ol', 'katakana-aiueo', 'katakana'),
+                            'iroha': () => applyListPattern('ol', 'japanese-iroha', 'iroha'),
+                            'upper-alpha': () => applyListPattern('ol', 'upper-alpha', ''),
+                            'lower-alpha': () => applyListPattern('ol', 'lower-alpha', ''),
+                            'upper-roman': () => applyListPattern('ol', 'upper-roman', ''),
+                            'none': () => applyListPattern('none')
+                        };
+                        if (valMap[value]) valMap[value]();
+                    }
+                },
+                fetch: function (callback) {
+                    const items = [
+                        { type: 'choiceitem', text: '1. 2. 3. 通常数字', value: 'decimal', onAction: () => applyListPattern('ol', 'decimal', '') },
+                        { type: 'choiceitem', text: '① ② ③ 丸数字', value: 'circled', onAction: () => applyListPattern('ol', 'circled-decimal', 'circled') },
+                        { type: 'choiceitem', text: '(1) (2) (3) 括弧数字', value: 'paren', onAction: () => applyListPattern('ol', 'paren-decimal', 'paren') },
+                        { type: 'choiceitem', text: '[1] [2] [3] 角括弧数字', value: 'bracket', onAction: () => applyListPattern('ol', 'bracket-decimal', 'bracket') },
+                        { type: 'choiceitem', text: 'ア. イ. ウ. カタカナ', value: 'katakana', onAction: () => applyListPattern('ol', 'katakana-aiueo', 'katakana') },
+                        { type: 'choiceitem', text: 'イ. ロ. ハ. いろは', value: 'iroha', onAction: () => applyListPattern('ol', 'japanese-iroha', 'iroha') },
+                        { type: 'choiceitem', text: 'A. B. C. 英大文字', value: 'upper-alpha', onAction: () => applyListPattern('ol', 'upper-alpha', '') },
+                        { type: 'choiceitem', text: 'a. b. c. 英小文字', value: 'lower-alpha', onAction: () => applyListPattern('ol', 'lower-alpha', '') },
+                        { type: 'choiceitem', text: 'I. II. III. ローマ数字', value: 'upper-roman', onAction: () => applyListPattern('ol', 'upper-roman', '') },
+                        { type: 'separator' },
+                        { type: 'choiceitem', text: '✖ リストを解除', value: 'none', onAction: () => applyListPattern('none') }
+                    ];
+                    callback(items);
+                },
+                onSetup: (api) => {
+                    const nodeChangeHandler = () => {
+                        const node = editor.selection.getNode();
+                        const list = node ? node.closest('ol, ul') : null;
+                        api.setActive(list !== null && list.nodeName === 'OL');
+                    };
+                    editor.on('NodeChange', nodeChangeHandler);
+                    return () => editor.off('NodeChange', nodeChangeHandler);
+                }
+            });
+        });
         
         tinymce.init({
             selector: '#tinymce-editor',
@@ -1056,7 +1209,7 @@ const Editor = {
             promotion: false,
             toolbar_mode: 'sliding',
             indentation: '16px',
-            plugins: 'table lists image autolink accordion searchreplace', 
+            plugins: 'table lists advlist image autolink accordion searchreplace', 
             contextmenu: false, // ブラウザ標準の右クリックメニュー（画像をコピー等）を有効化
             toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion acc_menu table image hr | removeformat',
             table_toolbar: 'tableprops tablerowprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
@@ -1266,155 +1419,6 @@ const Editor = {
                         let currentSize = Math.round(pxSize * 0.75);
                         let prevSize = sizes.slice().reverse().find(s => s < currentSize) || sizes[0];
                         editor.execCommand('FontSize', false, prevSize + 'pt');
-                    }
-                });
-
-                const applyListPattern = (type, styleValue, dataVal) => {
-                    editor.undoManager.transact(() => {
-                        if (type === 'none') {
-                            editor.execCommand('RemoveList');
-                            return;
-                        }
-                        const isOrdered = type === 'ol';
-                        const targetCmd = isOrdered ? 'InsertOrderedList' : 'InsertUnorderedList';
-                        const targetTag = isOrdered ? 'OL' : 'UL';
-                        
-                        let node = editor.selection.getNode();
-                        let list = node ? node.closest('ol, ul') : null;
-                        
-                        if (!list) {
-                            editor.execCommand(targetCmd);
-                            node = editor.selection.getNode();
-                            list = node ? node.closest('ol, ul') : null;
-                        } else if (list.nodeName !== targetTag) {
-                            editor.execCommand(targetCmd);
-                            node = editor.selection.getNode();
-                            list = node ? node.closest('ol, ul') : null;
-                        }
-                        
-                        if (list) {
-                            const selectedBlocks = editor.selection.getSelectedBlocks ? editor.selection.getSelectedBlocks() : [node];
-                            const selectedLists = selectedBlocks.map(b => b ? b.closest('ol, ul') : null).filter(Boolean);
-                            const uniqueLists = Array.from(new Set([list, ...selectedLists]));
-                            
-                            uniqueLists.forEach(l => {
-                                if (l.nodeName === targetTag) {
-                                    editor.dom.setStyle(l, 'list-style-type', styleValue);
-                                    if (dataVal) {
-                                        l.setAttribute('data-list-type', dataVal);
-                                    } else {
-                                        l.removeAttribute('data-list-type');
-                                    }
-                                }
-                            });
-                        }
-                    });
-                    if (typeof Editor !== 'undefined' && Editor.triggerSave) {
-                        Editor.triggerSave();
-                    }
-                };
-
-                editor.ui.registry.addSplitButton('bullist', {
-                    icon: 'unordered-list',
-                    tooltip: '箇条書き',
-                    onAction: () => {
-                        editor.execCommand('InsertUnorderedList');
-                    },
-                    onItemAction: (api, value) => {
-                        if (value) {
-                            const valMap = {
-                                'disc': () => applyListPattern('ul', 'disc', ''),
-                                'white-circle': () => applyListPattern('ul', 'white-circle', 'white-circle'),
-                                'black-square': () => applyListPattern('ul', 'black-square', 'black-square'),
-                                'white-square': () => applyListPattern('ul', 'white-square', 'white-square'),
-                                'kome': () => applyListPattern('ul', 'kome', 'kome'),
-                                'nakaguro': () => applyListPattern('ul', 'nakaguro', 'nakaguro'),
-                                'arrow': () => applyListPattern('ul', 'arrow', 'arrow'),
-                                'star': () => applyListPattern('ul', 'star', 'star'),
-                                'check': () => applyListPattern('ul', 'check', 'check'),
-                                'hyphen': () => applyListPattern('ul', 'hyphen', 'hyphen'),
-                                'asterisk': () => applyListPattern('ul', 'asterisk', 'asterisk'),
-                                'none': () => applyListPattern('none')
-                            };
-                            if (valMap[value]) valMap[value]();
-                        }
-                    },
-                    fetch: function (callback) {
-                        const items = [
-                            { type: 'choiceitem', text: '● 黒丸 (標準)', value: 'disc', onAction: () => applyListPattern('ul', 'disc', '') },
-                            { type: 'choiceitem', text: '○ 白丸', value: 'white-circle', onAction: () => applyListPattern('ul', 'white-circle', 'white-circle') },
-                            { type: 'choiceitem', text: '■ 黒四角', value: 'black-square', onAction: () => applyListPattern('ul', 'black-square', 'black-square') },
-                            { type: 'choiceitem', text: '□ 白四角', value: 'white-square', onAction: () => applyListPattern('ul', 'white-square', 'white-square') },
-                            { type: 'choiceitem', text: '※ 注記 (※印)', value: 'kome', onAction: () => applyListPattern('ul', 'kome', 'kome') },
-                            { type: 'choiceitem', text: '・ 中黒', value: 'nakaguro', onAction: () => applyListPattern('ul', 'nakaguro', 'nakaguro') },
-                            { type: 'choiceitem', text: '▶ 矢印 (三角)', value: 'arrow', onAction: () => applyListPattern('ul', 'arrow', 'arrow') },
-                            { type: 'choiceitem', text: '★ 星印', value: 'star', onAction: () => applyListPattern('ul', 'star', 'star') },
-                            { type: 'choiceitem', text: '✔ チェックマーク', value: 'check', onAction: () => applyListPattern('ul', 'check', 'check') },
-                            { type: 'choiceitem', text: '― ダッシュ/ハイフン', value: 'hyphen', onAction: () => applyListPattern('ul', 'hyphen', 'hyphen') },
-                            { type: 'choiceitem', text: '＊ アスタリスク', value: 'asterisk', onAction: () => applyListPattern('ul', 'asterisk', 'asterisk') },
-                            { type: 'separator' },
-                            { type: 'choiceitem', text: '✖ 箇条書きを解除', value: 'none', onAction: () => applyListPattern('none') }
-                        ];
-                        callback(items);
-                    },
-                    onSetup: (api) => {
-                        const nodeChangeHandler = () => {
-                            const node = editor.selection.getNode();
-                            const list = node ? node.closest('ol, ul') : null;
-                            api.setActive(list !== null && list.nodeName === 'UL');
-                        };
-                        editor.on('NodeChange', nodeChangeHandler);
-                        return () => editor.off('NodeChange', nodeChangeHandler);
-                    }
-                });
-
-                editor.ui.registry.addSplitButton('numlist', {
-                    icon: 'ordered-list',
-                    tooltip: '番号付き箇条書き',
-                    onAction: () => {
-                        editor.execCommand('InsertOrderedList');
-                    },
-                    onItemAction: (api, value) => {
-                        if (value) {
-                            const valMap = {
-                                'decimal': () => applyListPattern('ol', 'decimal', ''),
-                                'circled': () => applyListPattern('ol', 'circled-decimal', 'circled'),
-                                'paren': () => applyListPattern('ol', 'paren-decimal', 'paren'),
-                                'bracket': () => applyListPattern('ol', 'bracket-decimal', 'bracket'),
-                                'katakana': () => applyListPattern('ol', 'katakana-aiueo', 'katakana'),
-                                'iroha': () => applyListPattern('ol', 'japanese-iroha', 'iroha'),
-                                'upper-alpha': () => applyListPattern('ol', 'upper-alpha', ''),
-                                'lower-alpha': () => applyListPattern('ol', 'lower-alpha', ''),
-                                'upper-roman': () => applyListPattern('ol', 'upper-roman', ''),
-                                'none': () => applyListPattern('none')
-                            };
-                            if (valMap[value]) valMap[value]();
-                        }
-                    },
-                    fetch: function (callback) {
-                        const items = [
-                            { type: 'choiceitem', text: '1. 2. 3. 通常数字', value: 'decimal', onAction: () => applyListPattern('ol', 'decimal', '') },
-                            { type: 'choiceitem', text: '① ② ③ 丸数字', value: 'circled', onAction: () => applyListPattern('ol', 'circled-decimal', 'circled') },
-                            { type: 'choiceitem', text: '(1) (2) (3) 括弧数字', value: 'paren', onAction: () => applyListPattern('ol', 'paren-decimal', 'paren') },
-                            { type: 'choiceitem', text: '[1] [2] [3] 角括弧数字', value: 'bracket', onAction: () => applyListPattern('ol', 'bracket-decimal', 'bracket') },
-                            { type: 'choiceitem', text: 'ア. イ. ウ. カタカナ', value: 'katakana', onAction: () => applyListPattern('ol', 'katakana-aiueo', 'katakana') },
-                            { type: 'choiceitem', text: 'イ. ロ. ハ. いろは', value: 'iroha', onAction: () => applyListPattern('ol', 'japanese-iroha', 'iroha') },
-                            { type: 'choiceitem', text: 'A. B. C. 英大文字', value: 'upper-alpha', onAction: () => applyListPattern('ol', 'upper-alpha', '') },
-                            { type: 'choiceitem', text: 'a. b. c. 英小文字', value: 'lower-alpha', onAction: () => applyListPattern('ol', 'lower-alpha', '') },
-                            { type: 'choiceitem', text: 'I. II. III. ローマ数字', value: 'upper-roman', onAction: () => applyListPattern('ol', 'upper-roman', '') },
-                            { type: 'separator' },
-                            { type: 'choiceitem', text: '✖ リストを解除', value: 'none', onAction: () => applyListPattern('none') }
-                        ];
-                        callback(items);
-                    },
-                    onSetup: (api) => {
-                        const nodeChangeHandler = () => {
-                            const node = editor.selection.getNode();
-                            const list = node ? node.closest('ol, ul') : null;
-                            api.setActive(list !== null && list.nodeName === 'OL');
-                        };
-                        editor.on('NodeChange', nodeChangeHandler);
-                        return () => editor.off('NodeChange', nodeChangeHandler);
                     }
                 });
 
