@@ -1257,6 +1257,25 @@ const Editor = {
                                 });
                                 Editor.triggerSave();
                             }},
+                            { type: 'menuitem', text: '🎯 このアコーディオン全体を選択', onAction: () => {
+                                const acc = getAcc();
+                                if (!acc) {
+                                    alert('選択したいアコーディオン内にカーソルを置いてから実行してください。');
+                                    return;
+                                }
+                                setAccOpen(acc, true); // 閉じた状態だと内部が選択から外れるため開く
+                                editor.focus();
+                                const rng = editor.dom.createRng();
+                                rng.selectNodeContents(acc);
+                                editor.selection.setRng(rng);
+                            }},
+                            { type: 'menuitem', text: '📑 すべて展開して全体選択', onAction: () => {
+                                editor.undoManager.transact(() => {
+                                    editor.getBody().querySelectorAll('details').forEach(d => setAccOpen(d, true));
+                                });
+                                editor.focus();
+                                editor.execCommand('SelectAll');
+                            }},
                             { type: 'menuitem', text: '↑ 全体を上に移動', onAction: () => {
                                 const acc = getAcc();
                                 if (acc && acc.previousElementSibling) {
