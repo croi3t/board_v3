@@ -58,6 +58,50 @@
             height: auto;
         }
 
+        /* 箇条書き・連番パターンのスタイル定義 */
+        @counter-style circled-decimal {
+            system: fixed;
+            symbols: '①' '②' '③' '④' '⑤' '⑥' '⑦' '⑧' '⑨' '⑩' '⑪' '⑫' '⑬' '⑭' '⑮' '⑯' '⑰' '⑱' '⑲' '⑳' '㉑' '㉒' '㉓' '㉔' '㉕' '㉖' '㉗' '㉘' '㉙' '㉚';
+            suffix: ' ';
+        }
+        @counter-style paren-decimal {
+            system: fixed;
+            symbols: '(1)' '(2)' '(3)' '(4)' '(5)' '(6)' '(7)' '(8)' '(9)' '(10)' '(11)' '(12)' '(13)' '(14)' '(15)' '(16)' '(17)' '(18)' '(19)' '(20)';
+            suffix: ' ';
+        }
+        @counter-style bracket-decimal {
+            system: fixed;
+            symbols: '[1]' '[2]' '[3]' '[4]' '[5]' '[6]' '[7]' '[8]' '[9]' '[10]' '[11]' '[12]' '[13]' '[14]' '[15]' '[16]' '[17]' '[18]' '[19]' '[20]';
+            suffix: ' ';
+        }
+        @counter-style katakana-aiueo {
+            system: fixed;
+            symbols: 'ア.' 'イ.' 'ウ.' 'エ.' 'オ.' 'カ.' 'キ.' 'ク.' 'ケ.' 'コ.' 'サ.' 'シ.' 'ス.' 'セ.' 'ソ.' 'タ.' 'チ.' 'ツ.' 'テ.' 'ト.';
+            suffix: ' ';
+        }
+        @counter-style japanese-iroha {
+            system: fixed;
+            symbols: 'イ.' 'ロ.' 'ハ.' 'ニ.' 'ホ.' 'ヘ.' 'ト.' 'チ.' 'リ.' 'ヌ.' 'ル.' 'ヲ.' 'ワ.' 'カ.' 'ヨ.' 'タ.' 'レ.' 'ソ.' 'ツ.' 'ネ.';
+            suffix: ' ';
+        }
+
+        ol[style*="list-style-type: circled"], ol[data-list-type="circled"] { list-style-type: circled-decimal !important; }
+        ol[style*="list-style-type: paren"], ol[data-list-type="paren"] { list-style-type: paren-decimal !important; }
+        ol[style*="list-style-type: bracket"], ol[data-list-type="bracket"] { list-style-type: bracket-decimal !important; }
+        ol[style*="list-style-type: katakana"], ol[data-list-type="katakana"] { list-style-type: katakana-aiueo !important; }
+        ol[style*="list-style-type: iroha"], ol[data-list-type="iroha"] { list-style-type: japanese-iroha !important; }
+
+        ul[style*="list-style-type: kome"], ul[data-list-type="kome"] { list-style-type: "※ " !important; }
+        ul[style*="list-style-type: asterisk"], ul[data-list-type="asterisk"] { list-style-type: "＊ " !important; }
+        ul[style*="list-style-type: hyphen"], ul[data-list-type="hyphen"] { list-style-type: "― " !important; }
+        ul[style*="list-style-type: nakaguro"], ul[data-list-type="nakaguro"] { list-style-type: "・ " !important; }
+        ul[style*="list-style-type: black-square"], ul[data-list-type="black-square"] { list-style-type: "■ " !important; }
+        ul[style*="list-style-type: white-square"], ul[data-list-type="white-square"] { list-style-type: "□ " !important; }
+        ul[style*="list-style-type: white-circle"], ul[data-list-type="white-circle"] { list-style-type: "○ " !important; }
+        ul[style*="list-style-type: arrow"], ul[data-list-type="arrow"] { list-style-type: "▶ " !important; }
+        ul[style*="list-style-type: check"], ul[data-list-type="check"] { list-style-type: "✔ " !important; }
+        ul[style*="list-style-type: star"], ul[data-list-type="star"] { list-style-type: "★ " !important; }
+
         /* ================= ページリスト (右側) ================= */
         .page-pane { width: 280px; background: #fdfdfd; border-left: 1px solid #ddd; display: flex; flex-direction: column; flex-shrink: 0; }
         .page-header { padding: 12px; background: #f8f9fa; border-bottom: 1px solid #ddd; font-weight: bold; color: #555; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
@@ -1014,13 +1058,29 @@ const Editor = {
             indentation: '16px',
             plugins: 'table lists advlist image autolink accordion searchreplace', 
             contextmenu: false, // ブラウザ標準の右クリックメニュー（画像をコピー等）を有効化
-            toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | notetags | accordion acc_menu table image hr | removeformat',
+            toolbar: 'undo redo | blocks fontfamily fontsize fontup fontdown lineheight | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist list_patterns outdent indent | notetags | accordion acc_menu table image hr | removeformat',
             table_toolbar: 'tableprops tablerowprops tablecellprops tablecellbackgroundcolor tablecellbordercolor | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells | tabledelete',
             advlist_bullet_styles: 'square,disc,circle,default',
             advlist_number_styles: 'default,lower-alpha,lower-roman,upper-alpha,upper-roman',
+            font_family_formats: 
+                '游ゴシック="Yu Gothic", YuGothic, "游ゴシック体", sans-serif;' +
+                'メイリオ=Meiryo, "メイリオ", "Hiragino Kaku Gothic ProN", sans-serif;' +
+                'ＭＳ ゴシック="MS Gothic", "ＭＳ ゴシック", Osaka-Mono, monospace;' +
+                'ＭＳ Ｐゴシック="MS PGothic", "ＭＳ Ｐゴシック", sans-serif;' +
+                '游明朝="Yu Mincho", YuMincho, "游明朝体", serif;' +
+                'ＭＳ 明朝="MS Mincho", "ＭＳ 明朝", serif;' +
+                'ＭＳ Ｐ明朝="MS PMincho", "ＭＳ Ｐ明朝", serif;' +
+                'システム標準ゴシック=sans-serif;' +
+                'システム標準明朝=serif;' +
+                '等幅フォント=monospace;' +
+                'Arial=Arial, Helvetica, sans-serif;' +
+                'Calibri=Calibri, Candara, Segoe, "Segoe UI", Optima, Arial, sans-serif;' +
+                'Segoe UI="Segoe UI", Tahoma, Geneva, Verdana, sans-serif;' +
+                'Times New Roman="Times New Roman", Times, serif',
+            font_size_formats: '8pt 9pt 10pt 10.5pt 11pt 12pt 14pt 16pt 18pt 20pt 24pt 28pt 36pt 48pt 72pt',
             paste_data_images: true, 
             paste_webkit_styles: 'none',
-            paste_retain_style_properties: 'color,font-size,font-weight,font-style,text-decoration,text-align,background-color',
+            paste_retain_style_properties: 'color,font-size,font-weight,font-style,text-decoration,text-align,background-color,list-style-type',
             paste_preprocess: function (plugin, args) {
                 if (!args.content) return;
 
@@ -1118,8 +1178,49 @@ const Editor = {
                     box-sizing: border-box !important;
                 }
                 
-                ul[style*="list-style-type: kome"] { list-style-type: "※ " !important; }
-                ul[style*="list-style-type: asterisk"] { list-style-type: "* " !important; }
+                /* 箇条書き・連番パターンのスタイル定義 */
+                @counter-style circled-decimal {
+                    system: fixed;
+                    symbols: '①' '②' '③' '④' '⑤' '⑥' '⑦' '⑧' '⑨' '⑩' '⑪' '⑫' '⑬' '⑭' '⑮' '⑯' '⑰' '⑱' '⑲' '⑳' '㉑' '㉒' '㉓' '㉔' '㉕' '㉖' '㉗' '㉘' '㉙' '㉚';
+                    suffix: ' ';
+                }
+                @counter-style paren-decimal {
+                    system: fixed;
+                    symbols: '(1)' '(2)' '(3)' '(4)' '(5)' '(6)' '(7)' '(8)' '(9)' '(10)' '(11)' '(12)' '(13)' '(14)' '(15)' '(16)' '(17)' '(18)' '(19)' '(20)';
+                    suffix: ' ';
+                }
+                @counter-style bracket-decimal {
+                    system: fixed;
+                    symbols: '[1]' '[2]' '[3]' '[4]' '[5]' '[6]' '[7]' '[8]' '[9]' '[10]' '[11]' '[12]' '[13]' '[14]' '[15]' '[16]' '[17]' '[18]' '[19]' '[20]';
+                    suffix: ' ';
+                }
+                @counter-style katakana-aiueo {
+                    system: fixed;
+                    symbols: 'ア.' 'イ.' 'ウ.' 'エ.' 'オ.' 'カ.' 'キ.' 'ク.' 'ケ.' 'コ.' 'サ.' 'シ.' 'ス.' 'セ.' 'ソ.' 'タ.' 'チ.' 'ツ.' 'テ.' 'ト.';
+                    suffix: ' ';
+                }
+                @counter-style japanese-iroha {
+                    system: fixed;
+                    symbols: 'イ.' 'ロ.' 'ハ.' 'ニ.' 'ホ.' 'ヘ.' 'ト.' 'チ.' 'リ.' 'ヌ.' 'ル.' 'ヲ.' 'ワ.' 'カ.' 'ヨ.' 'タ.' 'レ.' 'ソ.' 'ツ.' 'ネ.';
+                    suffix: ' ';
+                }
+
+                ol[style*="list-style-type: circled"], ol[data-list-type="circled"] { list-style-type: circled-decimal !important; }
+                ol[style*="list-style-type: paren"], ol[data-list-type="paren"] { list-style-type: paren-decimal !important; }
+                ol[style*="list-style-type: bracket"], ol[data-list-type="bracket"] { list-style-type: bracket-decimal !important; }
+                ol[style*="list-style-type: katakana"], ol[data-list-type="katakana"] { list-style-type: katakana-aiueo !important; }
+                ol[style*="list-style-type: iroha"], ol[data-list-type="iroha"] { list-style-type: japanese-iroha !important; }
+
+                ul[style*="list-style-type: kome"], ul[data-list-type="kome"] { list-style-type: "※ " !important; }
+                ul[style*="list-style-type: asterisk"], ul[data-list-type="asterisk"] { list-style-type: "＊ " !important; }
+                ul[style*="list-style-type: hyphen"], ul[data-list-type="hyphen"] { list-style-type: "― " !important; }
+                ul[style*="list-style-type: nakaguro"], ul[data-list-type="nakaguro"] { list-style-type: "・ " !important; }
+                ul[style*="list-style-type: black-square"], ul[data-list-type="black-square"] { list-style-type: "■ " !important; }
+                ul[style*="list-style-type: white-square"], ul[data-list-type="white-square"] { list-style-type: "□ " !important; }
+                ul[style*="list-style-type: white-circle"], ul[data-list-type="white-circle"] { list-style-type: "○ " !important; }
+                ul[style*="list-style-type: arrow"], ul[data-list-type="arrow"] { list-style-type: "▶ " !important; }
+                ul[style*="list-style-type: check"], ul[data-list-type="check"] { list-style-type: "✔ " !important; }
+                ul[style*="list-style-type: star"], ul[data-list-type="star"] { list-style-type: "★ " !important; }
                 
                 .note-tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-weight: bold; margin-right: 4px; }
                 .note-star { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
@@ -1167,6 +1268,84 @@ const Editor = {
                         let currentSize = Math.round(pxSize * 0.75);
                         let prevSize = sizes.slice().reverse().find(s => s < currentSize) || sizes[0];
                         editor.execCommand('FontSize', false, prevSize + 'pt');
+                    }
+                });
+
+                const applyListPattern = (type, styleValue, dataVal) => {
+                    editor.undoManager.transact(() => {
+                        if (type === 'none') {
+                            editor.execCommand('RemoveList');
+                            return;
+                        }
+                        const isOrdered = type === 'ol';
+                        const targetCmd = isOrdered ? 'InsertOrderedList' : 'InsertUnorderedList';
+                        const targetTag = isOrdered ? 'OL' : 'UL';
+                        
+                        let node = editor.selection.getNode();
+                        let list = node ? node.closest('ol, ul') : null;
+                        
+                        if (!list) {
+                            editor.execCommand(targetCmd);
+                            node = editor.selection.getNode();
+                            list = node ? node.closest('ol, ul') : null;
+                        } else if (list.nodeName !== targetTag) {
+                            editor.execCommand(targetCmd);
+                            node = editor.selection.getNode();
+                            list = node ? node.closest('ol, ul') : null;
+                        }
+                        
+                        if (list) {
+                            const selectedBlocks = editor.selection.getSelectedBlocks ? editor.selection.getSelectedBlocks() : [node];
+                            const selectedLists = selectedBlocks.map(b => b ? b.closest('ol, ul') : null).filter(Boolean);
+                            const uniqueLists = Array.from(new Set([list, ...selectedLists]));
+                            
+                            uniqueLists.forEach(l => {
+                                if (l.nodeName === targetTag) {
+                                    editor.dom.setStyle(l, 'list-style-type', styleValue);
+                                    if (dataVal) {
+                                        l.setAttribute('data-list-type', dataVal);
+                                    } else {
+                                        l.removeAttribute('data-list-type');
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    if (typeof Editor !== 'undefined' && Editor.triggerSave) {
+                        Editor.triggerSave();
+                    }
+                };
+
+                editor.ui.registry.addMenuButton('list_patterns', {
+                    text: '箇条書き種類 ▼',
+                    tooltip: '箇条書き・連番のパターンを選択',
+                    fetch: function (callback) {
+                        const items = [
+                            { type: 'menuitem', text: '① ② ③ 丸数字', onAction: () => applyListPattern('ol', 'circled-decimal', 'circled') },
+                            { type: 'menuitem', text: '(1) (2) (3) 括弧数字', onAction: () => applyListPattern('ol', 'paren-decimal', 'paren') },
+                            { type: 'menuitem', text: '[1] [2] [3] 角括弧数字', onAction: () => applyListPattern('ol', 'bracket-decimal', 'bracket') },
+                            { type: 'menuitem', text: '1. 2. 3. 通常数字', onAction: () => applyListPattern('ol', 'decimal', '') },
+                            { type: 'menuitem', text: 'ア. イ. ウ. カタカナ', onAction: () => applyListPattern('ol', 'katakana-aiueo', 'katakana') },
+                            { type: 'menuitem', text: 'イ. ロ. ハ. いろは', onAction: () => applyListPattern('ol', 'japanese-iroha', 'iroha') },
+                            { type: 'menuitem', text: 'A. B. C. 英大文字', onAction: () => applyListPattern('ol', 'upper-alpha', '') },
+                            { type: 'menuitem', text: 'a. b. c. 英小文字', onAction: () => applyListPattern('ol', 'lower-alpha', '') },
+                            { type: 'menuitem', text: 'I. II. III. ローマ数字', onAction: () => applyListPattern('ol', 'upper-roman', '') },
+                            { type: 'separator' },
+                            { type: 'menuitem', text: '※ 注記 (※印)', onAction: () => applyListPattern('ul', 'kome', 'kome') },
+                            { type: 'menuitem', text: '・ 中黒', onAction: () => applyListPattern('ul', 'nakaguro', 'nakaguro') },
+                            { type: 'menuitem', text: '● 黒丸 (標準)', onAction: () => applyListPattern('ul', 'disc', '') },
+                            { type: 'menuitem', text: '○ 白丸', onAction: () => applyListPattern('ul', 'white-circle', 'white-circle') },
+                            { type: 'menuitem', text: '■ 黒四角', onAction: () => applyListPattern('ul', 'black-square', 'black-square') },
+                            { type: 'menuitem', text: '□ 白四角', onAction: () => applyListPattern('ul', 'white-square', 'white-square') },
+                            { type: 'menuitem', text: '▶ 矢印 (三角)', onAction: () => applyListPattern('ul', 'arrow', 'arrow') },
+                            { type: 'menuitem', text: '★ 星印', onAction: () => applyListPattern('ul', 'star', 'star') },
+                            { type: 'menuitem', text: '✔ チェックマーク', onAction: () => applyListPattern('ul', 'check', 'check') },
+                            { type: 'menuitem', text: '― ダッシュ/ハイフン', onAction: () => applyListPattern('ul', 'hyphen', 'hyphen') },
+                            { type: 'menuitem', text: '＊ アスタリスク', onAction: () => applyListPattern('ul', 'asterisk', 'asterisk') },
+                            { type: 'separator' },
+                            { type: 'menuitem', text: '✖ リスト解除 (標準テキストに戻す)', onAction: () => applyListPattern('none') }
+                        ];
+                        callback(items);
                     }
                 });
 
