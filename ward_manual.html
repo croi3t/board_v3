@@ -40,10 +40,30 @@
         /* TinyMCE未読込時のテキストエリアスタイル */
         #tinymce-editor { flex: 1; width: 100%; resize: none; border: 1px solid #ccc; border-radius: 4px; padding: 15px; font-size: 14px; font-family: inherit; line-height: 1.6; outline: none; box-sizing: border-box; }
 
-        /* 閲覧モード（リードオンリー）のレスポンシブ自動折り返し */
+        /* 閲覧モード（リードオンリー）のレスポンシブ自動折り返し・コンパクト行間 */
         #readonly-viewer {
             word-wrap: break-word;
             overflow-wrap: break-word;
+            line-height: 1.5;
+        }
+        #readonly-viewer p {
+            margin: 0 0 2px 0;
+            padding: 0;
+            line-height: 1.5;
+        }
+        #readonly-viewer div {
+            line-height: 1.5;
+        }
+        #readonly-viewer table td, #readonly-viewer table th {
+            padding: 4px 8px;
+        }
+        #readonly-viewer ul, #readonly-viewer ol {
+            margin: 4px 0;
+            padding-left: 24px;
+        }
+        #readonly-viewer li {
+            margin: 2px 0;
+            line-height: 1.5;
         }
         #readonly-viewer div[style*="width"][style*="in"],
         #readonly-viewer div[style*="width"][style*="pt"],
@@ -57,6 +77,7 @@
             max-width: 100%;
             height: auto;
         }
+
 
         /* 箇条書き・連番パターンのスタイル定義 */
         @counter-style circled-decimal {
@@ -1240,6 +1261,10 @@ const Editor = {
                 args.content = args.content.replace(/(<div\b[^>]*style=["'][^"']*)\bwidth:\s*[\d.]+(?:in|pt|cm)\s*;?/gi, '$1');
                 args.content = args.content.replace(/(<div\b[^>]*style=["'][^"']*)\bborder-width:\s*100%\s*;?/gi, '$1');
 
+                // 貼り付け時に外部（Word、Webページ等）から持ち込まれる過大な行間・マージンをクリーンアップしてコンパクトにする
+                args.content = args.content.replace(/(<[^>]+style=["'][^"']*)\bline-height:\s*[^;]+;?/gi, '$1');
+                args.content = args.content.replace(/(<[^>]+style=["'][^"']*)\bmargin-(?:top|bottom):\s*[^;]+;?/gi, '$1');
+
                 // LINEWORKSなどのプレーンテキスト系コピーで改行が消える問題の対策
                 // ※画像(img)やテーブル(table)等のHTMLが含まれる場合は構造を壊さないようスキップする
                 if (!/<(p|br|div|img|html|table|ul|ol|li)[ >]/i.test(args.content)) {
@@ -1256,9 +1281,9 @@ const Editor = {
                                 else if(indentStr[i] === '　') indentPx += 16;
                                 else indentPx += 8;
                             }
-                            return `<p style="margin-left: ${indentPx}px">${text || '<br>'}</p>`;
+                            return `<p style="margin: 0 0 2px 0; margin-left: ${indentPx}px">${text || '<br>'}</p>`;
                         }
-                        return `<p>${line || '<br>'}</p>`;
+                        return `<p style="margin: 0 0 2px 0;">${line || '<br>'}</p>`;
                     }).join('');
                 }
             },
@@ -1318,6 +1343,27 @@ const Editor = {
                 body {
                     word-wrap: break-word;
                     overflow-wrap: break-word;
+                    line-height: 1.5;
+                }
+                /* 段落・行間・余白をコンパクトにする設定 */
+                p {
+                    margin: 0 0 2px 0;
+                    padding: 0;
+                    line-height: 1.5;
+                }
+                div {
+                    line-height: 1.5;
+                }
+                table td, table th {
+                    padding: 4px 8px;
+                }
+                ul, ol {
+                    margin: 4px 0;
+                    padding-left: 24px;
+                }
+                li {
+                    margin: 2px 0;
+                    line-height: 1.5;
                 }
                 /* 【方法1】OneNote由来の固定幅コンテナ (width: ...in や width: ...pt 等) をエディタ幅に合わせて自動伸縮・折り返し可能にする */
                 div[style*="width"][style*="in"],
