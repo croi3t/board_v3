@@ -1,0 +1,373 @@
+次はデータ収集を一時停止できる機能を追加したいです。また、採血項目、採血日、採血値という列配置にしていますが、採血項目の列に採血値を入力してもらえれば良いので列配置を修正してください。年齢の収集もしたいのですがデータを取得するURLが別になります。1度に全て収集してもらうか、分けるべきかを教えてください。
+
+# プロジェクト概要
+JUSTcalc（表計算ソフト）からコピーした「患者ID・基準日・取得したい採血項目」のリスト（タブ区切り）を入力とし、電子カルテのWebシステムから該当データを自動抽出して、JUSTcalcに貼り付け可能な形式で出力するWindows用HTA（HTML Application）ツールを開発しています。
+
+# 現在の仕様と実装済みの機能
+1. **通信方式**: `InternetExplorer.Application`（COMオブジェクト）を非表示で起動し、IEのセッションを利用してカルテ（http://10.5.171.42:8082/karte/kentai_kekka_karte.php）へアクセス。これによりログイン認証とクロスドメイン制約を突破。
+2. **見出し連動抽出**: ユーザーが貼り付けた1行目（ヘッダ）を読み取り、指定された項目だけを動的に抽出。
+3. **期間指定検索**: 基準日（入力データの2列目）から何日前まで遡るか（探索期間）を画面上で指定。空欄の場合は全期間（パラメータなし）として検索。日付フォーマットは自動でゼロ埋め補正（2015/1/6 → 2015/01/06）。
+4. **表記揺れ吸収**: 全半角カナ、全半角英数、大文字小文字、スペースの有無を自動正規化。また「eGFRcrea → EGFR」「LDH → LD」などのシステム間エイリアスを吸収。
+5. **全履歴まとめモード**: 見出しに「全期間」または「全履歴」が含まれる場合（例：eGFR全期間）、期間内のすべての採血履歴を `2015/04/16: 51, 2015/02/19: 70` のようにカンマ区切りで1つのセルに集約して出力。それ以外は最新の1件のみ出力。
+6. **UI**: 処理状況のリアルタイム表示と、結果のプレビューエリアを実装済み。
+
+# 最新のソースコード（get_blood_test.hta）
+以下のコードが現在の最新版です。このコードをベースに今後の改修や質問に対応してください。
+
+```html
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>一括採血データ取得ツール（期間空欄対応版）</title>
+<hta:application id="oHTA" border="dialog" innerborder="no" scroll="yes" contextmenu="yes" />
+<script language="javascript">
+var ie = null; 
+
+window.onunload = function() {
+    if(ie) { try { ie.Quit(); } catch(e) {} }
+};
+
+function trimStr(str) {
+    if(!str) return "";
+    return str.replace(/^[\s\u3000]+|[\s\u3000]+\$/g, "").replace(/\r?\n/g, "");
+}
+
+function padDateStr(dateStr) {
+    var parts = dateStr.split(/[\/\-]/);
+    if (parts.length !== 3) return dateStr;
+    var y = parts[0];
+    var m = parts[1].length === 1 ? "0" + parts[1] : parts[1];
+    var d = parts[2].length === 1 ? "0" + parts[2] : parts[2];
+    return y + "/" + m + "/" + d;
+}
+
+function getPastDateStr(dateStr, daysToSubtract) {
+    var parts = dateStr.split(/[\/\-]/);
+    if (parts.length !== 3) return dateStr;
+    var d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() - daysToSubtract);
+    var yy = d.getFullYear();
+    var mm = d.getMonth() + 1;
+    var dd = d.getDate();
+    if (mm < 10) mm = "0" + mm;
+    if (dd < 10) dd = "0" + dd;
+    return yy + "/" + mm + "/" + dd;
+}
+
+function normalizeItemName(name) {
+    if (!name) return "";
+    var s = name;
+    var kanaMap = {
+        'ｶﾞ':'ガ','ｷﾞ':'ギ','ｸﾞ':'グ','ｹﾞ':'ゲ','ｺﾞ':'ゴ','ｻﾞ':'ザ','ｼﾞ':'ジ','ｽﾞ':'ズ','ｾﾞ':'ゼ','ｿﾞ':'ゾ',
+        'ﾀﾞ':'ダ','ﾁﾞ':'ヂ','ﾂﾞ':'ヅ','ﾃﾞ':'デ','ﾄﾞ':'ド','ﾊﾞ':'バ','ﾋﾞ':'ビ','ﾌﾞ':'ブ','ﾍﾞ':'ベ','ﾎﾞ':'ボ',
+        'ﾊﾟ':'パ','ﾋﾟ':'ピ','ﾌﾟ':'プ','ﾍﾟ':'ペ','ﾎﾟ':'ポ','ｳﾞ':'ヴ','ｧ':'ァ','ｨ':'ィ','ｩ':'ゥ','ｪ':'ェ','ｫ':'ォ',
+        'ｬ':'ャ','ｭ':'ュ','ｮ':'ョ','ｯ':'ッ','ｰ':'ー','ｱ':'ア','ｲ':'イ','ｳ':'ウ','ｴ':'エ','ｵ':'オ',
+        'ｶ':'カ','ｷ':'キ','ｸ':'ク','ｹ':'ケ','ｺ':'コ','ｻ':'サ','ｼ':'シ','ｽ':'ス','ｾ':'セ','ｿ':'ソ',
+        'ﾀ':'タ','ﾁ':'チ','ﾂ':'ツ','ﾃ':'テ','ﾄ':'ト','ﾅ':'ナ','ﾆ':'ニ','ﾇ':'ヌ','ﾈ':'ネ','ﾉ':'ノ',
+        'ﾊ':'ハ','ﾋ':'ヒ','ﾌ':'フ','ﾍ':'ヘ','ﾎ':'ホ','ﾏ':'マ','ﾐ':'ミ','ﾑ':'ム','ﾒ':'メ','ﾓ':'モ',
+        'ﾔ':'ヤ','ﾕ':'ユ','ﾖ':'ヨ','ﾗ':'ラ','ﾘ':'リ','ﾙ':'ル','ﾚ':'レ','ﾛ':'ロ','ﾜ':'ワ','ｦ':'ヲ','ﾝ':'ン'
+    };
+    var reg = new RegExp(Object.keys(kanaMap).join('|'), 'g');
+    s = s.replace(reg, function(match){ return kanaMap[match]; });
+    s = s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(m) { return String.fromCharCode(m.charCodeAt(0) - 0xFEE0); });
+    s = s.toUpperCase();
+    s = s.replace(/[\s\u3000]+/g, "");
+
+    if (s === "EGFRCREA") s = "EGFR"; 
+    if (s === "LD(IFCC)") s = "LD";   
+    if (s === "LDH") s = "LD";        
+    if (s === "ALP(IFCC)") s = "ALP"; 
+    if (s === "HBA1C(NGSP)") s = "HBA1C"; 
+    if (s === "Γ-GTP") s = "Γ-GT";  
+    if (s === "CPK") s = "CK";        
+    
+    return s;
+}
+
+var lines = [];
+var currentLine = 0;
+var outputLines = [];
+var currentCols = [];
+var currentId = "";
+var currentTargetDate = "";
+var currentRawLine = "";
+var targetItems = []; 
+var searchDays = ""; 
+
+function updatePreview() {
+    var previewText = document.getElementById("previewText");
+    if (outputLines.length <= 5) {
+        previewText.value = outputLines.join("\n");
+    } else if (outputLines.length === 6) {
+        previewText.value += "\n... (以下省略)";
+    }
+}
+
+function startProcess() {
+    var text = document.getElementById("inputText").value;
+    if(!text) {
+        alert("データを貼り付けてください。");
+        return;
+    }
+    
+    var sdVal = document.getElementById("searchDays").value;
+    if (sdVal === "") {
+        searchDays = "";
+    } else {
+        searchDays = parseInt(sdVal, 10);
+    }
+    
+    try {
+        if(!ie) {
+            ie = new ActiveXObject("InternetExplorer.Application");
+            ie.Visible = false;
+        }
+    } catch(e) {
+        alert("Internet Explorerの起動に失敗しました。");
+        return;
+    }
+
+    lines = text.split("\n");
+    currentLine = 0;
+    outputLines = [];
+    targetItems = []; 
+    document.getElementById("previewText").value = "";
+    document.getElementById("msg").innerText = "処理を開始します...";
+    document.getElementById("btn").disabled = true;
+    
+    processNext();
+}
+
+function processNext() {
+    if (currentLine >= lines.length) {
+        var finalStr = outputLines.join("\n");
+        window.clipboardData.setData("Text", finalStr);
+        document.getElementById("msg").innerText = "完了しました！ プレビューを確認し、JUSTcalcに貼り付けてください。";
+        document.getElementById("btn").disabled = false;
+        try { ie.Quit(); ie = null; } catch(e) {}
+        return;
+    }
+
+    currentRawLine = lines[currentLine];
+    var line = trimStr(currentRawLine);
+    currentLine++;
+
+    if (!line) {
+        setTimeout(processNext, 10);
+        return;
+    }
+
+    currentCols = line.split("\t");
+    if (currentCols.length < 2) {
+        outputLines.push(line + "\tエラー:列不足");
+        updatePreview();
+        setTimeout(processNext, 10);
+        return;
+    }
+
+    currentId = trimStr(currentCols[0]);
+    var rawTargetDate = trimStr(currentCols[1]); 
+    var isDataRow = rawTargetDate.match(/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\$/);
+
+    if (!isDataRow) {
+        targetItems = []; 
+        var headerRow = [currentId, rawTargetDate];
+        for (var k = 2; k < currentCols.length; k++) {
+            var colName = trimStr(currentCols[k]);
+            if (colName && colName !== "採血日" && colName !== "採血値") {
+                targetItems.push(colName);
+                headerRow.push(colName);
+                headerRow.push("採血日");
+                headerRow.push("採血値");
+            }
+        }
+        outputLines.push(headerRow.join("\t"));
+        updatePreview();
+        setTimeout(processNext, 10);
+        return;
+    }
+
+    if(targetItems.length === 0 && currentCols.length > 2) {
+        for (var k = 2; k < currentCols.length; k++) {
+            var colName = trimStr(currentCols[k]);
+            if(colName) targetItems.push(colName);
+        }
+    }
+
+    currentTargetDate = padDateStr(rawTargetDate);
+    document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + ")";
+
+    var startDate = "";
+    if (searchDays !== "") {
+        startDate = getPastDateStr(currentTargetDate, searchDays); 
+    }
+    var endDate = currentTargetDate;
+
+    var url = "[http://10.5.171.42:8082/karte/kentai_kekka_karte.php](http://10.5.171.42:8082/karte/kentai_kekka_karte.php)"
+            + "?kanja_id=" + currentId
+            + "&user_id=16622"
+            + "&section_code=0000023"
+            + "&kentai_disp_flgs="
+            + "&disp_kekka_start_date=" + startDate
+            + "&disp_kekka_end_date=" + endDate
+            + "&disp_zoom=80"
+            + "&disp_kensu_count=30"
+            + "&_t=" + new Date().getTime();
+
+    try {
+        ie.Navigate(url);
+        setTimeout(waitForIeLoad, 100);
+    } catch(e) {
+        appendErrorRow("IE制御エラー");
+        setTimeout(processNext, 10);
+    }
+}
+
+function waitForIeLoad() {
+    try {
+        if (ie.Busy || ie.readyState !== 4) {
+            setTimeout(waitForIeLoad, 200);
+            return;
+        }
+        
+        var doc = ie.Document;
+        var tables = doc.getElementsByTagName("table");
+        
+        if(tables.length === 0) {
+            appendErrorRow("データなし");
+        } else {
+            var targetTable = tables[0];
+            
+            var dateCols = [];
+            for (var i = 0; i < targetTable.rows.length; i++) {
+                if (trimStr(targetTable.rows[i].cells[0].innerText) === "全件") {
+                    var dRow = targetTable.rows[i];
+                    for(var c = 3; c < dRow.cells.length; c += 2) {
+                        var dText = trimStr(dRow.cells[c].innerText);
+                        if(dText) dateCols.push({ colIdx: c, dateStr: dText });
+                    }
+                    break;
+                }
+            }
+
+            var valueMap = {};
+            if (dateCols.length > 0) {
+                for (var i = 0; i < targetTable.rows.length; i++) {
+                    var row = targetTable.rows[i];
+                    if (row.cells.length > 3) {
+                        var itemName = trimStr(row.cells[0].innerText);
+                        if (itemName !== "" && itemName !== "全件" && itemName !== "検査項目") {
+                            var normKey = normalizeItemName(itemName);
+                            
+                            var latestVal = trimStr(row.cells[3].innerText);
+                            var historyArr = [];
+                            for(var d = 0; d < dateCols.length; d++) {
+                                var col = dateCols[d].colIdx;
+                                var dateTxt = dateCols[d].dateStr;
+                                var valTxt = (col < row.cells.length) ? trimStr(row.cells[col].innerText) : "";
+                                if(valTxt) historyArr.push(dateTxt + ": " + valTxt);
+                            }
+                            
+                            var dataObj = { latest: latestVal, history: historyArr.join(", ") };
+                            valueMap[normKey] = dataObj;
+                            valueMap[itemName] = dataObj; 
+                        }
+                    }
+                }
+            }
+
+            var rawInputDate = trimStr(currentCols[1]);
+            var outRow = [currentId, rawInputDate]; 
+            
+            for (var k = 0; k < targetItems.length; k++) {
+                var reqItemRaw = targetItems[k];
+                var searchItem = reqItemRaw;
+                var isHistory = false;
+
+                if (searchItem.indexOf("全期間") !== -1) {
+                    isHistory = true;
+                    searchItem = searchItem.replace("全期間", "");
+                } else if (searchItem.indexOf("全履歴") !== -1) {
+                    isHistory = true;
+                    searchItem = searchItem.replace("全履歴", "");
+                }
+                
+                var normReq = normalizeItemName(searchItem);
+                var valObj = valueMap[normReq] || valueMap[searchItem];
+                
+                var finalDate = "";
+                var finalVal = "";
+
+                if (!valObj) {
+                    finalDate = "結果なし";
+                } else {
+                    if (isHistory) {
+                        finalDate = "全期間"; 
+                        finalVal = valObj.history;
+                    } else {
+                        finalDate = dateCols.length > 0 ? dateCols[0].dateStr : "結果なし";
+                        finalVal = valObj.latest; 
+                    }
+                }
+
+                outRow.push(reqItemRaw);
+                outRow.push(finalDate);
+                outRow.push(finalVal);
+            }
+            outputLines.push(outRow.join("\t"));
+        }
+    } catch(e) {
+        appendErrorRow("解析エラー");
+    }
+
+    updatePreview();
+    setTimeout(processNext, 50);
+}
+
+function appendErrorRow(errMsg) {
+    var rawInputDate = trimStr(currentCols[1]);
+    var outRow = [currentId, rawInputDate]; 
+    for (var k = 0; k < targetItems.length; k++) {
+        outRow.push(targetItems[k]);
+        outRow.push(errMsg);
+        outRow.push("");
+    }
+    outputLines.push(outRow.join("\t"));
+    updatePreview();
+}
+</script>
+<style>
+    body { font-family: 'Meiryo UI', sans-serif; background-color: #f4f6f9; padding: 15px; font-size: 13px; }
+    textarea { width: 100%; height: 120px; font-size: 12px; font-family: 'MS Gothic', monospace; white-space: pre; overflow: auto; border: 1px solid #ccc; padding: 5px; box-sizing: border-box; }
+    button { padding: 8px 20px; font-size: 14px; cursor: pointer; font-weight: bold; background-color: #0078D7; color: white; border: none; border-radius: 3px; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    .control-panel { background-color: #fff; padding: 12px; border: 1px solid #ddd; margin-bottom: 10px; line-height: 1.8; }
+</style>
+</head>
+<body>
+    <h3 style="margin-top:0; color: #333; margin-bottom: 10px;">採血データ一括取得ツール</h3>
+    
+    <div class="control-panel">
+        <label>
+            <b>探索期間: </b>
+            <input type="number" id="searchDays" value="" placeholder="無制限" style="width: 70px; padding: 2px;"> 日前まで遡って検索する
+        </label>
+        <div style="font-size: 11px; color: #666; margin-top: 5px;">
+            ※空欄にすると<b>「基準日以前のすべてのデータ」</b>を取得対象とします。<br>
+            ※JUSTcalcの見出しに<b>「eGFR全期間」</b>のように入力すると、その項目のみ該当期間すべての履歴を1セルに抽出します。
+        </div>
+    </div>
+
+    <textarea id="inputText" placeholder="ここにJUSTcalcのデータ（1行目の見出しを含む）を貼り付けてください"></textarea>
+    
+    <div style="margin-top: 10px;">
+        <button id="btn" onclick="startProcess()">一覧から一括取得してコピー</button>
+        <span id="msg" style="color: #d32f2f; font-weight: bold; margin-left: 15px;">待機中...</span>
+    </div>
+
+    <div style="margin-top: 15px; font-weight: bold; color: #333;">結果プレビュー:</div>
+    <textarea id="previewText" readonly style="background-color: #f0f0f0; height: 100px;"></textarea>
+
+</body>
+</html>
