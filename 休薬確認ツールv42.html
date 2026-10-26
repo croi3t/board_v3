@@ -1221,11 +1221,30 @@ const DATE_RULES = {
     "1日前": { days: -1, alert: true }, "1週間": { days: -7, alert: true }, "7日前": { days: -7, alert: true },
     "2日": { days: -2, alert: true }, "2日前": { days: -2, alert: true }, "3日前": { days: -3, alert: true },
     "前日(1日前)": { days: -1, alert: true }, "当日": { days: 0, alert: true },
+    "前後2日": { days: [-2, 2], alert: true },
+    "前後3日間": { days: [-3, 3], alert: true },
+    "前後3~5日": { days: [-5, 5], alert: true },
+    "前後3~7日": { days: [-7, 7], alert: true },
+    "1～3日": { days: [-3, -1], alert: true },
+    "3〜7日": { days: [-7, -3], alert: true },
+    "7～10 日前": { days: [-10, -7], alert: true },
+    "2週間": { days: -14, alert: true }, "28日前": { days: -28, alert: true }, "手術前４週": { days: -28, alert: true },
+    "4～6週間": { days: [-42, -28], alert: true },
+    "手術前４週､術後２週": { days: [-28, 14], alert: true },
+    "術後1週間": { days: 7, alert: true },
+    "5日以上前": { text: "{d5}より前から休薬", alert: true },
+    "24時間以上": { text: "{date} 手術予定時刻の24時間以上前から休薬", alert: true },
+    "24 時間以上": { text: "{date} 手術予定時刻の24時間以上前から休薬", alert: true },
     "24時間前": { text: "{date} 手術予定時刻の24時間前から休薬", alert: true },
     "48時間前": { text: "{date} 手術予定時刻の48時間前から休薬", alert: true },
     "糖尿病3日前/心不全当日": { text: "{d3} または {date}", alert: true },
+    "長期不動状態の３日前": { text: "長期不動状態の3日前", alert: true },
+    "歯科手術２カ月前": { text: "歯科手術2カ月前", alert: true },
+    "ｵﾋﾟｵｲﾄﾞ投与1週間前": { text: "オピオイド投与1週間前", alert: true },
+    "主治医判断": { text: "主治医判断", alert: true },
     "資料参照": { text: "要確認", alert: true },
     "院内推奨期間なし": { text: "院内推奨期間なし", alert: false, css: "row-gray" },
+    "院内推奨期間無し": { text: "院内推奨期間なし", alert: false, css: "row-gray" },
     "-": { text: "-", alert: false }, "対象外": { text: "-", alert: false },
     "継続を推奨": { text: "-", alert: false }
 };
@@ -1347,7 +1366,7 @@ function cleanDrugName(rawText) {
     name = name.replace(/．/g, ".");
 
     // 5. 剤形の後に数字が続く場合、剤形以降をカット
-    const boundaries = ["OD錠", "ＯＤ錠", "錠", "カプセル", "散", "顆粒", "細粒", "シロップ", "ドライシロップ", "液", "テープ", "パップ", "クリーム", "軟膏", "ゲル", "ローション", "坐剤", "坐薬", "スプレー", "塩酸塩", "硫酸塩", "リン酸塩", "マレイン酸塩", "クエン酸塩", "フマル酸塩", "メシル酸塩", "ベシル酸塩", "トシル酸塩", "ナトリウム", "カリウム", "カルシウム"];
+    const boundaries = ["OD錠", "ＯＤ錠", "錠", "粒状カプセル", "カプセル", "散", "顆粒", "細粒", "シロップ", "ドライシロップ", "液", "テープ", "パップ", "クリーム", "軟膏", "ゲル", "ローション", "坐剤", "坐薬", "スプレー", "塩酸塩", "硫酸塩", "リン酸塩", "マレイン酸塩", "クエン酸塩", "フマル酸塩", "メシル酸塩", "ベシル酸塩", "トシル酸塩", "ナトリウム", "カリウム", "カルシウム"];
     for (const b of boundaries) {
         const reg = new RegExp("(" + b + ")[0-9０-９]+.*$");
         if (reg.test(name)) { name = name.replace(reg, "$1"); break; }
@@ -1660,18 +1679,28 @@ function calcScheduleTab() {
     const patterns = [
         { l: "6週間前", d: -42 }, { l: "4週間前", d: -28 }, { l: "2週間前", d: -14 },
         { l: "1週間前", d: -7 }, { l: "7日前", d: -7 }, { l: "5日以上前", d: -5 },
-        { l: "3日前", d: -3 }, { l: "2日前", d: -2 }, { l: "前日(1日前)", d: -1 },
-        { l: "手術当日", d: 0 }, { l: "術後2週", d: 14 }
+        { l: "3日前", d: -3 }, { l: "2日前", d: -2 }, { l: "前後2日", d: [-2, 2] },
+        { l: "前日(1日前)", d: -1 }, { l: "手術当日", d: 0 },
+        { l: "術後2日後(前後2日)", d: 2, calOnly: true, calLabel: "術後2日" },
+        { l: "術後2週", d: 14 }
     ];
     
     let highlightDates = {};
     let h = `<div class="timeline-wrapper"><div class="timeline-container"><table class="timeline-table"><thead><tr><th class="timeline-date-col">日付</th><th class="timeline-content-col">休薬・対応</th></tr></thead><tbody>`;
     patterns.forEach(p => {
-        let dateObj = add(p.d);
-        let dateStr = `${dateObj.getFullYear()}-${dateObj.getMonth()+1}-${dateObj.getDate()}`;
-        if(p.d === 0) highlightDates[dateStr] = { class: "cal-surgery", label: "手術" };
-        else highlightDates[dateStr] = { class: "cal-mark", label: p.l.replace("手術前","").replace("前","") };
-        h += `<tr class="${p.d===0?'timeline-row-today':''}"><td class="timeline-date-col">${fmt(dateObj)}</td><td class="timeline-content-col">${p.l}</td></tr>`;
+        if (Array.isArray(p.d)) {
+            let d1 = add(p.d[0]);
+            let d2 = add(p.d[1]);
+            h += `<tr><td class="timeline-date-col">${fmt(d1)} ～ ${fmt(d2)}</td><td class="timeline-content-col">${p.l}</td></tr>`;
+        } else {
+            let dateObj = add(p.d);
+            let dateStr = `${dateObj.getFullYear()}-${dateObj.getMonth()+1}-${dateObj.getDate()}`;
+            if(p.d === 0) highlightDates[dateStr] = { class: "cal-surgery", label: "手術" };
+            else highlightDates[dateStr] = { class: "cal-mark", label: p.calLabel || p.l.replace("手術前","").replace("前","") };
+            if (!p.calOnly) {
+                h += `<tr class="${p.d===0?'timeline-row-today':''}"><td class="timeline-date-col">${fmt(dateObj)}</td><td class="timeline-content-col">${p.l}</td></tr>`;
+            }
+        }
     });
     h += `</tbody></table></div><div class="calendar-container"><div class="cal-wrapper">`;
     h += generateCalendarHTML(new Date(sDate.getFullYear(), sDate.getMonth() - 1, 1), highlightDates);
@@ -1814,7 +1843,7 @@ function isSeparatorWord(remainStr) {
     if (/[a-zA-Zａ-ｚＡ-Ｚ]/.test(firstChar)) return true;
     
     const sepWords = [
-        "錠", "カプセル", "散", "顆粒", "細粒", "シロップ", "ドライシロップ", "液", "水性", "懸濁", "ワクチン",
+        "錠", "粒状カプセル", "カプセル", "散", "顆粒", "細粒", "シロップ", "ドライシロップ", "液", "水性", "懸濁", "ワクチン",
         "テープ", "パップ", "クリーム", "軟膏", "ゲル", "ローション", "坐剤", "坐薬", "スプレー", "エアロゾル", "ポンプ", "吸入", "外用", "内服",
         "点眼", "点耳", "点鼻", "注射", "注", "キット", "シリンジ", "バッグ", "ディスポ", "ポリアンプ",
         "配合", "徐放", "舌下", "無水物",
