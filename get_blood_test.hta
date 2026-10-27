@@ -38,6 +38,19 @@ function getPastDateStr(dateStr, daysToSubtract) {
     return yy + "/" + mm + "/" + dd;
 }
 
+function addDaysStr(dateStr, daysToAdd) {
+    var parts = dateStr.split(/[\/\-]/);
+    if (parts.length !== 3) return dateStr;
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    d.setDate(d.getDate() + daysToAdd);
+    var yy = d.getFullYear();
+    var mm = d.getMonth() + 1;
+    var dd = d.getDate();
+    if (mm < 10) mm = "0" + mm;
+    if (dd < 10) dd = "0" + dd;
+    return yy + "/" + mm + "/" + dd;
+}
+
 // 検索用ID（先頭の0を除いた文字列）
 function getSearchId(id) {
     var s = trimStr(String(id));
@@ -76,6 +89,32 @@ function calculateAge(birthDateStr, targetDateStr) {
 
 function isProfileItem(colName) {
     return (colName === "年齢" || colName === "生年月日" || colName === "性別");
+}
+
+function isByomeiAllItem(colName) {
+    return (colName === "有効病名" || colName === "併存疾患" || colName === "病名一覧" || colName === "病名");
+}
+
+function isByomeiSearchItem(colName) {
+    if (!colName) return false;
+    return (colName.indexOf("病名:") === 0 || colName.indexOf("病名：") === 0 || colName.indexOf("疾患:") === 0 || colName.indexOf("疾患：") === 0);
+}
+
+function isByomeiItem(colName) {
+    return (isByomeiAllItem(colName) || isByomeiSearchItem(colName));
+}
+
+function isMedAllItem(colName) {
+    return (colName === "併用薬" || colName === "処方薬" || colName === "内服薬" || colName === "処方" || colName === "注射薬" || colName === "注射");
+}
+
+function isMedSearchItem(colName) {
+    if (!colName) return false;
+    return (colName.indexOf("薬剤:") === 0 || colName.indexOf("薬剤：") === 0 || colName.indexOf("薬:") === 0 || colName.indexOf("薬：") === 0 || colName.indexOf("併用薬:") === 0 || colName.indexOf("併用薬：") === 0);
+}
+
+function isMedItem(colName) {
+    return (isMedAllItem(colName) || isMedSearchItem(colName));
 }
 
 function isHistoryItem(colName) {
@@ -121,10 +160,16 @@ var currentId = "";
 var currentTargetDate = "";
 var currentRawLine = "";
 var targetItems = []; 
-var searchDays = ""; // 初期値を空にする
+var searchDays = ""; // 採血探索期間（初期値空欄）
+var medSearchDays = 30; // 併用薬探索期間（初期値30日）
 var isPaused = false;
 var fetchAgeEnabled = true;
+var fetchByomeiEnabled = true;
+var excludeSuspectedEnabled = false;
+var fetchMedEnabled = true;
 var patientInfoCache = {}; // key: 7桁0埋めID -> { found, birthDate, listAge, sex }
+var byomeiCache = {};      // key: 7桁0埋めID + "_" + currentTargetDate -> { list: [{name, suspected}], error }
+var medOrderCache = {};    // key: 7桁0埋めID -> { shoho: [...], chusha: [...], shohoLoaded, chushaLoaded, shohoError, chushaError }
 
 function updatePreview() {
     var previewText = document.getElementById("previewText");
@@ -180,14 +225,24 @@ function startProcess() {
         return;
     }
     
-    // 探索期間の取得（空欄ならそのまま空文字、数字があれば数値化）
+    // 採血探索期間の取得（空欄ならそのまま空文字、数字があれば数値化）
     var sdVal = document.getElementById("searchDays").value;
     if (sdVal === "") {
         searchDays = "";
     } else {
         searchDays = parseInt(sdVal, 10);
     }
+    // 併用薬探索期間の取得
+    var msdVal = document.getElementById("medSearchDays").value;
+    if (msdVal === "") {
+        medSearchDays = "";
+    } else {
+        medSearchDays = parseInt(msdVal, 10);
+    }
     fetchAgeEnabled = document.getElementById("fetchAgeChk").checked;
+    fetchByomeiEnabled = document.getElementById("fetchByomeiChk").checked;
+    excludeSuspectedEnabled = document.getElementById("excludeSuspectedChk").checked;
+    fetchMedEnabled = document.getElementById("fetchMedChk").checked;
     
     try {
         if(!ie) {
@@ -203,6 +258,8 @@ function startProcess() {
     currentLine = 0;
     outputLines = [];
     targetItems = []; 
+    byomeiCache = {};
+    medOrderCache = {};
     isPaused = false;
     document.getElementById("previewText").value = "";
     if (document.getElementById("copyBtn")) document.getElementById("copyBtn").disabled = true;
@@ -223,9 +280,32 @@ function hasPatientInfoTarget() {
     return false;
 }
 
+function hasByomeiTarget() {
+    for (var i = 0; i < targetItems.length; i++) {
+        if (isByomeiItem(targetItems[i])) return true;
+    }
+    return false;
+}
+
+function needShohoTarget() {
+    for (var i = 0; i < targetItems.length; i++) {
+        var c = targetItems[i];
+        if (c === "併用薬" || c === "処方薬" || c === "内服薬" || c === "処方" || isMedSearchItem(c)) return true;
+    }
+    return false;
+}
+
+function needChushaTarget() {
+    for (var i = 0; i < targetItems.length; i++) {
+        var c = targetItems[i];
+        if (c === "併用薬" || c === "注射薬" || c === "注射" || isMedSearchItem(c)) return true;
+    }
+    return false;
+}
+
 function hasBloodTestTarget() {
     for (var i = 0; i < targetItems.length; i++) {
-        if (!isProfileItem(targetItems[i])) return true;
+        if (!isProfileItem(targetItems[i]) && !isByomeiItem(targetItems[i]) && !isMedItem(targetItems[i])) return true;
     }
     return false;
 }
@@ -280,9 +360,13 @@ function processNext() {
     if (!isDataRow) {
         targetItems = []; 
         var hasAgeInHeader = false;
+        var hasByomeiInHeader = false;
+        var hasMedInHeader = false;
         for (var k = 2; k < currentCols.length; k++) {
             var cName = trimStr(currentCols[k]);
             if (cName === "年齢") hasAgeInHeader = true;
+            if (isByomeiAllItem(cName)) hasByomeiInHeader = true;
+            if (isMedAllItem(cName)) hasMedInHeader = true;
         }
 
         var headerRow = [currentId, rawTargetDate];
@@ -290,12 +374,20 @@ function processNext() {
             targetItems.push("年齢");
             headerRow.push("年齢");
         }
+        if (fetchByomeiEnabled && !hasByomeiInHeader) {
+            targetItems.push("有効病名");
+            headerRow.push("有効病名");
+        }
+        if (fetchMedEnabled && !hasMedInHeader) {
+            targetItems.push("併用薬");
+            headerRow.push("併用薬");
+        }
         for (var k = 2; k < currentCols.length; k++) {
             var colName = trimStr(currentCols[k]);
             if (colName && colName !== "採血日" && colName !== "採血値") {
                 targetItems.push(colName);
                 headerRow.push(colName);
-                if (!isProfileItem(colName) && !isHistoryItem(colName)) {
+                if (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isHistoryItem(colName)) {
                     headerRow.push("採血日");
                 }
             }
@@ -310,10 +402,16 @@ function processNext() {
         if (fetchAgeEnabled) {
             targetItems.push("年齢");
         }
+        if (fetchByomeiEnabled) {
+            targetItems.push("有効病名");
+        }
+        if (fetchMedEnabled) {
+            targetItems.push("併用薬");
+        }
         if (currentCols.length > 2) {
             for (var k = 2; k < currentCols.length; k++) {
                 var colName = trimStr(currentCols[k]);
-                if (colName && !(fetchAgeEnabled && colName === "年齢")) {
+                if (colName && !(fetchAgeEnabled && colName === "年齢") && !(fetchByomeiEnabled && isByomeiAllItem(colName)) && !(fetchMedEnabled && isMedAllItem(colName))) {
                     targetItems.push(colName);
                 }
             }
@@ -323,7 +421,7 @@ function processNext() {
     currentTargetDate = padDateStr(rawTargetDate);
     var paddedId = zeroPadId(currentId);
 
-    // 1. まず年齢（生年月日）の取得が必要で、かつ未キャッシュなら患者一覧URLへアクセス
+    // 1. 年齢（生年月日）の取得が必要で、かつ未キャッシュなら患者一覧URLへアクセス
     if (hasPatientInfoTarget() && (!patientInfoCache[paddedId] || patientInfoCache[paddedId].error)) {
         document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の基本情報を取得中)";
         var searchId = getSearchId(currentId);
@@ -340,12 +438,12 @@ function processNext() {
             setTimeout(waitForInfoLoad, 100);
         } catch(e) {
             patientInfoCache[paddedId] = { found: false, birthDate: "", listAge: "", sex: "", error: true };
-            proceedToBloodOrFinish();
+            proceedToByomeiOrNext();
         }
         return;
     }
 
-    proceedToBloodOrFinish();
+    proceedToByomeiOrNext();
 }
 
 function waitForInfoLoad() {
@@ -382,7 +480,7 @@ function waitForInfoLoad() {
         patientInfoCache[paddedIdErr] = { found: false, birthDate: "", listAge: "", sex: "", error: true };
     }
 
-    proceedToBloodOrFinish();
+    proceedToByomeiOrNext();
 }
 
 // 0埋め7桁IDとの完全一致で行を検索（6桁ID等で複数患者がヒットした場合の誤マッチ防止）
@@ -421,8 +519,428 @@ function findPatientRowByExactId(currentDoc, paddedId) {
     return null;
 }
 
+// 2. 有効病名の取得が必要で、かつ未キャッシュなら病名一覧URLへアクセス
+function proceedToByomeiOrNext() {
+    var bKey = zeroPadId(currentId) + "_" + currentTargetDate;
+    if (hasByomeiTarget() && (!byomeiCache[bKey] || byomeiCache[bKey].error)) {
+        document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の有効病名を取得中)";
+        var byomeiUrl = "http://10.5.171.42:8082/karte/kanja_profile/parts/kanja_byomei_info_disp.php"
+                      + "?kanja_id=" + encodeURIComponent(currentId)
+                      + "&user_id=16622"
+                      + "&section_code=0000022"
+                      + "&disp_start_date=" + currentTargetDate
+                      + "&disp_end_date=" + currentTargetDate
+                      + "&shindan_kind=2"
+                      + "&mysection_flg=1"
+                      + "&disp_range_kind=1"
+                      + "&risk_manage_kind=0"
+                      + "&byomei_status_kind=0"
+                      + "&_t=" + new Date().getTime();
+        try {
+            ie.Navigate(byomeiUrl);
+            setTimeout(waitForByomeiLoad, 100);
+        } catch(e) {
+            byomeiCache[bKey] = { list: [], error: true };
+            proceedToMedOrNext();
+        }
+        return;
+    }
+
+    proceedToMedOrNext();
+}
+
+function waitForByomeiLoad() {
+    var bKey = zeroPadId(currentId) + "_" + currentTargetDate;
+    try {
+        if (ie.Busy || ie.readyState !== 4) {
+            setTimeout(waitForByomeiLoad, 150);
+            return;
+        }
+
+        var doc = ie.Document;
+        var list = [];
+        var tables = doc.getElementsByTagName("table");
+        for (var t = 0; t < tables.length; t++) {
+            var rows = tables[t].rows;
+            for (var r = 0; r < rows.length; r++) {
+                var cells = rows[r].cells;
+                if (cells && cells.length >= 9) {
+                    var numTxt = trimStr(cells[0].innerText || cells[0].textContent || "");
+                    if (numTxt === "" || numTxt === "番号") continue;
+
+                    var byomeiName = trimStr(cells[3].innerText || cells[3].textContent || "");
+                    var utagaiTxt = trimStr(cells[4].innerText || cells[4].textContent || "");
+                    var tenkiTxt = trimStr(cells[5].innerText || cells[5].textContent || "");
+                    var endDateTxt = trimStr(cells[8].innerText || cells[8].textContent || "");
+
+                    if (byomeiName !== "") {
+                        var isSuspected = (utagaiTxt === "○" || byomeiName.indexOf("の疑い") !== -1);
+                        list.push({
+                            name: byomeiName,
+                            suspected: isSuspected,
+                            tenki: tenkiTxt,
+                            endDate: endDateTxt
+                        });
+                    }
+                }
+            }
+        }
+        byomeiCache[bKey] = { list: list, error: false };
+    } catch(e) {
+        byomeiCache[bKey] = { list: [], error: true };
+    }
+
+    proceedToMedOrNext();
+}
+
+function getByomeiItemValue(colName) {
+    var bKey = zeroPadId(currentId) + "_" + currentTargetDate;
+    var bData = byomeiCache[bKey];
+    if (!bData) return "";
+    if (bData.error) return "病名取得エラー";
+
+    // 重複を除きつつ条件に合う病名リストを作成
+    var filteredNames = [];
+    var seen = {};
+    for (var i = 0; i < bData.list.length; i++) {
+        var item = bData.list[i];
+        if (excludeSuspectedEnabled && item.suspected) {
+            continue;
+        }
+        var dispName = item.name;
+        if (!seen[dispName]) {
+            seen[dispName] = true;
+            filteredNames.push(dispName);
+        }
+    }
+
+    // 「有効病名」「併存疾患」等の全件出力列の場合
+    if (isByomeiAllItem(colName)) {
+        if (filteredNames.length === 0) return "登録なし";
+        return filteredNames.join(", ");
+    }
+
+    // 「病名:糖尿病」や「病名:胃癌|大腸癌」のような個別キーワードサーチ列の場合
+    var kwPart = colName.replace(/^(?:病名|疾患)[:：]/, "");
+    var keywords = kwPart.split(/[|｜\/／]/);
+    var matchedNames = [];
+    for (var j = 0; j < filteredNames.length; j++) {
+        var dName = filteredNames[j];
+        var normDName = normalizeItemName(dName);
+        for (var m = 0; m < keywords.length; m++) {
+            var kw = trimStr(keywords[m]);
+            if (!kw) continue;
+            var normKw = normalizeItemName(kw);
+            if (dName.indexOf(kw) !== -1 || (normKw && normDName.indexOf(normKw) !== -1)) {
+                matchedNames.push(dName);
+                break;
+            }
+        }
+    }
+    return matchedNames.join(", ");
+}
+
+// 3. 併用薬（処方: order_search_code=1 / 注射: order_search_code=4）の取得
+function proceedToMedOrNext() {
+    var paddedId = zeroPadId(currentId);
+    if (!medOrderCache[paddedId]) {
+        medOrderCache[paddedId] = {
+            shoho: [],
+            chusha: [],
+            shohoLoaded: false,
+            chushaLoaded: false,
+            shohoError: false,
+            chushaError: false
+        };
+    }
+
+    if (needShohoTarget() && (!medOrderCache[paddedId].shohoLoaded || medOrderCache[paddedId].shohoError)) {
+        document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の処方歴を取得中)";
+        var shohoUrl = "http://10.5.171.42:8082/karte/karte.php"
+                     + "?kanja_id=" + encodeURIComponent(currentId)
+                     + "&user_id=16622"
+                     + "&order_search_flg=1"
+                     + "&order_search_code=1"
+                     + "&order_search_name="
+                     + "&_t=" + new Date().getTime()
+                     + "#top";
+        try {
+            ie.Navigate(shohoUrl);
+            setTimeout(waitForShohoLoad, 100);
+        } catch(e) {
+            medOrderCache[paddedId].shohoLoaded = true;
+            medOrderCache[paddedId].shohoError = true;
+            proceedToChushaOrNext();
+        }
+        return;
+    }
+
+    proceedToChushaOrNext();
+}
+
+function waitForShohoLoad() {
+    var paddedId = zeroPadId(currentId);
+    try {
+        if (ie.Busy || ie.readyState !== 4) {
+            setTimeout(waitForShohoLoad, 150);
+            return;
+        }
+        var doc = ie.Document;
+        medOrderCache[paddedId].shoho = parseMedOrdersFromDoc(doc);
+        medOrderCache[paddedId].shohoLoaded = true;
+        medOrderCache[paddedId].shohoError = false;
+    } catch(e) {
+        medOrderCache[paddedId].shoho = [];
+        medOrderCache[paddedId].shohoLoaded = true;
+        medOrderCache[paddedId].shohoError = true;
+    }
+    proceedToChushaOrNext();
+}
+
+function proceedToChushaOrNext() {
+    var paddedId = zeroPadId(currentId);
+    if (needChushaTarget() && (!medOrderCache[paddedId].chushaLoaded || medOrderCache[paddedId].chushaError)) {
+        document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の注射歴を取得中)";
+        var chushaUrl = "http://10.5.171.42:8082/karte/karte.php"
+                      + "?kanja_id=" + encodeURIComponent(currentId)
+                      + "&user_id=16622"
+                      + "&order_search_flg=1"
+                      + "&order_search_code=4"
+                      + "&order_search_name="
+                      + "&_t=" + new Date().getTime()
+                      + "#top";
+        try {
+            ie.Navigate(chushaUrl);
+            setTimeout(waitForChushaLoad, 100);
+        } catch(e) {
+            medOrderCache[paddedId].chushaLoaded = true;
+            medOrderCache[paddedId].chushaError = true;
+            proceedToBloodOrFinish();
+        }
+        return;
+    }
+
+    proceedToBloodOrFinish();
+}
+
+function waitForChushaLoad() {
+    var paddedId = zeroPadId(currentId);
+    try {
+        if (ie.Busy || ie.readyState !== 4) {
+            setTimeout(waitForChushaLoad, 150);
+            return;
+        }
+        var doc = ie.Document;
+        medOrderCache[paddedId].chusha = parseMedOrdersFromDoc(doc);
+        medOrderCache[paddedId].chushaLoaded = true;
+        medOrderCache[paddedId].chushaError = false;
+    } catch(e) {
+        medOrderCache[paddedId].chusha = [];
+        medOrderCache[paddedId].chushaLoaded = true;
+        medOrderCache[paddedId].chushaError = true;
+    }
+    proceedToBloodOrFinish();
+}
+
+// 薬剤名から先頭記号（★, ●, （持参薬）等）および末尾の用量・単位・【分割】等を除去
+function cleanDrugName(rawLine) {
+    if (!rawLine) return "";
+    var s = rawLine.replace(/\u00a0/g, " ");
+    s = s.replace(/^[\s\u3000]+|[\s\u3000]+$/g, "");
+    // 先頭の記号・持参薬表記等を除去
+    s = s.replace(/^(?:[★●◎○◆■▲▽▼※]|[\(（]持参薬[\)）]|[\(（]院外[\)）]|[\(（]院内[\)）]|[\s\u3000])+/, "");
+    // 末尾の【分割】【一包化】等のタグを除去
+    s = s.replace(/\s*【[^】]*】\s*$/g, "");
+    // 末尾の「(入院 )?数値+単位」を除去
+    s = s.replace(/\s+(?:(?:入院|外来)\s+)?\d+(?:\.\d+)?\s*(?:Ｔ|ＣＰ|カプセル|包|ｇ|ｍｇ|μｇ|ｍＬ|ｍｌ|mL|ml|Ｌ|本|枚|個|管|Ａ|Ｖ|袋|筒|キット|単位|滴|ブリスター|シート|吸入|パフ|押し|錠|丸|パック|セット|瓶|バイアル|アンプル)[^\s]*\s*$/i, "");
+    s = s.replace(/^[\s\u3000]+|[\s\u3000]+$/g, "");
+    return s;
+}
+
+// 処方・注射ページのDOMからRp単位で { orderDate, effectiveEndDate, drugs: [...] } を抽出
+function parseMedOrdersFromDoc(doc) {
+    var orders = [];
+    if (!doc) return orders;
+
+    var els = doc.getElementsByTagName("*");
+    var lastHeaderTxt = "";
+    var lastHeaderDate = "";
+
+    for (var i = 0; i < els.length; i++) {
+        var tag = els[i].tagName ? els[i].tagName.toUpperCase() : "";
+        if (tag === "SPAN") {
+            var sTxt = trimStr(els[i].innerText || els[i].textContent || "");
+            if (sTxt.indexOf("【") !== -1) {
+                var dm = sTxt.match(/(\d{4}\/\d{2}\/\d{2})\s*$/);
+                if (dm) {
+                    lastHeaderTxt = sTxt;
+                    lastHeaderDate = dm[1];
+                }
+            }
+        } else if (tag === "PRE") {
+            var preTxt = els[i].innerText || els[i].textContent || "";
+            if (!preTxt) continue;
+
+            // オーダー全体が[中止]または×の場合はスキップ
+            if (lastHeaderTxt.indexOf("[中止]") !== -1 || lastHeaderTxt.indexOf("×") !== -1) {
+                continue;
+            }
+
+            var preLines = preTxt.split(/\r?\n/);
+            var orderDate = lastHeaderDate;
+            var orderCancelled = false;
+
+            // PRE先頭部のオーダー日・中止判定を確認
+            for (var p = 0; p < preLines.length; p++) {
+                var pl = trimStr(preLines[p]);
+                if (/^Rp\d+/.test(pl)) break;
+                if (!orderDate) {
+                    var pdm = pl.match(/^(\d{4}\/\d{2}\/\d{2})/);
+                    if (pdm) orderDate = pdm[1];
+                }
+                if (/No\.\d+\s+中止/.test(pl)) {
+                    orderCancelled = true;
+                }
+            }
+            if (orderCancelled || !orderDate) continue;
+
+            // Rpブロックごとに分割して解析
+            var inRp = false;
+            var rpDrugs = [];
+            var rpDuration = 1;
+            var rpStopDate = "";
+
+            for (var p = 0; p <= preLines.length; p++) {
+                var rawL = (p < preLines.length) ? preLines[p] : "Rp999999";
+                var trimmedL = trimStr(rawL);
+
+                if (/^Rp\d+/.test(trimmedL)) {
+                    if (inRp && rpDrugs.length > 0) {
+                        var effEnd = addDaysStr(orderDate, (rpDuration > 1 ? rpDuration - 1 : 0));
+                        var skipRp = false;
+                        if (rpStopDate) {
+                            if (rpStopDate <= orderDate) {
+                                skipRp = true;
+                            } else {
+                                var stopPrev = addDaysStr(rpStopDate, -1);
+                                if (stopPrev < effEnd) effEnd = stopPrev;
+                            }
+                        }
+                        if (!skipRp) {
+                            orders.push({
+                                orderDate: orderDate,
+                                effectiveEndDate: effEnd,
+                                drugs: rpDrugs
+                            });
+                        }
+                    }
+                    inRp = true;
+                    rpDrugs = [];
+                    rpDuration = 1;
+                    rpStopDate = "";
+                    continue;
+                }
+
+                if (!inRp) continue;
+
+                // 全角スペース1個で始まる行＝薬剤名行
+                if (/^\u3000[^\s\u3000]/.test(rawL)) {
+                    var dName = cleanDrugName(rawL);
+                    if (dName && dName.indexOf("----") === -1) {
+                        rpDrugs.push(dName);
+                    }
+                } else if (/^\u3000{2}/.test(rawL)) {
+                    // 用法・日数行（例: 　　分２　(朝・夕)食後    14日分）
+                    var durMatch = rawL.match(/(\d+)\s*日分/);
+                    if (durMatch) {
+                        var dNum = parseInt(durMatch[1], 10);
+                        if (!isNaN(dNum) && dNum > rpDuration) {
+                            rpDuration = dNum;
+                        }
+                    }
+                    // 【中止】YYYY年MM月DD日
+                    var stopMatch = rawL.match(/【中止】\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                    if (stopMatch) {
+                        rpStopDate = padDateStr(stopMatch[1] + "/" + stopMatch[2] + "/" + stopMatch[3]);
+                    }
+                }
+            }
+        }
+    }
+
+    return orders;
+}
+
+function getMedItemValue(colName) {
+    var paddedId = zeroPadId(currentId);
+    var mCache = medOrderCache[paddedId];
+    if (!mCache) return "";
+
+    var useShoho = (colName === "併用薬" || colName === "処方薬" || colName === "内服薬" || colName === "処方" || isMedSearchItem(colName));
+    var useChusha = (colName === "併用薬" || colName === "注射薬" || colName === "注射" || isMedSearchItem(colName));
+
+    if ((useShoho && mCache.shohoError) && (useChusha && mCache.chushaError)) {
+        return "薬剤取得エラー";
+    }
+
+    var startDate = "";
+    if (medSearchDays !== "" && !isNaN(medSearchDays)) {
+        startDate = getPastDateStr(currentTargetDate, medSearchDays);
+    }
+
+    var combinedOrders = [];
+    if (useShoho && mCache.shoho) {
+        combinedOrders = combinedOrders.concat(mCache.shoho);
+    }
+    if (useChusha && mCache.chusha) {
+        combinedOrders = combinedOrders.concat(mCache.chusha);
+    }
+
+    // 基準日・探索期間（＋処方日数による継続期間）に合致する薬剤を重複排除して抽出
+    var activeDrugs = [];
+    var seen = {};
+    for (var i = 0; i < combinedOrders.length; i++) {
+        var ord = combinedOrders[i];
+        if (ord.orderDate > currentTargetDate) continue;
+        if (startDate !== "" && ord.effectiveEndDate < startDate) continue;
+
+        for (var d = 0; d < ord.drugs.length; d++) {
+            var drugName = ord.drugs[d];
+            if (!seen[drugName]) {
+                seen[drugName] = true;
+                activeDrugs.push(drugName);
+            }
+        }
+    }
+
+    // 「併用薬」「処方薬」「注射薬」等の全件出力列の場合
+    if (isMedAllItem(colName)) {
+        if (activeDrugs.length === 0) return "なし";
+        return activeDrugs.join(", ");
+    }
+
+    // 「薬剤:アムロジピン|ノルバスク」等のキーワードサーチ列の場合
+    var kwPart = colName.replace(/^(?:併用薬|薬剤|薬)[:：]/, "");
+    var keywords = kwPart.split(/[|｜\/／]/);
+    var matchedDrugs = [];
+    for (var j = 0; j < activeDrugs.length; j++) {
+        var aName = activeDrugs[j];
+        var normAName = normalizeItemName(aName);
+        for (var m = 0; m < keywords.length; m++) {
+            var kw = trimStr(keywords[m]);
+            if (!kw) continue;
+            var normKw = normalizeItemName(kw);
+            if (aName.indexOf(kw) !== -1 || (normKw && normAName.indexOf(normKw) !== -1)) {
+                matchedDrugs.push(aName);
+                break;
+            }
+        }
+    }
+    return matchedDrugs.join(", ");
+}
+
 function proceedToBloodOrFinish() {
-    // 採血項目がない場合（年齢のみ取得など）は採血URLへアクセスせず即出力
+    // 採血項目がない場合（年齢・病名・併用薬のみ取得など）は採血URLへアクセスせず即出力
     if (!hasBloodTestTarget()) {
         buildAndPushRow({});
         updatePreview();
@@ -545,6 +1063,14 @@ function buildAndPushRow(valueMap, dateCols) {
             outRow.push(getProfileItemValue(reqItemRaw));
             continue;
         }
+        if (isByomeiItem(reqItemRaw)) {
+            outRow.push(getByomeiItemValue(reqItemRaw));
+            continue;
+        }
+        if (isMedItem(reqItemRaw)) {
+            outRow.push(getMedItemValue(reqItemRaw));
+            continue;
+        }
 
         var searchItem = reqItemRaw;
         var isHistory = false;
@@ -591,6 +1117,10 @@ function appendErrorRow(errMsg) {
         var reqItemRaw = targetItems[k];
         if (isProfileItem(reqItemRaw)) {
             outRow.push(getProfileItemValue(reqItemRaw));
+        } else if (isByomeiItem(reqItemRaw)) {
+            outRow.push(getByomeiItemValue(reqItemRaw));
+        } else if (isMedItem(reqItemRaw)) {
+            outRow.push(getMedItemValue(reqItemRaw));
         } else if (isHistoryItem(reqItemRaw)) {
             outRow.push(errMsg);
         } else {
@@ -615,25 +1145,48 @@ function appendErrorRow(errMsg) {
 </style>
 </head>
 <body>
-    <h3 style="margin-top:0; color: #333; margin-bottom: 10px;">採血データ・年齢一括取得ツール（列名指定対応）</h3>
+    <h3 style="margin-top:0; color: #333; margin-bottom: 10px;">採血データ・年齢・有効病名・併用薬 一括取得ツール</h3>
     
     <div class="control-panel">
-        <label>
-            <b>探索期間: </b>
-            <input type="number" id="searchDays" value="" placeholder="無制限" style="width: 70px; padding: 2px;"> 日前まで遡って検索する
-        </label>
-        <label style="margin-left: 20px; cursor: pointer;">
-            <input type="checkbox" id="fetchAgeChk" checked>
-            <b>年齢も同時に取得する</b>（生年月日から基準日時点の年齢を自動算出）
-        </label>
-        <label style="margin-left: 20px; cursor: pointer;">
-            <input type="checkbox" id="autoCopyChk">
-            <b>完了・一時停止時に自動でクリップボードへコピーする</b>
-        </label>
-        <div style="font-size: 11px; color: #666; margin-top: 5px;">
-            ※探索期間を空欄にすると<b>「基準日以前のすべてのデータ」</b>を取得対象とします（通常はこちら推奨）。<br>
-            ※見出し（1行目）に<b>「年齢」「生年月日」「性別」</b>を含めるか、上の「年齢も同時に取得する」にチェックを入れると患者一覧から自動取得します（年齢のみ取得したい場合は見出しを「ID / 基準日 / 年齢」だけにすると高速に取得できます）。<br>
-            ※JUSTcalcの見出し（1行目）に<b>「eGFR全期間」</b>のように<b>「全期間」</b>とつけて入力すると、その項目だけ取得対象期間のすべての履歴データを1つのセルにまとめて抽出します。
+        <div>
+            <label>
+                <b>採血の探索期間: </b>
+                <input type="number" id="searchDays" value="" placeholder="無制限" style="width: 65px; padding: 2px;"> 日前まで
+            </label>
+            <label style="margin-left: 18px;">
+                <b>併用薬の探索期間: </b>
+                <input type="number" id="medSearchDays" value="30" placeholder="無制限" style="width: 65px; padding: 2px;"> 日前まで（処方日数も加味）
+            </label>
+        </div>
+        <div style="margin-top: 4px;">
+            <label style="cursor: pointer;">
+                <input type="checkbox" id="fetchAgeChk" checked>
+                <b>年齢も同時に取得</b>
+            </label>
+            <label style="margin-left: 16px; cursor: pointer;">
+                <input type="checkbox" id="fetchByomeiChk" checked>
+                <b>有効病名（併存疾患）も同時に取得</b>
+            </label>
+            <label style="margin-left: 16px; cursor: pointer;">
+                <input type="checkbox" id="excludeSuspectedChk">
+                <b>「疑い病名（疑＝○）」を除外</b>
+            </label>
+            <label style="margin-left: 16px; cursor: pointer;">
+                <input type="checkbox" id="fetchMedChk" checked>
+                <b>併用薬（処方・注射）も同時に取得</b>
+            </label>
+        </div>
+        <div style="margin-top: 4px;">
+            <label style="cursor: pointer;">
+                <input type="checkbox" id="autoCopyChk">
+                <b>完了・一時停止時に自動でクリップボードへコピーする</b>
+            </label>
+        </div>
+        <div style="font-size: 11px; color: #666; margin-top: 6px; border-top: 1px dashed #ddd; padding-top: 5px;">
+            ※<b>全病名・全併用薬の収集</b>：上のチェックをONにするか、見出し（1行目）に<b>「有効病名」「併存疾患」</b>や<b>「併用薬」</b>（処方のみは<b>「処方薬」</b>、注射のみは<b>「注射薬」</b>）と入力すると、重複排除して1セルにまとめて出力します。<br>
+            ※<b>特定疾患・特定薬剤のサーチ</b>：見出しに<b>「病名:糖尿病」</b>や<b>「薬剤:アムロジピン|ノルバスク」</b>（複数キーワードは <code>|</code> 区切り）と入力すると、該当項目のみを抽出します。<br>
+            ※<b>併用薬の判定</b>：基準日以前のオーダーのうち、探索期間内の処方・注射に加え、長期処方（例：60日分）で基準日時点も服用継続中の薬剤を自動判定します（[中止]オーダーや服用中止分は自動除外）。<br>
+            ※<b>全期間採血</b>：見出しに<b>「eGFR全期間」</b>のように<b>「全期間」</b>をつけると、採血日列を作らずに対象期間の履歴を1セルにまとめて出力します。
         </div>
     </div>
 
