@@ -78,6 +78,11 @@ function isProfileItem(colName) {
     return (colName === "年齢" || colName === "生年月日" || colName === "性別");
 }
 
+function isHistoryItem(colName) {
+    if (!colName) return false;
+    return (colName.indexOf("全期間") !== -1 || colName.indexOf("全履歴") !== -1);
+}
+
 function normalizeItemName(name) {
     if (!name) return "";
     var s = name;
@@ -123,10 +128,34 @@ var patientInfoCache = {}; // key: 7桁0埋めID -> { found, birthDate, listAge,
 
 function updatePreview() {
     var previewText = document.getElementById("previewText");
-    if (outputLines.length <= 5) {
+    var showAll = document.getElementById("showAllPreviewChk") ? document.getElementById("showAllPreviewChk").checked : true;
+    if (showAll || outputLines.length <= 5) {
         previewText.value = outputLines.join("\n");
-    } else if (outputLines.length === 6) {
-        previewText.value += "\n... (以下省略)";
+    } else {
+        previewText.value = outputLines.slice(0, 5).join("\n") + "\n... (以下省略・全 " + outputLines.length + " 行)";
+    }
+    var copyBtn = document.getElementById("copyBtn");
+    if (copyBtn) {
+        copyBtn.disabled = (outputLines.length === 0);
+    }
+    var countSpan = document.getElementById("previewCount");
+    if (countSpan) {
+        countSpan.innerText = outputLines.length > 0 ? "（現在 " + outputLines.length + " 行）" : "";
+    }
+}
+
+function copyResult() {
+    if (outputLines.length === 0) {
+        alert("コピーする取得結果がありません。");
+        return;
+    }
+    window.clipboardData.setData("Text", outputLines.join("\n"));
+    var copyStatus = document.getElementById("copyStatus");
+    if (copyStatus) {
+        copyStatus.innerText = "✓ クリップボードにコピーしました！（全 " + outputLines.length + " 行）";
+        setTimeout(function() {
+            if (copyStatus) copyStatus.innerText = "";
+        }, 4000);
     }
 }
 
@@ -176,6 +205,9 @@ function startProcess() {
     targetItems = []; 
     isPaused = false;
     document.getElementById("previewText").value = "";
+    if (document.getElementById("copyBtn")) document.getElementById("copyBtn").disabled = true;
+    if (document.getElementById("previewCount")) document.getElementById("previewCount").innerText = "";
+    if (document.getElementById("copyStatus")) document.getElementById("copyStatus").innerText = "";
     document.getElementById("msg").innerText = "処理を開始します...";
     document.getElementById("btn").disabled = true;
     document.getElementById("pauseBtn").disabled = false;
@@ -200,18 +232,23 @@ function hasBloodTestTarget() {
 
 function processNext() {
     if (isPaused) {
-        if (outputLines.length > 0) {
+        var autoCopyPause = document.getElementById("autoCopyChk") && document.getElementById("autoCopyChk").checked;
+        if (autoCopyPause && outputLines.length > 0) {
             window.clipboardData.setData("Text", outputLines.join("\n"));
         }
         document.getElementById("btn").disabled = false;
-        document.getElementById("msg").innerText = "一時停止中 (" + currentLine + " / " + lines.length + " 行目まで処理済・途中結果をコピー済)";
+        document.getElementById("msg").innerText = "一時停止中 (" + currentLine + " / " + lines.length + " 行目まで処理済・「取得結果をコピー」ボタンでコピーできます)";
         return;
     }
 
     if (currentLine >= lines.length) {
-        var finalStr = outputLines.join("\n");
-        window.clipboardData.setData("Text", finalStr);
-        document.getElementById("msg").innerText = "完了しました！ プレビューを確認し、JUSTcalcに貼り付けてください。";
+        var autoCopyDone = document.getElementById("autoCopyChk") && document.getElementById("autoCopyChk").checked;
+        if (autoCopyDone && outputLines.length > 0) {
+            window.clipboardData.setData("Text", outputLines.join("\n"));
+            document.getElementById("msg").innerText = "完了しました！（自動コピー済） プレビューを確認し、JUSTcalcに貼り付けてください。";
+        } else {
+            document.getElementById("msg").innerText = "完了しました！ 「取得結果をコピー」ボタンを押してJUSTcalcに貼り付けてください。";
+        }
         document.getElementById("btn").disabled = false;
         document.getElementById("pauseBtn").disabled = true;
         document.getElementById("pauseBtn").innerText = "一時停止";
@@ -258,7 +295,7 @@ function processNext() {
             if (colName && colName !== "採血日" && colName !== "採血値") {
                 targetItems.push(colName);
                 headerRow.push(colName);
-                if (!isProfileItem(colName)) {
+                if (!isProfileItem(colName) && !isHistoryItem(colName)) {
                     headerRow.push("採血日");
                 }
             }
@@ -523,23 +560,26 @@ function buildAndPushRow(valueMap, dateCols) {
         var normReq = normalizeItemName(searchItem);
         var valObj = valueMap[normReq] || valueMap[searchItem];
         
-        var finalDate = "";
-        var finalVal = "";
-
-        if (!valObj) {
-            finalDate = "結果なし";
+        if (isHistory) {
+            if (!valObj || !valObj.history) {
+                outRow.push("結果なし");
+            } else {
+                outRow.push(valObj.history);
+            }
         } else {
-            if (isHistory) {
-                finalDate = "全期間"; 
-                finalVal = valObj.history;
+            var finalDate = "";
+            var finalVal = "";
+
+            if (!valObj) {
+                finalDate = "結果なし";
             } else {
                 finalDate = (dateCols && dateCols.length > 0) ? dateCols[0].dateStr : "結果なし";
                 finalVal = valObj.latest; 
             }
-        }
 
-        outRow.push(finalVal);
-        outRow.push(finalDate);
+            outRow.push(finalVal);
+            outRow.push(finalDate);
+        }
     }
     outputLines.push(outRow.join("\t"));
 }
@@ -551,6 +591,8 @@ function appendErrorRow(errMsg) {
         var reqItemRaw = targetItems[k];
         if (isProfileItem(reqItemRaw)) {
             outRow.push(getProfileItemValue(reqItemRaw));
+        } else if (isHistoryItem(reqItemRaw)) {
+            outRow.push(errMsg);
         } else {
             outRow.push("");
             outRow.push(errMsg);
@@ -562,11 +604,13 @@ function appendErrorRow(errMsg) {
 </script>
 <style>
     body { font-family: 'Meiryo UI', sans-serif; background-color: #f4f6f9; padding: 15px; font-size: 13px; }
-    textarea { width: 100%; height: 120px; font-size: 12px; font-family: 'MS Gothic', monospace; white-space: pre; overflow: auto; border: 1px solid #ccc; padding: 5px; box-sizing: border-box; }
+    textarea { width: 100%; height: 120px; font-size: 12px; font-family: 'MS Gothic', monospace; white-space: pre; word-wrap: normal; overflow-x: scroll; overflow-y: auto; border: 1px solid #ccc; padding: 5px; box-sizing: border-box; }
     button { padding: 8px 20px; font-size: 14px; cursor: pointer; font-weight: bold; background-color: #0078D7; color: white; border: none; border-radius: 3px; }
     button:disabled { background-color: #ccc; cursor: not-allowed; }
     #pauseBtn { background-color: #f57c00; margin-left: 8px; }
     #pauseBtn:disabled { background-color: #ccc; }
+    #copyBtn { background-color: #2e7d32; margin-left: 8px; }
+    #copyBtn:disabled { background-color: #ccc; }
     .control-panel { background-color: #fff; padding: 12px; border: 1px solid #ddd; margin-bottom: 10px; line-height: 1.8; }
 </style>
 </head>
@@ -582,6 +626,10 @@ function appendErrorRow(errMsg) {
             <input type="checkbox" id="fetchAgeChk" checked>
             <b>年齢も同時に取得する</b>（生年月日から基準日時点の年齢を自動算出）
         </label>
+        <label style="margin-left: 20px; cursor: pointer;">
+            <input type="checkbox" id="autoCopyChk">
+            <b>完了・一時停止時に自動でクリップボードへコピーする</b>
+        </label>
         <div style="font-size: 11px; color: #666; margin-top: 5px;">
             ※探索期間を空欄にすると<b>「基準日以前のすべてのデータ」</b>を取得対象とします（通常はこちら推奨）。<br>
             ※見出し（1行目）に<b>「年齢」「生年月日」「性別」</b>を含めるか、上の「年齢も同時に取得する」にチェックを入れると患者一覧から自動取得します（年齢のみ取得したい場合は見出しを「ID / 基準日 / 年齢」だけにすると高速に取得できます）。<br>
@@ -589,16 +637,23 @@ function appendErrorRow(errMsg) {
         </div>
     </div>
 
-    <textarea id="inputText" placeholder="ここにJUSTcalcのデータ（1行目の見出しを含む）を貼り付けてください"></textarea>
+    <textarea id="inputText" wrap="off" placeholder="ここにJUSTcalcのデータ（1行目の見出しを含む）を貼り付けてください"></textarea>
     
     <div style="margin-top: 10px;">
-        <button id="btn" onclick="startProcess()">一覧から一括取得してコピー</button>
+        <button id="btn" onclick="startProcess()">一覧から一括取得開始</button>
         <button id="pauseBtn" onclick="togglePause()" disabled>一時停止</button>
+        <button id="copyBtn" onclick="copyResult()" disabled>取得結果をコピー</button>
         <span id="msg" style="color: #d32f2f; font-weight: bold; margin-left: 15px;">待機中...</span>
+        <span id="copyStatus" style="color: #2e7d32; font-weight: bold; margin-left: 10px;"></span>
     </div>
 
-    <div style="margin-top: 15px; font-weight: bold; color: #333;">結果プレビュー (最初の数件):</div>
-    <textarea id="previewText" readonly style="background-color: #f0f0f0; height: 100px;" placeholder="ここに実行結果がリアルタイムで表示されます"></textarea>
+    <div style="margin-top: 15px; margin-bottom: 4px; color: #333;">
+        <b>結果プレビュー</b><span id="previewCount" style="font-size: 12px; color: #555;"></span>:
+        <label style="margin-left: 15px; font-weight: normal; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="showAllPreviewChk" checked onchange="updatePreview()"> 全件表示する（オフで先頭5行のみ表示）
+        </label>
+    </div>
+    <textarea id="previewText" wrap="off" readonly style="background-color: #f0f0f0; height: 220px;" placeholder="ここに実行結果がリアルタイムで全件表示されます（手動で範囲選択してコピーすることも可能です）"></textarea>
 
 </body>
 </html>
