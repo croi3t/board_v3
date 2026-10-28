@@ -333,7 +333,16 @@ function expandSearchKeywords(kwPart) {
     return result;
 }
 
+// IE/HTAの「このページのスクリプトが原因で、Internet Explorer の実行速度が遅くなっています」ダイアログを抑止（管理者権限不要・HKCU）
+function disableIeScriptTimeoutWarning() {
+    try {
+        var wsh = new ActiveXObject("WScript.Shell");
+        wsh.RegWrite("HKCU\\Software\\Microsoft\\Internet Explorer\\Styles\\MaxScriptStatements", 0x7FFFFFFF, "REG_DWORD");
+    } catch(e) {}
+}
+
 window.onload = function() {
+    disableIeScriptTimeoutWarning();
     loadDictionary();
 };
 
@@ -431,11 +440,13 @@ function startProcess() {
 
     // 画面上の辞書内容を反映・自動保存
     saveDictionary(true);
+    disableIeScriptTimeoutWarning();
     
     try {
         if(!ie) {
             ie = new ActiveXObject("InternetExplorer.Application");
             ie.Visible = false;
+            try { ie.Silent = true; } catch(e2) {}
         }
     } catch(e) {
         alert("Internet Explorerの起動に失敗しました。");
@@ -747,29 +758,28 @@ function waitForByomeiLoad() {
 
         var doc = ie.Document;
         var list = [];
-        var tables = doc.getElementsByTagName("table");
-        for (var t = 0; t < tables.length; t++) {
-            var rows = tables[t].rows;
-            for (var r = 0; r < rows.length; r++) {
-                var cells = rows[r].cells;
-                if (cells && cells.length >= 9) {
-                    var numTxt = trimStr(cells[0].innerText || cells[0].textContent || "");
-                    if (numTxt === "" || numTxt === "番号") continue;
+        // ★高速化: DOMのセルを1つずつCOM経由で読むのではなく、HTMLを一括取得してメモリ内で解析
+        var bodyHtml = (doc && doc.body) ? (doc.body.innerHTML || "") : "";
+        var trChunks = bodyHtml.split(/<tr\b[^>]*>/i);
+        for (var r = 1; r < trChunks.length; r++) {
+            var cells = extractRowCellsFromTrHtml(trChunks[r]);
+            if (cells.length >= 9) {
+                var numTxt = cells[0];
+                if (numTxt === "" || numTxt === "番号") continue;
 
-                    var byomeiName = trimStr(cells[3].innerText || cells[3].textContent || "");
-                    var utagaiTxt = trimStr(cells[4].innerText || cells[4].textContent || "");
-                    var tenkiTxt = trimStr(cells[5].innerText || cells[5].textContent || "");
-                    var endDateTxt = trimStr(cells[8].innerText || cells[8].textContent || "");
+                var byomeiName = cells[3];
+                var utagaiTxt = cells[4];
+                var tenkiTxt = cells[5];
+                var endDateTxt = cells[8];
 
-                    if (byomeiName !== "") {
-                        var isSuspected = (utagaiTxt === "○" || byomeiName.indexOf("の疑い") !== -1);
-                        list.push({
-                            name: byomeiName,
-                            suspected: isSuspected,
-                            tenki: tenkiTxt,
-                            endDate: endDateTxt
-                        });
-                    }
+                if (byomeiName !== "") {
+                    var isSuspected = (utagaiTxt === "○" || byomeiName.indexOf("の疑い") !== -1);
+                    list.push({
+                        name: byomeiName,
+                        suspected: isSuspected,
+                        tenki: tenkiTxt,
+                        endDate: endDateTxt
+                    });
                 }
             }
         }
@@ -945,19 +955,53 @@ function cleanDrugName(rawLine) {
     return s;
 }
 
+// HTML文字列からタグ除去・主要実体参照デコード
+function stripHtmlTags(htmlStr) {
+    if (!htmlStr) return "";
+    return htmlStr
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"');
+}
+
+// <TR>内部のHTML文字列から全<TD>/<TH>のテキスト配列をメモリ上で高速抽出
+function extractRowCellsFromTrHtml(trHtml) {
+    var cells = [];
+    if (!trHtml) return cells;
+    var closeTr = trHtml.search(/<\/tr>/i);
+    var rowBody = (closeTr !== -1) ? trHtml.substring(0, closeTr) : trHtml;
+    var tdRe = /<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    var m;
+    while ((m = tdRe.exec(rowBody)) !== null) {
+        cells.push(trimStr(stripHtmlTags(m[1])));
+    }
+    return cells;
+}
+
 // 処方・注射ページのDOMからRp単位で { orderDate, effectiveEndDate, drugs: [...] } を抽出
+// ※ getElementsByTagName("*") による数千回のプロセス間COMアクセスを廃止し、innerHTMLの1回取得で高速解析
 function parseMedOrdersFromDoc(doc) {
     var orders = [];
-    if (!doc) return orders;
+    if (!doc || !doc.body) return orders;
 
-    var els = doc.getElementsByTagName("*");
+    var bodyHtml = doc.body.innerHTML || "";
+    if (!bodyHtml) return orders;
+
+    var preChunks = bodyHtml.split(/<pre\b[^>]*>/i);
     var lastHeaderTxt = "";
     var lastHeaderDate = "";
 
-    for (var i = 0; i < els.length; i++) {
-        var tag = els[i].tagName ? els[i].tagName.toUpperCase() : "";
-        if (tag === "SPAN") {
-            var sTxt = trimStr(els[i].innerText || els[i].textContent || "");
+    for (var i = 1; i < preChunks.length; i++) {
+        // 直前のチャンクから <SPAN>【...】... YYYY/MM/DD</SPAN> ヘッダを抽出
+        var prevHtml = preChunks[i - 1];
+        var spanRe = /<span\b[^>]*>([\s\S]*?)<\/span>/gi;
+        var sm;
+        while ((sm = spanRe.exec(prevHtml)) !== null) {
+            var sTxt = trimStr(stripHtmlTags(sm[1]));
             if (sTxt.indexOf("【") !== -1) {
                 var dm = sTxt.match(/(\d{4}\/\d{2}\/\d{2})\s*$/);
                 if (dm) {
@@ -965,92 +1009,95 @@ function parseMedOrdersFromDoc(doc) {
                     lastHeaderDate = dm[1];
                 }
             }
-        } else if (tag === "PRE") {
-            var preTxt = els[i].innerText || els[i].textContent || "";
-            if (!preTxt) continue;
+        }
 
-            // オーダー全体が[中止]または×の場合はスキップ
-            if (lastHeaderTxt.indexOf("[中止]") !== -1 || lastHeaderTxt.indexOf("×") !== -1) {
+        var curChunk = preChunks[i];
+        var closeIdx = curChunk.search(/<\/pre>/i);
+        var rawPreHtml = (closeIdx !== -1) ? curChunk.substring(0, closeIdx) : curChunk;
+        var preTxt = stripHtmlTags(rawPreHtml);
+        if (!preTxt) continue;
+
+        // オーダー全体が[中止]または×の場合はスキップ
+        if (lastHeaderTxt.indexOf("[中止]") !== -1 || lastHeaderTxt.indexOf("×") !== -1) {
+            continue;
+        }
+
+        var preLines = preTxt.split(/\r?\n/);
+        var orderDate = lastHeaderDate;
+        var orderCancelled = false;
+
+        // PRE先頭部のオーダー日・中止判定を確認
+        for (var p = 0; p < preLines.length; p++) {
+            var pl = trimStr(preLines[p]);
+            if (/^Rp\d+/.test(pl)) break;
+            if (!orderDate) {
+                var pdm = pl.match(/^(\d{4}\/\d{2}\/\d{2})/);
+                if (pdm) orderDate = pdm[1];
+            }
+            if (/No\.\d+\s+中止/.test(pl)) {
+                orderCancelled = true;
+            }
+        }
+        if (orderCancelled || !orderDate) continue;
+
+        // Rpブロックごとに分割して解析
+        var inRp = false;
+        var rpDrugs = [];
+        var rpDuration = 1;
+        var rpStopDate = "";
+
+        for (var p = 0; p <= preLines.length; p++) {
+            var rawL = (p < preLines.length) ? preLines[p] : "Rp999999";
+            var trimmedL = trimStr(rawL);
+
+            if (/^Rp\d+/.test(trimmedL)) {
+                if (inRp && rpDrugs.length > 0) {
+                    var effEnd = addDaysStr(orderDate, (rpDuration > 1 ? rpDuration - 1 : 0));
+                    var skipRp = false;
+                    if (rpStopDate) {
+                        if (rpStopDate <= orderDate) {
+                            skipRp = true;
+                        } else {
+                            var stopPrev = addDaysStr(rpStopDate, -1);
+                            if (stopPrev < effEnd) effEnd = stopPrev;
+                        }
+                    }
+                    if (!skipRp) {
+                        orders.push({
+                            orderDate: orderDate,
+                            effectiveEndDate: effEnd,
+                            drugs: rpDrugs
+                        });
+                    }
+                }
+                inRp = true;
+                rpDrugs = [];
+                rpDuration = 1;
+                rpStopDate = "";
                 continue;
             }
 
-            var preLines = preTxt.split(/\r?\n/);
-            var orderDate = lastHeaderDate;
-            var orderCancelled = false;
+            if (!inRp) continue;
 
-            // PRE先頭部のオーダー日・中止判定を確認
-            for (var p = 0; p < preLines.length; p++) {
-                var pl = trimStr(preLines[p]);
-                if (/^Rp\d+/.test(pl)) break;
-                if (!orderDate) {
-                    var pdm = pl.match(/^(\d{4}\/\d{2}\/\d{2})/);
-                    if (pdm) orderDate = pdm[1];
+            // 全角スペース1個で始まる行＝薬剤名行
+            if (/^\u3000[^\s\u3000]/.test(rawL)) {
+                var dName = cleanDrugName(rawL);
+                if (dName && dName.indexOf("----") === -1) {
+                    rpDrugs.push(dName);
                 }
-                if (/No\.\d+\s+中止/.test(pl)) {
-                    orderCancelled = true;
+            } else if (/^\u3000{2}/.test(rawL)) {
+                // 用法・日数行（例: 　　分２　(朝・夕)食後    14日分）
+                var durMatch = rawL.match(/(\d+)\s*日分/);
+                if (durMatch) {
+                    var dNum = parseInt(durMatch[1], 10);
+                    if (!isNaN(dNum) && dNum > rpDuration) {
+                        rpDuration = dNum;
+                    }
                 }
-            }
-            if (orderCancelled || !orderDate) continue;
-
-            // Rpブロックごとに分割して解析
-            var inRp = false;
-            var rpDrugs = [];
-            var rpDuration = 1;
-            var rpStopDate = "";
-
-            for (var p = 0; p <= preLines.length; p++) {
-                var rawL = (p < preLines.length) ? preLines[p] : "Rp999999";
-                var trimmedL = trimStr(rawL);
-
-                if (/^Rp\d+/.test(trimmedL)) {
-                    if (inRp && rpDrugs.length > 0) {
-                        var effEnd = addDaysStr(orderDate, (rpDuration > 1 ? rpDuration - 1 : 0));
-                        var skipRp = false;
-                        if (rpStopDate) {
-                            if (rpStopDate <= orderDate) {
-                                skipRp = true;
-                            } else {
-                                var stopPrev = addDaysStr(rpStopDate, -1);
-                                if (stopPrev < effEnd) effEnd = stopPrev;
-                            }
-                        }
-                        if (!skipRp) {
-                            orders.push({
-                                orderDate: orderDate,
-                                effectiveEndDate: effEnd,
-                                drugs: rpDrugs
-                            });
-                        }
-                    }
-                    inRp = true;
-                    rpDrugs = [];
-                    rpDuration = 1;
-                    rpStopDate = "";
-                    continue;
-                }
-
-                if (!inRp) continue;
-
-                // 全角スペース1個で始まる行＝薬剤名行
-                if (/^\u3000[^\s\u3000]/.test(rawL)) {
-                    var dName = cleanDrugName(rawL);
-                    if (dName && dName.indexOf("----") === -1) {
-                        rpDrugs.push(dName);
-                    }
-                } else if (/^\u3000{2}/.test(rawL)) {
-                    // 用法・日数行（例: 　　分２　(朝・夕)食後    14日分）
-                    var durMatch = rawL.match(/(\d+)\s*日分/);
-                    if (durMatch) {
-                        var dNum = parseInt(durMatch[1], 10);
-                        if (!isNaN(dNum) && dNum > rpDuration) {
-                            rpDuration = dNum;
-                        }
-                    }
-                    // 【中止】YYYY年MM月DD日
-                    var stopMatch = rawL.match(/【中止】\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                    if (stopMatch) {
-                        rpStopDate = padDateStr(stopMatch[1] + "/" + stopMatch[2] + "/" + stopMatch[3]);
-                    }
+                // 【中止】YYYY年MM月DD日
+                var stopMatch = rawL.match(/【中止】\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                if (stopMatch) {
+                    rpStopDate = padDateStr(stopMatch[1] + "/" + stopMatch[2] + "/" + stopMatch[3]);
                 }
             }
         }
@@ -1215,38 +1262,38 @@ function waitForIeLoad() {
         }
         
         var doc = ie.Document;
-        var tables = doc.getElementsByTagName("table");
+        // ★高速化: 疾患・薬剤と同様に、表示された検査結果HTMLを1回で一括取得し、メモリ上で必要な箇所だけ探索する
+        var bodyHtml = (doc && doc.body) ? (doc.body.innerHTML || "") : "";
         
-        if(tables.length === 0) {
+        if (!bodyHtml || bodyHtml.indexOf("<table") === -1 && bodyHtml.indexOf("<TABLE") === -1) {
             appendErrorRow("データなし");
         } else {
-            var targetTable = null;
+            var trChunks = bodyHtml.split(/<tr\b[^>]*>/i);
             var dateCols = [];
+            var zenkenRowIdx = -1;
 
-            // 「全件」行を持つテーブルを探し、日付列を取得
-            for (var t = 0; t < tables.length; t++) {
-                var tbl = tables[t];
-                for (var i = 0; i < tbl.rows.length; i++) {
-                    if (tbl.rows[i].cells.length > 0 && trimStr(tbl.rows[i].cells[0].innerText) === "全件") {
-                        targetTable = tbl;
-                        var dRow = tbl.rows[i];
-                        for (var c = 3; c < dRow.cells.length; c += 2) {
-                            var dText = trimStr(dRow.cells[c].innerText);
-                            if (dText) {
-                                var normD = extractLabDateStr(dText);
-                                dateCols.push({
-                                    colIdx: c,
-                                    dateStr: dText,
-                                    normDate: normD || dText
-                                });
-                            }
+            // 1. 「全件」行を探し、日付列を取得
+            for (var r = 1; r < trChunks.length; r++) {
+                var firstCellMatch = trChunks[r].match(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/i);
+                if (!firstCellMatch) continue;
+                var firstCellTxt = trimStr(stripHtmlTags(firstCellMatch[1]));
+                if (firstCellTxt === "全件") {
+                    zenkenRowIdx = r;
+                    var dCells = extractRowCellsFromTrHtml(trChunks[r]);
+                    for (var c = 3; c < dCells.length; c += 2) {
+                        var dText = dCells[c];
+                        if (dText) {
+                            var normD = extractLabDateStr(dText);
+                            dateCols.push({
+                                colIdx: c,
+                                dateStr: dText,
+                                normDate: normD || dText
+                            });
                         }
-                        break;
                     }
+                    break;
                 }
-                if (targetTable) break;
             }
-            if (!targetTable) targetTable = tables[0];
 
             // 基準日・探索期間によるフィルタリング用開始日
             var filterStartDate = "";
@@ -1258,7 +1305,6 @@ function waitForIeLoad() {
             var validDateCols = [];
             for (var dc = 0; dc < dateCols.length; dc++) {
                 var dcItem = dateCols[dc];
-                // YYYY/MM/DD 形式が取れている場合は基準日以前・開始日以降かを厳密チェック
                 if (/^\d{4}\/\d{2}\/\d{2}$/.test(dcItem.normDate)) {
                     if (dcItem.normDate > currentTargetDate) continue;
                     if (filterStartDate !== "" && dcItem.normDate < filterStartDate) continue;
@@ -1273,53 +1319,79 @@ function waitForIeLoad() {
 
             var valueMap = {};
             if (validDateCols.length > 0) {
-                for (var i = 0; i < targetTable.rows.length; i++) {
-                    var row = targetTable.rows[i];
-                    if (row.cells.length > 3) {
-                        var itemName = trimStr(row.cells[0].innerText);
-                        if (itemName !== "" && itemName !== "全件" && itemName !== "検査項目") {
-                            var normKey = normalizeItemName(itemName);
-                            
-                            // ★重要修正: 固定の cells[3] ではなく、その項目に実際に値が入っている最も基準日に近い列を探す
-                            var itemLatestVal = "";
-                            var itemLatestDate = "";
-                            var itemLatestNormDate = "";
-                            var historyArr = [];
-                            var historyMap = {};
+                // 見出しで指定された採血項目のマップを作成
+                var reqLabMap = {};
+                for (var ti = 0; ti < targetItems.length; ti++) {
+                    var reqRaw = targetItems[ti];
+                    if (isProfileItem(reqRaw) || isByomeiItem(reqRaw) || isMedItem(reqRaw)) continue;
+                    var isHist = isHistoryItem(reqRaw);
+                    var sItem = reqRaw.replace("全期間", "").replace("全履歴", "");
+                    var nReq = normalizeItemName(sItem);
+                    if (nReq) {
+                        if (!reqLabMap[nReq]) reqLabMap[nReq] = { needHistory: false };
+                        if (isHist) reqLabMap[nReq].needHistory = true;
+                    }
+                    if (sItem) {
+                        if (!reqLabMap[sItem]) reqLabMap[sItem] = { needHistory: false };
+                        if (isHist) reqLabMap[sItem].needHistory = true;
+                    }
+                }
 
-                            for (var d = 0; d < validDateCols.length; d++) {
-                                var col = validDateCols[d].colIdx;
-                                var dateTxt = validDateCols[d].dateStr;
-                                var normDateTxt = validDateCols[d].normDate;
-                                var valTxt = (col < row.cells.length) ? trimStr(row.cells[col].innerText) : "";
-                                if (valTxt !== "") {
-                                    if (itemLatestVal === "") {
-                                        itemLatestVal = valTxt;
-                                        itemLatestDate = dateTxt;
-                                        itemLatestNormDate = normDateTxt;
-                                    }
-                                    var hEntry = dateTxt + ": " + valTxt;
-                                    if (!historyMap[hEntry]) {
-                                        historyMap[hEntry] = true;
-                                        historyArr.push(hEntry);
-                                    }
+                // 2. メモリ上の各行の先頭セル（項目名）だけを確認し、必要な項目の行だけセルを展開して値を抽出
+                var startRow = (zenkenRowIdx !== -1) ? zenkenRowIdx + 1 : 1;
+                for (var i = startRow; i < trChunks.length; i++) {
+                    var fMatch = trChunks[i].match(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/i);
+                    if (!fMatch) continue;
+                    var itemName = trimStr(stripHtmlTags(fMatch[1]));
+                    if (itemName === "" || itemName === "全件" || itemName === "検査項目") continue;
+
+                    var normKey = normalizeItemName(itemName);
+                    var reqInfo = reqLabMap[normKey] || reqLabMap[itemName];
+                    if (!reqInfo) continue; // 要求されていない検査項目行はセル展開せず即スキップ
+
+                    var rowCells = extractRowCellsFromTrHtml(trChunks[i]);
+                    if (rowCells.length <= 3) continue;
+
+                    var needHist = reqInfo.needHistory || (reqLabMap[normKey] && reqLabMap[normKey].needHistory) || (reqLabMap[itemName] && reqLabMap[itemName].needHistory);
+                    var itemLatestVal = "";
+                    var itemLatestDate = "";
+                    var itemLatestNormDate = "";
+                    var historyArr = [];
+                    var historyMap = {};
+
+                    for (var d = 0; d < validDateCols.length; d++) {
+                        var col = validDateCols[d].colIdx;
+                        var valTxt = (col < rowCells.length) ? rowCells[col] : "";
+                        if (valTxt !== "") {
+                            var dateTxt = validDateCols[d].dateStr;
+                            var normDateTxt = validDateCols[d].normDate;
+                            if (itemLatestVal === "") {
+                                itemLatestVal = valTxt;
+                                itemLatestDate = dateTxt;
+                                itemLatestNormDate = normDateTxt;
+                                if (!needHist) {
+                                    break;
                                 }
                             }
-                            
-                            var dataObj = {
-                                latest: itemLatestVal,
-                                latestDate: itemLatestDate,
-                                latestNormDate: itemLatestNormDate,
-                                historyArr: historyArr,
-                                history: historyArr.join(", ")
-                            };
-
-                            // ★重要修正: 同一正規化名（LDとLD(IFCC)等）が複数行ある場合、空行や古い行で最新値を上書きしないようマージする
-                            mergeLabDataObj(valueMap, normKey, dataObj);
-                            if (itemName !== normKey) {
-                                mergeLabDataObj(valueMap, itemName, dataObj);
+                            var hEntry = dateTxt + ": " + valTxt;
+                            if (!historyMap[hEntry]) {
+                                historyMap[hEntry] = true;
+                                historyArr.push(hEntry);
                             }
                         }
+                    }
+
+                    var dataObj = {
+                        latest: itemLatestVal,
+                        latestDate: itemLatestDate,
+                        latestNormDate: itemLatestNormDate,
+                        historyArr: historyArr,
+                        history: historyArr.join(", ")
+                    };
+
+                    mergeLabDataObj(valueMap, normKey, dataObj);
+                    if (itemName !== normKey) {
+                        mergeLabDataObj(valueMap, itemName, dataObj);
                     }
                 }
             }
