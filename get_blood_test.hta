@@ -141,13 +141,17 @@ function normalizeItemName(name) {
     s = s.toUpperCase();
     s = s.replace(/[\s\u3000]+/g, "");
 
-    if (s === "EGFRCREA") s = "EGFR"; 
-    if (s === "LD(IFCC)") s = "LD";   
-    if (s === "LDH") s = "LD";        
+    if (s === "EGFRCREA" || s === "EGFR(CRE)") s = "EGFR"; 
+    if (s === "LD(IFCC)" || s === "LDH") s = "LD";   
     if (s === "ALP(IFCC)") s = "ALP"; 
-    if (s === "HBA1C(NGSP)") s = "HBA1C"; 
-    if (s === "Γ-GTP") s = "Γ-GT";  
+    if (s === "HBA1C(NGSP)" || s === "HBA1C(JDS)") s = "HBA1C"; 
+    if (s === "Γ-GTP" || s === "Γ-GT" || s === "ΓGTP" || s === "G-GTP" || s === "G-GT" || s === "GGTP") s = "G-GTP";  
     if (s === "CPK") s = "CK";        
+    if (s === "CRE" || s === "CR" || s === "CREA") s = "CREA";
+    if (s === "HB" || s === "HGB") s = "HGB";
+    if (s === "TBIL" || s === "T.BIL" || s === "T-BIL") s = "T-BIL";
+    if (s === "DBIL" || s === "D.BIL" || s === "D-BIL") s = "D-BIL";
+    if (s === "GLU" || s === "BS" || s === "GLUCOSE") s = "GLUCOSE";
     
     return s;
 }
@@ -950,22 +954,47 @@ function proceedToBloodOrFinish() {
 
     document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の採血結果を取得中)";
 
-    // ★ 探索日数が指定されていれば計算し、空欄なら開始日を空（無制限）にする
-    var startDate = "";
-    if (searchDays !== "") {
+    // ★ 探索日数が指定されていれば計算し、空欄なら開始日を "1990/01/01"（事実上の無制限）にする
+    // ※ kentai_kekka_menu.php の仕様上、期間指定モード(kentai_disp_flgs先頭=0)では開始日・終了日の両方が必須のため
+    var startDate = "1990/01/01";
+    if (searchDays !== "" && !isNaN(searchDays)) {
         startDate = getPastDateStr(currentTargetDate, searchDays); 
     }
     var endDate = currentTargetDate;
+
+    // kentai_kekka_menu.php の MakeKentaiDispFlgs() 仕様に基づくフラグ文字列:
+    // [0] disp_kensu_gentei_flg = 0 (0:日付期間指定を有効化 / 1:件数限定・日付期間は無視される)
+    // [1] disp_koumoku_name_kind = 1 (カタカナ・英数字を半角で表示)
+    // [2] disp_column = 11101 (単位:1, 参考値:1, 判定:1, コメント:0, 日付:1)
+    // [3] disp_result_order_kind = 1 (降順: 新しい日付が左)
+    // [4] disp_graph_order_kind = 1
+    // [5] disp_main_value_kind = 1
+    // [6] disp_date_kind = 0 (YYYY/MM/DD 4桁年表記)
+    // [7] disp_result_set_code = 1 (00.全件)
+    // [8] select_section_code_str = ""
+    // [9] disp_only_login_user = 0
+    // [10] disp_row_flgtbl = 00
+    var dispFlgs = "0/1/11101/1/1/1/0/1//0/00";
 
     var url = "http://10.5.171.42:8082/karte/kentai_kekka_karte.php"
             + "?kanja_id=" + currentId
             + "&user_id=16622"
             + "&section_code=0000023"
-            + "&kentai_disp_flgs="
+            + "&kentai_disp_flgs=" + dispFlgs
             + "&disp_kekka_start_date=" + startDate
             + "&disp_kekka_end_date=" + endDate
             + "&disp_zoom=80"
-            + "&disp_kensu_count=30"
+            + "&disp_kensu_count=9999"
+            + "&disp_koumoku_name_kind=1"
+            + "&disp_column_tani=1"
+            + "&disp_column_sankouchi=1"
+            + "&disp_column_hantei=1"
+            + "&disp_column_date=1"
+            + "&disp_result_order_kind=1"
+            + "&disp_graph_order_kind=1"
+            + "&disp_main_value_kind=1"
+            + "&disp_date_kind=0"
+            + "&disp_result_set_code=1"
             + "&_t=" + new Date().getTime();
 
     try {
@@ -975,6 +1004,23 @@ function proceedToBloodOrFinish() {
         appendErrorRow("IE制御エラー");
         setTimeout(processNext, 10);
     }
+}
+
+// 検体検査の日付列文字列（例: "2026/10/25", "26/10/25", "2026/10/25(1)" 等）から YYYY/MM/DD を抽出
+function extractLabDateStr(rawDateTxt) {
+    if (!rawDateTxt) return "";
+    var s = trimStr(rawDateTxt);
+    var m4 = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+    if (m4) {
+        return padDateStr(m4[1] + "/" + m4[2] + "/" + m4[3]);
+    }
+    var m2 = s.match(/(\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (m2) {
+        var yr = parseInt(m2[1], 10);
+        var fullYr = (yr >= 70 ? "19" : "20") + m2[1];
+        return padDateStr(fullYr + "/" + m2[2] + "/" + m2[3]);
+    }
+    return "";
 }
 
 function waitForIeLoad() {
@@ -990,22 +1036,59 @@ function waitForIeLoad() {
         if(tables.length === 0) {
             appendErrorRow("データなし");
         } else {
-            var targetTable = tables[0];
-            
+            var targetTable = null;
             var dateCols = [];
-            for (var i = 0; i < targetTable.rows.length; i++) {
-                if (trimStr(targetTable.rows[i].cells[0].innerText) === "全件") {
-                    var dRow = targetTable.rows[i];
-                    for(var c = 3; c < dRow.cells.length; c += 2) {
-                        var dText = trimStr(dRow.cells[c].innerText);
-                        if(dText) dateCols.push({ colIdx: c, dateStr: dText });
+
+            // 「全件」行を持つテーブルを探し、日付列を取得
+            for (var t = 0; t < tables.length; t++) {
+                var tbl = tables[t];
+                for (var i = 0; i < tbl.rows.length; i++) {
+                    if (tbl.rows[i].cells.length > 0 && trimStr(tbl.rows[i].cells[0].innerText) === "全件") {
+                        targetTable = tbl;
+                        var dRow = tbl.rows[i];
+                        for (var c = 3; c < dRow.cells.length; c += 2) {
+                            var dText = trimStr(dRow.cells[c].innerText);
+                            if (dText) {
+                                var normD = extractLabDateStr(dText);
+                                dateCols.push({
+                                    colIdx: c,
+                                    dateStr: dText,
+                                    normDate: normD || dText
+                                });
+                            }
+                        }
+                        break;
                     }
-                    break;
                 }
+                if (targetTable) break;
+            }
+            if (!targetTable) targetTable = tables[0];
+
+            // 基準日・探索期間によるフィルタリング用開始日
+            var filterStartDate = "";
+            if (searchDays !== "" && !isNaN(searchDays)) {
+                filterStartDate = getPastDateStr(currentTargetDate, searchDays);
             }
 
+            // 日付列を基準日に近い順（新しい順＝降順）にソートして探索対象列を確定
+            var validDateCols = [];
+            for (var dc = 0; dc < dateCols.length; dc++) {
+                var dcItem = dateCols[dc];
+                // YYYY/MM/DD 形式が取れている場合は基準日以前・開始日以降かを厳密チェック
+                if (/^\d{4}\/\d{2}\/\d{2}$/.test(dcItem.normDate)) {
+                    if (dcItem.normDate > currentTargetDate) continue;
+                    if (filterStartDate !== "" && dcItem.normDate < filterStartDate) continue;
+                }
+                validDateCols.push(dcItem);
+            }
+            validDateCols.sort(function(a, b) {
+                if (a.normDate > b.normDate) return -1;
+                if (a.normDate < b.normDate) return 1;
+                return a.colIdx - b.colIdx;
+            });
+
             var valueMap = {};
-            if (dateCols.length > 0) {
+            if (validDateCols.length > 0) {
                 for (var i = 0; i < targetTable.rows.length; i++) {
                     var row = targetTable.rows[i];
                     if (row.cells.length > 3) {
@@ -1013,24 +1096,51 @@ function waitForIeLoad() {
                         if (itemName !== "" && itemName !== "全件" && itemName !== "検査項目") {
                             var normKey = normalizeItemName(itemName);
                             
-                            var latestVal = trimStr(row.cells[3].innerText);
+                            // ★重要修正: 固定の cells[3] ではなく、その項目に実際に値が入っている最も基準日に近い列を探す
+                            var itemLatestVal = "";
+                            var itemLatestDate = "";
+                            var itemLatestNormDate = "";
                             var historyArr = [];
-                            for(var d = 0; d < dateCols.length; d++) {
-                                var col = dateCols[d].colIdx;
-                                var dateTxt = dateCols[d].dateStr;
+                            var historyMap = {};
+
+                            for (var d = 0; d < validDateCols.length; d++) {
+                                var col = validDateCols[d].colIdx;
+                                var dateTxt = validDateCols[d].dateStr;
+                                var normDateTxt = validDateCols[d].normDate;
                                 var valTxt = (col < row.cells.length) ? trimStr(row.cells[col].innerText) : "";
-                                if(valTxt) historyArr.push(dateTxt + ": " + valTxt);
+                                if (valTxt !== "") {
+                                    if (itemLatestVal === "") {
+                                        itemLatestVal = valTxt;
+                                        itemLatestDate = dateTxt;
+                                        itemLatestNormDate = normDateTxt;
+                                    }
+                                    var hEntry = dateTxt + ": " + valTxt;
+                                    if (!historyMap[hEntry]) {
+                                        historyMap[hEntry] = true;
+                                        historyArr.push(hEntry);
+                                    }
+                                }
                             }
                             
-                            var dataObj = { latest: latestVal, history: historyArr.join(", ") };
-                            valueMap[normKey] = dataObj;
-                            valueMap[itemName] = dataObj; 
+                            var dataObj = {
+                                latest: itemLatestVal,
+                                latestDate: itemLatestDate,
+                                latestNormDate: itemLatestNormDate,
+                                historyArr: historyArr,
+                                history: historyArr.join(", ")
+                            };
+
+                            // ★重要修正: 同一正規化名（LDとLD(IFCC)等）が複数行ある場合、空行や古い行で最新値を上書きしないようマージする
+                            mergeLabDataObj(valueMap, normKey, dataObj);
+                            if (itemName !== normKey) {
+                                mergeLabDataObj(valueMap, itemName, dataObj);
+                            }
                         }
                     }
                 }
             }
 
-            buildAndPushRow(valueMap, dateCols);
+            buildAndPushRow(valueMap, validDateCols);
         }
     } catch(e) {
         appendErrorRow("解析エラー");
@@ -1038,6 +1148,45 @@ function waitForIeLoad() {
 
     updatePreview();
     setTimeout(processNext, 50);
+}
+
+// 複数行に同じ検査項目（旧法と新法など）が存在する場合に、基準日に最も近い測定値を優先してマージする
+function mergeLabDataObj(map, key, newObj) {
+    if (!key) return;
+    var existing = map[key];
+    if (!existing) {
+        map[key] = {
+            latest: newObj.latest,
+            latestDate: newObj.latestDate,
+            latestNormDate: newObj.latestNormDate,
+            historyArr: newObj.historyArr.slice(0),
+            history: newObj.history
+        };
+        return;
+    }
+
+    // 新しい行に値があり、既存が空か、新しい行の方が基準日に近い（新しい日付）場合は採用
+    if (newObj.latest !== "") {
+        if (existing.latest === "" || (newObj.latestNormDate && existing.latestNormDate && newObj.latestNormDate > existing.latestNormDate)) {
+            existing.latest = newObj.latest;
+            existing.latestDate = newObj.latestDate;
+            existing.latestNormDate = newObj.latestNormDate;
+        }
+    }
+
+    // 履歴の結合（重複排除）
+    var seenH = {};
+    for (var i = 0; i < existing.historyArr.length; i++) {
+        seenH[existing.historyArr[i]] = true;
+    }
+    for (var j = 0; j < newObj.historyArr.length; j++) {
+        var h = newObj.historyArr[j];
+        if (!seenH[h]) {
+            seenH[h] = true;
+            existing.historyArr.push(h);
+        }
+    }
+    existing.history = existing.historyArr.join(", ");
 }
 
 function getProfileItemValue(colName) {
@@ -1096,10 +1245,11 @@ function buildAndPushRow(valueMap, dateCols) {
             var finalDate = "";
             var finalVal = "";
 
-            if (!valObj) {
+            if (!valObj || valObj.latest === "") {
                 finalDate = "結果なし";
+                finalVal = "";
             } else {
-                finalDate = (dateCols && dateCols.length > 0) ? dateCols[0].dateStr : "結果なし";
+                finalDate = valObj.latestDate || "結果なし";
                 finalVal = valObj.latest; 
             }
 
