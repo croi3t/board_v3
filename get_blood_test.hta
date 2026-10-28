@@ -156,6 +156,187 @@ function normalizeItemName(name) {
     return s;
 }
 
+// 薬効分類・検索キーワード展開辞書の初期値
+var DEFAULT_DICT_TEXT = [
+    "# 1行に1分類を「見出し語 = 検索語1, 検索語2, ...」の形式で記述します（#で始まる行はコメント）。",
+    "# 見出しに「薬剤:フィブラート」「薬剤:ARB」等と入力すると、右辺の全キーワードに自動展開してOR検索します。",
+    "# 複数の別名を登録する場合は「DPP4|DPP-4 = ...」のように | で区切ります。病名（病名:〇〇）にも使用可能です。",
+    "フィブラート|フィブラート系 = フィブラート, パルモディア, ベザトール, ベザリップ, リピディル, トライコア, リポクリン",
+    "スタチン|スタチン系|HMG-CoA = スタチン, クレストール, リピトール, リバロ, メバロチン, リポバス, ローコール, カデュエット, アトーゼット, ロスーゼット, リバゼブ",
+    "ARB|アンジオテンシンII受容体拮抗薬 = サルタン, ブロプレス, オルメテック, ミカルディス, ディオバン, アジルバ, ニューロタン, アバプロ, イルベタン, エカード, ユニシア, ミコンビ, ミカムロ, テルチア, コディオ, エックスフォージ, アテディオ, ザクラス, ジルムロ, プレミネント, アイミクス, レザルタス",
+    "SGLT2|SGLT-2 = グリフロジン, スーグラ, フォシーガ, ルセフィ, デベルザ, アプルウェイ, カナグル, ジャディアンス, スージャヌ, カナリア, トラディアンス",
+    "DPP4|DPP-4 = グリプチン, ジャヌビア, グラクティブ, エクア, ネシーナ, トラゼンタ, テネリア, スイニー, オングリザ, ザファテック, マリゼフ, エクメット, イニシンク, リオベル, グルベス, メトアナ, スージャヌ, カナリア, トラディアンス",
+    "PPI|プロトンポンプ阻害薬 = プラゾール, ボノプラザン, オメプラール, オメプラゾン, タケプロン, パリエット, ネキシウム, タケキャブ, タキャプロン, ボノサップ, ボノピオン, ラベキュア, ラベファイン, ランサップ, ランピオン",
+    "ビスホスホネート|ビスフォスフォネート|BP = ドロン酸, フォサマック, ボナロン, アクトネル, ベネット, ボノテオ, リカルボン, ボンビバ, ゾメタ, リクラスト, ダイドロネル, アレディア"
+].join("\r\n");
+
+var parsedDictMap = {};
+
+function getDictFilePath() {
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var htaPath = unescape(location.pathname);
+        if (htaPath.charAt(0) === "/" && htaPath.charAt(2) === ":") {
+            htaPath = htaPath.substring(1);
+        }
+        var folder = fso.GetParentFolderName(htaPath);
+        return fso.BuildPath(folder, "drug_dictionary.txt");
+    } catch(e) {
+        return "drug_dictionary.txt";
+    }
+}
+
+function loadDictionary() {
+    var dictEl = document.getElementById("dictText");
+    if (!dictEl) return;
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var path = getDictFilePath();
+        if (fso.FileExists(path)) {
+            var ts = fso.OpenTextFile(path, 1, false, -1); // -1: Unicode (UTF-16)
+            var content = ts.ReadAll();
+            ts.Close();
+            if (trimStr(content) !== "") {
+                dictEl.value = content;
+                parseDictionaryMap();
+                return;
+            }
+        }
+    } catch(e) {}
+    dictEl.value = DEFAULT_DICT_TEXT;
+    parseDictionaryMap();
+}
+
+function saveDictionary(silent) {
+    var dictEl = document.getElementById("dictText");
+    if (!dictEl) return;
+    parseDictionaryMap();
+    try {
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        var path = getDictFilePath();
+        var ts = fso.OpenTextFile(path, 2, true, -1); // 2: ForWriting, true: Create, -1: Unicode
+        ts.Write(dictEl.value);
+        ts.Close();
+        if (!silent) {
+            var st = document.getElementById("dictStatus");
+            if (st) {
+                st.innerText = "✓ 辞書を保存しました（drug_dictionary.txt）";
+                setTimeout(function() { if (st) st.innerText = ""; }, 4000);
+            }
+        }
+    } catch(e) {
+        if (!silent) {
+            alert("辞書ファイルの保存に失敗しました（画面上の編集内容は今回の取得にそのまま反映されます）。");
+        }
+    }
+}
+
+function resetDictionary() {
+    if (!confirm("薬効分類・検索辞書を初期状態に戻しますか？")) return;
+    var dictEl = document.getElementById("dictText");
+    if (dictEl) {
+        dictEl.value = DEFAULT_DICT_TEXT;
+        saveDictionary(false);
+    }
+}
+
+function toggleDictPanel() {
+    var panel = document.getElementById("dictPanel");
+    var btn = document.getElementById("toggleDictBtn");
+    if (!panel) return;
+    if (panel.style.display === "none" || panel.style.display === "") {
+        panel.style.display = "block";
+        if (btn) btn.innerText = "▲ 薬効分類・検索辞書を閉じる";
+    } else {
+        panel.style.display = "none";
+        if (btn) btn.innerText = "▼ 薬効分類・検索辞書の確認・編集";
+    }
+}
+
+function normalizeDictKey(k) {
+    var s = normalizeItemName(k);
+    // 末尾の「系薬」「阻害薬」「受容体拮抗薬」「製剤」等を除いたキーでも照合できるよう正規化
+    return s;
+}
+
+function stripClassSuffix(normK) {
+    if (!normK) return "";
+    return normK.replace(/(?:受容体拮抗薬|受容体拮抗剤|拮抗薬|拮抗剤|阻害薬|阻害剤|系薬剤|系薬|製剤|系|薬|剤)$/, "");
+}
+
+function parseDictionaryMap() {
+    parsedDictMap = {};
+    var dictEl = document.getElementById("dictText");
+    var rawText = dictEl ? dictEl.value : DEFAULT_DICT_TEXT;
+    var dLines = rawText.split(/\r?\n/);
+    for (var i = 0; i < dLines.length; i++) {
+        var line = trimStr(dLines[i]);
+        if (!line || line.charAt(0) === "#" || line.indexOf("//") === 0) continue;
+        var eqIdx = line.indexOf("=");
+        if (eqIdx === -1) eqIdx = line.indexOf("＝");
+        if (eqIdx === -1) continue;
+
+        var lhs = trimStr(line.substring(0, eqIdx));
+        var rhs = trimStr(line.substring(eqIdx + 1));
+        if (!lhs || !rhs) continue;
+
+        var keyAliases = lhs.split(/[|｜\/／,、]/);
+        var valTokens = rhs.split(/[|｜\/／,、]/);
+        var cleanVals = [];
+        for (var v = 0; v < valTokens.length; v++) {
+            var vt = trimStr(valTokens[v]);
+            if (vt) cleanVals.push(vt);
+        }
+        if (cleanVals.length === 0) continue;
+
+        for (var k = 0; k < keyAliases.length; k++) {
+            var ka = trimStr(keyAliases[k]);
+            if (!ka) continue;
+            var nk = normalizeDictKey(ka);
+            if (nk) {
+                parsedDictMap[nk] = cleanVals;
+                var stripped = stripClassSuffix(nk);
+                if (stripped && !parsedDictMap[stripped]) {
+                    parsedDictMap[stripped] = cleanVals;
+                }
+            }
+        }
+    }
+}
+
+// 見出しの検索キーワード（例: "フィブラート" や "ARB|アムロジピン"）を辞書で展開して返す
+function expandSearchKeywords(kwPart) {
+    var rawKws = kwPart.split(/[|｜\/／,、]/);
+    var result = [];
+    var seen = {};
+    for (var i = 0; i < rawKws.length; i++) {
+        var kw = trimStr(rawKws[i]);
+        if (!kw) continue;
+        var nk = normalizeDictKey(kw);
+        var strippedNk = stripClassSuffix(nk);
+        var expanded = parsedDictMap[nk] || (strippedNk ? parsedDictMap[strippedNk] : null);
+        if (expanded && expanded.length > 0) {
+            for (var j = 0; j < expanded.length; j++) {
+                var ekw = expanded[j];
+                if (!seen[ekw]) {
+                    seen[ekw] = true;
+                    result.push(ekw);
+                }
+            }
+        } else {
+            if (!seen[kw]) {
+                seen[kw] = true;
+                result.push(kw);
+            }
+        }
+    }
+    return result;
+}
+
+window.onload = function() {
+    loadDictionary();
+};
+
 var lines = [];
 var currentLine = 0;
 var outputLines = [];
@@ -247,6 +428,9 @@ function startProcess() {
     fetchByomeiEnabled = document.getElementById("fetchByomeiChk").checked;
     excludeSuspectedEnabled = document.getElementById("excludeSuspectedChk").checked;
     fetchMedEnabled = document.getElementById("fetchMedChk").checked;
+
+    // 画面上の辞書内容を反映・自動保存
+    saveDictionary(true);
     
     try {
         if(!ie) {
@@ -624,9 +808,9 @@ function getByomeiItemValue(colName) {
         return filteredNames.join(", ");
     }
 
-    // 「病名:糖尿病」や「病名:胃癌|大腸癌」のような個別キーワードサーチ列の場合
+    // 「病名:糖尿病」や「病名:胃癌|大腸癌」のような個別キーワードサーチ列の場合（辞書による自動展開対応）
     var kwPart = colName.replace(/^(?:病名|疾患)[:：]/, "");
-    var keywords = kwPart.split(/[|｜\/／]/);
+    var keywords = expandSearchKeywords(kwPart);
     var matchedNames = [];
     for (var j = 0; j < filteredNames.length; j++) {
         var dName = filteredNames[j];
@@ -923,9 +1107,9 @@ function getMedItemValue(colName) {
         return activeDrugs.join(", ");
     }
 
-    // 「薬剤:アムロジピン|ノルバスク」等のキーワードサーチ列の場合
+    // 「薬剤:フィブラート」「薬剤:ARB」「薬剤:アムロジピン|ノルバスク」等のキーワードサーチ列の場合（辞書による自動展開対応）
     var kwPart = colName.replace(/^(?:併用薬|薬剤|薬)[:：]/, "");
-    var keywords = kwPart.split(/[|｜\/／]/);
+    var keywords = expandSearchKeywords(kwPart);
     var matchedDrugs = [];
     for (var j = 0; j < activeDrugs.length; j++) {
         var aName = activeDrugs[j];
@@ -1331,10 +1515,22 @@ function appendErrorRow(errMsg) {
                 <input type="checkbox" id="autoCopyChk">
                 <b>完了・一時停止時に自動でクリップボードへコピーする</b>
             </label>
+            <button type="button" id="toggleDictBtn" onclick="toggleDictPanel()" style="margin-left: 16px; padding: 3px 10px; font-size: 12px; background-color: #546e7a;">▼ 薬効分類・検索辞書の確認・編集</button>
+        </div>
+        <div id="dictPanel" style="display: none; margin-top: 8px; padding: 8px; background-color: #f8f9fa; border: 1px solid #cfd8dc; border-radius: 3px;">
+            <div style="font-size: 12px; margin-bottom: 4px;">
+                <b>薬効分類・検索キーワード辞書</b>（<code>見出し語 = 検索語1, 検索語2, ...</code> の形式で自由に追加・編集できます）:
+            </div>
+            <textarea id="dictText" wrap="off" style="height: 135px; font-size: 12px; background-color: #fff;"></textarea>
+            <div style="margin-top: 5px;">
+                <button type="button" onclick="saveDictionary(false)" style="padding: 4px 12px; font-size: 12px; background-color: #0078D7;">辞書を保存</button>
+                <button type="button" onclick="resetDictionary()" style="padding: 4px 12px; font-size: 12px; background-color: #78909c; margin-left: 6px;">初期値に戻す</button>
+                <span id="dictStatus" style="color: #2e7d32; font-weight: bold; margin-left: 10px; font-size: 12px;"></span>
+            </div>
         </div>
         <div style="font-size: 11px; color: #666; margin-top: 6px; border-top: 1px dashed #ddd; padding-top: 5px;">
             ※<b>全病名・全併用薬の収集</b>：上のチェックをONにするか、見出し（1行目）に<b>「有効病名」「併存疾患」</b>や<b>「併用薬」</b>（処方のみは<b>「処方薬」</b>、注射のみは<b>「注射薬」</b>）と入力すると、重複排除して1セルにまとめて出力します。<br>
-            ※<b>特定疾患・特定薬剤のサーチ</b>：見出しに<b>「病名:糖尿病」</b>や<b>「薬剤:アムロジピン|ノルバスク」</b>（複数キーワードは <code>|</code> 区切り）と入力すると、該当項目のみを抽出します。<br>
+            ※<b>特定疾患・特定薬剤・薬効分類サーチ</b>：見出しに<b>「薬剤:フィブラート」「薬剤:ARB」「薬剤:SGLT2」「薬剤:DPP4」「薬剤:PPI」「薬剤:ビスホスホネート」「薬剤:スタチン」</b>や<b>「病名:糖尿病」</b>と入力すると、辞書登録された先発品・後発品・配合剤も含めて自動展開して抽出します（複数指定は <code>|</code> 区切り）。<br>
             ※<b>併用薬の判定</b>：基準日以前のオーダーのうち、探索期間内の処方・注射に加え、長期処方（例：60日分）で基準日時点も服用継続中の薬剤を自動判定します（[中止]オーダーや服用中止分は自動除外）。<br>
             ※<b>全期間採血</b>：見出しに<b>「eGFR全期間」</b>のように<b>「全期間」</b>をつけると、採血日列を作らずに対象期間の履歴を1セルにまとめて出力します。
         </div>
