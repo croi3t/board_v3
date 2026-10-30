@@ -51,6 +51,16 @@ function addDaysStr(dateStr, daysToAdd) {
     return yy + "/" + mm + "/" + dd;
 }
 
+// 2つの YYYY/MM/DD 文字列の日数差（dateStr2 - dateStr1）を返す
+function diffDaysStr(dateStr1, dateStr2) {
+    var p1 = dateStr1.split(/[\/\-]/);
+    var p2 = dateStr2.split(/[\/\-]/);
+    if (p1.length !== 3 || p2.length !== 3) return 0;
+    var d1 = new Date(parseInt(p1[0], 10), parseInt(p1[1], 10) - 1, parseInt(p1[2], 10));
+    var d2 = new Date(parseInt(p2[0], 10), parseInt(p2[1], 10) - 1, parseInt(p2[2], 10));
+    return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 // 検索用ID（先頭の0を除いた文字列）
 function getSearchId(id) {
     var s = trimStr(String(id));
@@ -113,8 +123,20 @@ function isMedSearchItem(colName) {
     return (colName.indexOf("薬剤:") === 0 || colName.indexOf("薬剤：") === 0 || colName.indexOf("薬:") === 0 || colName.indexOf("薬：") === 0 || colName.indexOf("併用薬:") === 0 || colName.indexOf("併用薬：") === 0);
 }
 
+// 案B：個別列として開始日のみを取得する見出し（例：「開始日:フィブラート」「薬剤開始日:SGLT2」「初回処方日:アムロジピン」）
+function isMedStartOnlyItem(colName) {
+    if (!colName) return false;
+    return (colName.indexOf("開始日:") === 0 || colName.indexOf("開始日：") === 0 || colName.indexOf("薬剤開始日:") === 0 || colName.indexOf("薬剤開始日：") === 0 || colName.indexOf("初回処方日:") === 0 || colName.indexOf("初回処方日：") === 0);
+}
+
+// 案B：個別列として服用期間（使用期間）のみを取得する見出し（例：「服用期間:フィブラート」「使用期間:SGLT2」「投与期間:アムロジピン」）
+function isMedDurationOnlyItem(colName) {
+    if (!colName) return false;
+    return (colName.indexOf("服用期間:") === 0 || colName.indexOf("服用期間：") === 0 || colName.indexOf("使用期間:") === 0 || colName.indexOf("使用期間：") === 0 || colName.indexOf("投与期間:") === 0 || colName.indexOf("投与期間：") === 0 || colName.indexOf("薬剤期間:") === 0 || colName.indexOf("薬剤期間：") === 0);
+}
+
 function isMedItem(colName) {
-    return (isMedAllItem(colName) || isMedSearchItem(colName));
+    return (isMedAllItem(colName) || isMedSearchItem(colName) || isMedStartOnlyItem(colName) || isMedDurationOnlyItem(colName));
 }
 
 function isHistoryItem(colName) {
@@ -356,6 +378,7 @@ var currentRawLine = "";
 var targetItems = []; 
 var searchDays = ""; // 採血探索期間（初期値空欄）
 var medSearchDays = 30; // 併用薬探索期間（初期値30日）
+var medGapDays = 30; // 服用期間算出時の許容空白期間（初期値30日）
 var isPaused = false;
 var fetchAgeEnabled = true;
 var fetchByomeiEnabled = true;
@@ -433,6 +456,13 @@ function startProcess() {
     } else {
         medSearchDays = parseInt(msdVal, 10);
     }
+    // 服用期間の許容空白期間の取得
+    var mgdVal = document.getElementById("medGapDays") ? document.getElementById("medGapDays").value : "30";
+    if (mgdVal === "") {
+        medGapDays = "";
+    } else {
+        medGapDays = parseInt(mgdVal, 10);
+    }
     fetchAgeEnabled = document.getElementById("fetchAgeChk").checked;
     fetchByomeiEnabled = document.getElementById("fetchByomeiChk").checked;
     excludeSuspectedEnabled = document.getElementById("excludeSuspectedChk").checked;
@@ -489,7 +519,7 @@ function hasByomeiTarget() {
 function needShohoTarget() {
     for (var i = 0; i < targetItems.length; i++) {
         var c = targetItems[i];
-        if (c === "併用薬" || c === "処方薬" || c === "内服薬" || c === "処方" || isMedSearchItem(c)) return true;
+        if (c === "併用薬" || c === "処方薬" || c === "内服薬" || c === "処方" || isMedSearchItem(c) || isMedStartOnlyItem(c) || isMedDurationOnlyItem(c)) return true;
     }
     return false;
 }
@@ -497,7 +527,7 @@ function needShohoTarget() {
 function needChushaTarget() {
     for (var i = 0; i < targetItems.length; i++) {
         var c = targetItems[i];
-        if (c === "併用薬" || c === "注射薬" || c === "注射" || isMedSearchItem(c)) return true;
+        if (c === "併用薬" || c === "注射薬" || c === "注射" || isMedSearchItem(c) || isMedStartOnlyItem(c) || isMedDurationOnlyItem(c)) return true;
     }
     return false;
 }
@@ -583,10 +613,13 @@ function processNext() {
         }
         for (var k = 2; k < currentCols.length; k++) {
             var colName = trimStr(currentCols[k]);
-            if (colName && colName !== "採血日" && colName !== "採血値") {
+            if (colName && colName !== "採血日" && colName !== "採血値" && colName !== "開始日" && colName !== "服用期間" && colName !== "服用期間(日)" && colName !== "使用期間" && colName !== "使用期間(日)") {
                 targetItems.push(colName);
                 headerRow.push(colName);
-                if (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isHistoryItem(colName)) {
+                if (isMedSearchItem(colName)) {
+                    headerRow.push("開始日");
+                    headerRow.push("服用期間(日)");
+                } else if (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isHistoryItem(colName)) {
                     headerRow.push("採血日");
                 }
             }
@@ -1106,16 +1139,36 @@ function parseMedOrdersFromDoc(doc) {
     return orders;
 }
 
-function getMedItemValue(colName) {
+// 薬剤名が検索キーワード配列のいずれかに部分一致するか判定
+function doesDrugMatchKeywords(drugName, keywords) {
+    if (!drugName || !keywords || keywords.length === 0) return false;
+    var normAName = normalizeItemName(drugName);
+    for (var m = 0; m < keywords.length; m++) {
+        var kw = trimStr(keywords[m]);
+        if (!kw) continue;
+        var normKw = normalizeItemName(kw);
+        if (drugName.indexOf(kw) !== -1 || (normKw && normAName.indexOf(normKw) !== -1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 処方・注射オーダーから対象列の出力値（案Aは [薬剤名, 開始日, 服用期間(日)] の3列配列、その他は1列配列）を返す
+function getMedItemColumns(colName) {
+    var isSearchA = isMedSearchItem(colName);
     var paddedId = zeroPadId(currentId);
     var mCache = medOrderCache[paddedId];
-    if (!mCache) return "";
+    if (!mCache) {
+        return isSearchA ? ["", "", ""] : [""];
+    }
 
-    var useShoho = (colName === "併用薬" || colName === "処方薬" || colName === "内服薬" || colName === "処方" || isMedSearchItem(colName));
-    var useChusha = (colName === "併用薬" || colName === "注射薬" || colName === "注射" || isMedSearchItem(colName));
+    var isSpecific = (isSearchA || isMedStartOnlyItem(colName) || isMedDurationOnlyItem(colName));
+    var useShoho = (colName === "併用薬" || colName === "処方薬" || colName === "内服薬" || colName === "処方" || isSpecific);
+    var useChusha = (colName === "併用薬" || colName === "注射薬" || colName === "注射" || isSpecific);
 
     if ((useShoho && mCache.shohoError) && (useChusha && mCache.chushaError)) {
-        return "薬剤取得エラー";
+        return isSearchA ? ["薬剤取得エラー", "", ""] : ["薬剤取得エラー"];
     }
 
     var startDate = "";
@@ -1131,47 +1184,115 @@ function getMedItemValue(colName) {
         combinedOrders = combinedOrders.concat(mCache.chusha);
     }
 
-    // 基準日・探索期間（＋処方日数による継続期間）に合致する薬剤を重複排除して抽出
-    var activeDrugs = [];
-    var seen = {};
-    for (var i = 0; i < combinedOrders.length; i++) {
-        var ord = combinedOrders[i];
-        if (ord.orderDate > currentTargetDate) continue;
-        if (startDate !== "" && ord.effectiveEndDate < startDate) continue;
-
-        for (var d = 0; d < ord.drugs.length; d++) {
-            var drugName = ord.drugs[d];
-            if (!seen[drugName]) {
-                seen[drugName] = true;
-                activeDrugs.push(drugName);
-            }
-        }
-    }
-
-    // 「併用薬」「処方薬」「注射薬」等の全件出力列の場合
+    // 1. 「併用薬」「処方薬」「注射薬」等の全件出力列の場合（1列）
     if (isMedAllItem(colName)) {
-        if (activeDrugs.length === 0) return "なし";
-        return activeDrugs.join(", ");
-    }
-
-    // 「薬剤:フィブラート」「薬剤:ARB」「薬剤:アムロジピン|ノルバスク」等のキーワードサーチ列の場合（辞書による自動展開対応）
-    var kwPart = colName.replace(/^(?:併用薬|薬剤|薬)[:：]/, "");
-    var keywords = expandSearchKeywords(kwPart);
-    var matchedDrugs = [];
-    for (var j = 0; j < activeDrugs.length; j++) {
-        var aName = activeDrugs[j];
-        var normAName = normalizeItemName(aName);
-        for (var m = 0; m < keywords.length; m++) {
-            var kw = trimStr(keywords[m]);
-            if (!kw) continue;
-            var normKw = normalizeItemName(kw);
-            if (aName.indexOf(kw) !== -1 || (normKw && normAName.indexOf(normKw) !== -1)) {
-                matchedDrugs.push(aName);
-                break;
+        var allActiveDrugs = [];
+        var seenAll = {};
+        for (var i = 0; i < combinedOrders.length; i++) {
+            var ord = combinedOrders[i];
+            if (ord.orderDate > currentTargetDate) continue;
+            if (startDate !== "" && ord.effectiveEndDate < startDate) continue;
+            for (var d = 0; d < ord.drugs.length; d++) {
+                var drugName = ord.drugs[d];
+                if (!seenAll[drugName]) {
+                    seenAll[drugName] = true;
+                    allActiveDrugs.push(drugName);
+                }
             }
         }
+        if (allActiveDrugs.length === 0) return ["なし"];
+        return [allActiveDrugs.join(", ")];
     }
-    return matchedDrugs.join(", ");
+
+    // 2. 個別薬剤・薬効分類サーチ（案A: 薬剤:〇〇 / 案B: 開始日:〇〇, 服用期間:〇〇）
+    var kwPart = colName.replace(/^(?:併用薬|薬剤開始日|初回処方日|開始日|服用期間|使用期間|投与期間|薬剤期間|薬剤|薬)[:：]/, "");
+    var keywords = expandSearchKeywords(kwPart);
+
+    var matchedActiveDrugs = [];
+    var seenMatched = {};
+    var earliestStartDate = "";
+    var matchedIntervals = [];
+
+    for (var j = 0; j < combinedOrders.length; j++) {
+        var mOrd = combinedOrders[j];
+        if (mOrd.orderDate > currentTargetDate) continue;
+
+        var hasTargetDrug = false;
+        var isWithinWindow = (startDate === "" || mOrd.effectiveEndDate >= startDate);
+
+        for (var md = 0; md < mOrd.drugs.length; md++) {
+            var dName = mOrd.drugs[md];
+            if (doesDrugMatchKeywords(dName, keywords)) {
+                hasTargetDrug = true;
+                if (isWithinWindow && !seenMatched[dName]) {
+                    seenMatched[dName] = true;
+                    matchedActiveDrugs.push(dName);
+                }
+            }
+        }
+
+        // 対象薬剤を含む基準日以前のオーダーがあれば、初回処方日と服用期間の計算対象に追加
+        if (hasTargetDrug) {
+            if (earliestStartDate === "" || mOrd.orderDate < earliestStartDate) {
+                earliestStartDate = mOrd.orderDate;
+            }
+            var cappedEnd = (mOrd.effectiveEndDate > currentTargetDate) ? currentTargetDate : mOrd.effectiveEndDate;
+            if (cappedEnd < mOrd.orderDate) cappedEnd = mOrd.orderDate;
+            matchedIntervals.push({
+                start: mOrd.orderDate,
+                end: cappedEnd
+            });
+        }
+    }
+
+    // 探索期間内に該当薬剤の併用がない場合は空欄を返す
+    if (matchedActiveDrugs.length === 0) {
+        return isSearchA ? ["", "", ""] : [""];
+    }
+
+    // 許容空白期間（medGapDays）を加味して処方期間を結合し、基準日までの総服用日数を算出
+    var totalDurationStr = "";
+    if (matchedIntervals.length > 0) {
+        matchedIntervals.sort(function(a, b) {
+            if (a.start < b.start) return -1;
+            if (a.start > b.start) return 1;
+            if (a.end < b.end) return -1;
+            if (a.end > b.end) return 1;
+            return 0;
+        });
+
+        var merged = [];
+        var cur = { start: matchedIntervals[0].start, end: matchedIntervals[0].end };
+        for (var idx = 1; idx < matchedIntervals.length; idx++) {
+            var nxt = matchedIntervals[idx];
+            var gapDays = diffDaysStr(cur.end, nxt.start) - 1;
+            if (medGapDays === "" || isNaN(medGapDays) || gapDays <= medGapDays) {
+                if (nxt.end > cur.end) {
+                    cur.end = nxt.end;
+                }
+            } else {
+                merged.push(cur);
+                cur = { start: nxt.start, end: nxt.end };
+            }
+        }
+        merged.push(cur);
+
+        var totalDays = 0;
+        for (var mIdx = 0; mIdx < merged.length; mIdx++) {
+            var days = diffDaysStr(merged[mIdx].start, merged[mIdx].end) + 1;
+            if (days > 0) totalDays += days;
+        }
+        totalDurationStr = String(totalDays);
+    }
+
+    if (isMedStartOnlyItem(colName)) {
+        return [earliestStartDate];
+    }
+    if (isMedDurationOnlyItem(colName)) {
+        return [totalDurationStr];
+    }
+    // 案A（薬剤:〇〇）は [該当薬剤名, 開始日(初回処方日), 服用期間(日)] の3列を出力
+    return [matchedActiveDrugs.join(", "), earliestStartDate, totalDurationStr];
 }
 
 function proceedToBloodOrFinish() {
@@ -1185,13 +1306,29 @@ function proceedToBloodOrFinish() {
 
     document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の採血結果を取得中)";
 
-    // ★ 探索日数が指定されていれば計算し、空欄なら開始日を "1990/01/01"（事実上の無制限）にする
-    // ※ kentai_kekka_menu.php の仕様上、期間指定モード(kentai_disp_flgs先頭=0)では開始日・終了日の両方が必須のため
+    // 見出しに「全期間」「全履歴」が含まれるか判定
+    var needAllPeriod = false;
+    for (var hi = 0; hi < targetItems.length; hi++) {
+        if (isHistoryItem(targetItems[hi])) {
+            needAllPeriod = true;
+            break;
+        }
+    }
+
+    // ★「全期間」指定がある場合は、基準日や探索期間に関係なくカルテ上の全期間（1990/01/01〜本日）を取得する
+    // ★通常の採血項目のみの場合は、探索期間〜基準日で取得する
     var startDate = "1990/01/01";
-    if (searchDays !== "" && !isNaN(searchDays)) {
+    var endDate = currentTargetDate;
+    if (needAllPeriod) {
+        var now = new Date();
+        var yy = now.getFullYear();
+        var mm = now.getMonth() + 1;
+        var dd = now.getDate();
+        var todayStr = yy + "/" + (mm < 10 ? "0" + mm : mm) + "/" + (dd < 10 ? "0" + dd : dd);
+        endDate = (currentTargetDate > todayStr) ? currentTargetDate : todayStr;
+    } else if (searchDays !== "" && !isNaN(searchDays)) {
         startDate = getPastDateStr(currentTargetDate, searchDays); 
     }
-    var endDate = currentTargetDate;
 
     // kentai_kekka_menu.php の MakeKentaiDispFlgs() 仕様に基づくフラグ文字列:
     // [0] disp_kensu_gentei_flg = 0 (0:日付期間指定を有効化 / 1:件数限定・日付期間は無視される)
@@ -1295,30 +1432,33 @@ function waitForIeLoad() {
                 }
             }
 
-            // 基準日・探索期間によるフィルタリング用開始日
+            // 基準日・探索期間によるフィルタリング用開始日（通常項目用）
             var filterStartDate = "";
             if (searchDays !== "" && !isNaN(searchDays)) {
                 filterStartDate = getPastDateStr(currentTargetDate, searchDays);
             }
 
-            // 日付列を基準日に近い順（新しい順＝降順）にソートして探索対象列を確定
+            // 全期間用（基準日・探索期間に関係なくすべての採血日列を降順ソート）
+            var allDateCols = dateCols.slice(0);
+            allDateCols.sort(function(a, b) {
+                if (a.normDate > b.normDate) return -1;
+                if (a.normDate < b.normDate) return 1;
+                return a.colIdx - b.colIdx;
+            });
+
+            // 通常項目用（基準日以前かつ探索期間内の採血日列を降順ソート）
             var validDateCols = [];
-            for (var dc = 0; dc < dateCols.length; dc++) {
-                var dcItem = dateCols[dc];
+            for (var dc = 0; dc < allDateCols.length; dc++) {
+                var dcItem = allDateCols[dc];
                 if (/^\d{4}\/\d{2}\/\d{2}$/.test(dcItem.normDate)) {
                     if (dcItem.normDate > currentTargetDate) continue;
                     if (filterStartDate !== "" && dcItem.normDate < filterStartDate) continue;
                 }
                 validDateCols.push(dcItem);
             }
-            validDateCols.sort(function(a, b) {
-                if (a.normDate > b.normDate) return -1;
-                if (a.normDate < b.normDate) return 1;
-                return a.colIdx - b.colIdx;
-            });
 
             var valueMap = {};
-            if (validDateCols.length > 0) {
+            if (allDateCols.length > 0) {
                 // 見出しで指定された採血項目のマップを作成
                 var reqLabMap = {};
                 for (var ti = 0; ti < targetItems.length; ti++) {
@@ -1359,24 +1499,29 @@ function waitForIeLoad() {
                     var historyArr = [];
                     var historyMap = {};
 
+                    // 通常項目用：基準日以前（かつ探索期間内）で最も基準日に近い1件を取得
                     for (var d = 0; d < validDateCols.length; d++) {
                         var col = validDateCols[d].colIdx;
                         var valTxt = (col < rowCells.length) ? rowCells[col] : "";
                         if (valTxt !== "") {
-                            var dateTxt = validDateCols[d].dateStr;
-                            var normDateTxt = validDateCols[d].normDate;
-                            if (itemLatestVal === "") {
-                                itemLatestVal = valTxt;
-                                itemLatestDate = dateTxt;
-                                itemLatestNormDate = normDateTxt;
-                                if (!needHist) {
-                                    break;
+                            itemLatestVal = valTxt;
+                            itemLatestDate = validDateCols[d].dateStr;
+                            itemLatestNormDate = validDateCols[d].normDate;
+                            break;
+                        }
+                    }
+
+                    // 全期間用：基準日や探索期間に関係なく、収集可能なすべての採血日（基準日より後の日付も含む全履歴）を取得
+                    if (needHist) {
+                        for (var hd = 0; hd < allDateCols.length; hd++) {
+                            var hCol = allDateCols[hd].colIdx;
+                            var hValTxt = (hCol < rowCells.length) ? rowCells[hCol] : "";
+                            if (hValTxt !== "") {
+                                var hEntry = allDateCols[hd].dateStr + ": " + hValTxt;
+                                if (!historyMap[hEntry]) {
+                                    historyMap[hEntry] = true;
+                                    historyArr.push(hEntry);
                                 }
-                            }
-                            var hEntry = dateTxt + ": " + valTxt;
-                            if (!historyMap[hEntry]) {
-                                historyMap[hEntry] = true;
-                                historyArr.push(hEntry);
                             }
                         }
                     }
@@ -1473,7 +1618,10 @@ function buildAndPushRow(valueMap, dateCols) {
             continue;
         }
         if (isMedItem(reqItemRaw)) {
-            outRow.push(getMedItemValue(reqItemRaw));
+            var medCols = getMedItemColumns(reqItemRaw);
+            for (var mc = 0; mc < medCols.length; mc++) {
+                outRow.push(medCols[mc]);
+            }
             continue;
         }
 
@@ -1526,7 +1674,10 @@ function appendErrorRow(errMsg) {
         } else if (isByomeiItem(reqItemRaw)) {
             outRow.push(getByomeiItemValue(reqItemRaw));
         } else if (isMedItem(reqItemRaw)) {
-            outRow.push(getMedItemValue(reqItemRaw));
+            var errMedCols = getMedItemColumns(reqItemRaw);
+            for (var emc = 0; emc < errMedCols.length; emc++) {
+                outRow.push(errMedCols[emc]);
+            }
         } else if (isHistoryItem(reqItemRaw)) {
             outRow.push(errMsg);
         } else {
@@ -1557,11 +1708,15 @@ function appendErrorRow(errMsg) {
         <div>
             <label>
                 <b>採血の探索期間: </b>
-                <input type="number" id="searchDays" value="" placeholder="無制限" style="width: 65px; padding: 2px;"> 日前まで
+                <input type="number" id="searchDays" value="" placeholder="無制限" style="width: 60px; padding: 2px;"> 日前まで
             </label>
-            <label style="margin-left: 18px;">
+            <label style="margin-left: 15px;">
                 <b>併用薬の探索期間: </b>
-                <input type="number" id="medSearchDays" value="30" placeholder="無制限" style="width: 65px; padding: 2px;"> 日前まで（処方日数も加味）
+                <input type="number" id="medSearchDays" value="30" placeholder="無制限" style="width: 60px; padding: 2px;"> 日前まで（処方日数も加味）
+            </label>
+            <label style="margin-left: 15px;">
+                <b>服用期間の許容空白: </b>
+                <input type="number" id="medGapDays" value="30" placeholder="無制限" style="width: 60px; padding: 2px;"> 日まで継続とみなす
             </label>
         </div>
         <div style="margin-top: 4px;">
@@ -1602,9 +1757,9 @@ function appendErrorRow(errMsg) {
         </div>
         <div style="font-size: 11px; color: #666; margin-top: 6px; border-top: 1px dashed #ddd; padding-top: 5px;">
             ※<b>全病名・全併用薬の収集</b>：上のチェックをONにするか、見出し（1行目）に<b>「有効病名」「併存疾患」</b>や<b>「併用薬」</b>（処方のみは<b>「処方薬」</b>、注射のみは<b>「注射薬」</b>）と入力すると、重複排除して1セルにまとめて出力します。<br>
-            ※<b>特定疾患・特定薬剤・薬効分類サーチ</b>：見出しに<b>「薬剤:フィブラート」「薬剤:ARB」「薬剤:SGLT2」「薬剤:DPP4」「薬剤:PPI」「薬剤:ビスホスホネート」「薬剤:スタチン」</b>や<b>「病名:糖尿病」</b>と入力すると、辞書登録された先発品・後発品・配合剤も含めて自動展開して抽出します（複数指定は <code>|</code> 区切り）。<br>
-            ※<b>併用薬の判定</b>：基準日以前のオーダーのうち、探索期間内の処方・注射に加え、長期処方（例：60日分）で基準日時点も服用継続中の薬剤を自動判定します（[中止]オーダーや服用中止分は自動除外）。<br>
-            ※<b>全期間採血</b>：見出しに<b>「eGFR全期間」</b>のように<b>「全期間」</b>をつけると、採血日列を作らずに対象期間の履歴を1セルにまとめて出力します。
+            ※<b>特定薬剤・薬効分類サーチ（案A・3列セット出力）</b>：見出しに<b>「薬剤:フィブラート」「薬剤:ARB」「薬剤:SGLT2」「薬剤:DPP4」「薬剤:PPI」「薬剤:ビスホスホネート」「薬剤:スタチン」</b>等と入力すると、<b>［該当薬剤名, 開始日(初回処方日), 服用期間(日)］の3列セット</b>で自動出力します（先発・後発・配合剤も辞書で自動展開し、グループ内の最も早い初回処方日と基準日までの総服用日数を算出）。<br>
+            ※<b>開始日・服用期間の単独列出力（案B）</b>：見出しに<b>「開始日:フィブラート」</b>や<b>「服用期間:フィブラート」</b>（または <code>使用期間:〇〇</code>）と入力すると、その項目だけを1列で出力します。<br>
+            ※<b>特定疾患サーチ・全期間採血</b>：見出しに<b>「病名:糖尿病」</b>で該当病名のみ抽出、<b>「eGFR全期間」</b>で採血日列を作らずに対象期間の履歴を1セルにまとめて出力します。
         </div>
     </div>
 

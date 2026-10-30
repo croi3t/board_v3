@@ -277,6 +277,126 @@
         .fraction { display: inline-block; vertical-align: middle; text-align: center; }
         .numerator { border-bottom: 1px solid #000; padding: 0 5px; }
         .denominator { padding: 0 5px; }
+
+        /* アプリ機能切り替えタブ */
+        .app-tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid #cbd5e1;
+            margin-bottom: 20px;
+        }
+        .app-tab-btn {
+            padding: 11px 22px;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            border-bottom: none;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .app-tab-btn:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .app-tab-btn.active {
+            background: #ffffff;
+            color: #0056b3;
+            border-top: 3px solid #0056b3;
+            border-bottom: 2px solid #ffffff;
+            margin-bottom: -2px;
+            box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
+        }
+
+        /* 一括解析用スタイル */
+        .batch-view-container {
+            background: #ffffff;
+            padding: 5px 0;
+        }
+        .batch-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .batch-metric-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            border-left: 4px solid #0056b3;
+        }
+        .batch-metric-val {
+            font-size: 26px;
+            font-weight: bold;
+            color: #0f172a;
+            margin-top: 6px;
+        }
+        .batch-metric-label {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: bold;
+        }
+
+        .batch-table-container {
+            overflow-x: auto;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            max-height: 520px;
+            overflow-y: auto;
+        }
+        .batch-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .batch-table th {
+            background: #f1f5f9;
+            color: #1e293b;
+            padding: 10px 14px;
+            font-weight: 700;
+            border-bottom: 2px solid #cbd5e1;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .batch-table td {
+            padding: 9px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+            vertical-align: middle;
+        }
+        .batch-table tbody tr:hover {
+            background-color: #f1f5f9;
+        }
+        .batch-table tbody tr.rapid-decline {
+            background-color: #fff1f2;
+        }
+        .btn-mini-view {
+            background: #0284c7;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+        .btn-mini-view:hover {
+            background: #0369a1;
+        }
     </style>
 </head>
 <body>
@@ -287,6 +407,18 @@
         <button class="help-btn" onclick="openModal()">使用方法・計算式</button>
     </div>
     
+    <!-- アプリ機能切り替えタブ -->
+    <div class="app-tabs">
+        <button type="button" class="app-tab-btn active" id="tabSingleBtn" onclick="switchAppTab('single')">
+            🔬 個別患者解析（詳細グラフ・外れ値・変化点）
+        </button>
+        <button type="button" class="app-tab-btn" id="tabBatchBtn" onclick="switchAppTab('batch')">
+            📊 複数患者一括解析（シート集計・バッチ算出）
+        </button>
+    </div>
+
+    <!-- 個別患者解析ビュー -->
+    <div id="singleAnalysisView">
     <div class="layout-grid">
         <div class="left-panel">
             <div class="instruction">
@@ -460,6 +592,99 @@
             </div>
         </div>
     </div>
+    </div><!-- /#singleAnalysisView -->
+
+    <!-- 複数患者一括解析ビュー -->
+    <div id="batchAnalysisView" class="batch-view-container" style="display: none;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h3 style="margin: 0 0 6px 0; color: #0056b3; font-size: 16px;">
+                        📋 複数患者シートデータの入力（1行1患者）
+                    </h3>
+                    <div style="font-size: 13px; color: #64748b; line-height: 1.5;">
+                        Excel等のシートから「採血日（基準日）」列や「eGFR全期間」列を含む範囲をそのままコピー＆ペーストしてください。<br>
+                        ※ 列順序（採血日 / eGFR全期間 / 患者ID）やヘッダーの有無は自動識別されます。「eGFR全期間」のみの場合は全期間スロープを算出し、日付列がある場合はその前後スロープも自動算出します。
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                    <button type="button" class="btn-secondary" onclick="loadBatchSampleData()" style="background-color: #0284c7; padding: 6px 12px;" title="テスト用のサンプルデータを読み込み">
+                        📝 サンプルデータ読込
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="clearBatchData()" style="background-color: #64748b; padding: 6px 12px;">
+                        クリア
+                    </button>
+                </div>
+            </div>
+
+            <textarea id="batchDataInput" style="height: 180px; width: 100%; font-family: Consolas, monospace; font-size: 12px; line-height: 1.4;" placeholder="（貼り付け例）&#10;採血日	eGFR全期間&#10;2015/1/14	2015/01/14: 9, 2015/01/12: 8, 2015/01/10: 12, ...&#10;2015/1/19	2015/01/19: 104, 2015/01/14: 112, 2015/01/13: 138&#10;2015/1/22	2015/01/22: 129, 2015/01/15: 100, 2014/12/26: 126, ..."></textarea>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 15px; align-items: center; font-size: 13px; color: #475569;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <span>基準日（採血日）当日の扱い:</span>
+                        <select id="batchBoundaryMode" style="padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;">
+                            <option value="inclusive" selected>前後の両区間に含める (推奨・連続性維持)</option>
+                            <option value="exclusive_post">前区間に含め、後区間は翌日以降 (&le; 基準日 / &gt; 基準日)</option>
+                            <option value="exclusive_pre">前区間は前日まで、後区間に当日を含む (&lt; 基準日 / &ge; 基準日)</option>
+                        </select>
+                    </label>
+                </div>
+
+                <button type="button" class="primary-btn" onclick="executeBatchAnalysis()" style="margin: 0; width: auto; padding: 10px 24px; font-size: 15px; background-color: #28a745;">
+                    ⚡ 一括スロープ算出を実行
+                </button>
+            </div>
+        </div>
+
+        <!-- 一括解析結果表示エリア -->
+        <div id="batchResultsSection" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #0056b3; padding-bottom: 8px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0; color: #0056b3; font-size: 17px;">
+                    📊 一括スロープ算出結果一覧 (mL/min/1.73m²/year)
+                </h3>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="copy-btn" id="batchCopyBtn" onclick="copyBatchResultsToClipboard()" style="background-color: #28a745; padding: 7px 15px; font-size: 13px;">
+                        📋 Excel貼り付け用コピー (TSV)
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="downloadBatchResultsCSV()" style="background-color: #0284c7; padding: 7px 15px; font-size: 13px;">
+                        💾 CSVダウンロード
+                    </button>
+                </div>
+            </div>
+
+            <!-- サマリーメトリクスカード -->
+            <div class="batch-card-grid" id="batchMetricCards"></div>
+
+            <!-- 結果一覧テーブル -->
+            <div class="batch-table-container">
+                <table class="batch-table" id="batchResultsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">No</th>
+                            <th>患者ID / 識別</th>
+                            <th>基準日 (採血日)</th>
+                            <th>全期間スロープ<br><span style="font-size:11px; font-weight:normal; color:#64748b;">(mL/min/1.73m²/yr)</span></th>
+                            <th>全点数</th>
+                            <th>基準日前スロープ<br><span style="font-size:11px; font-weight:normal; color:#64748b;">(&le; 基準日)</span></th>
+                            <th>前点数</th>
+                            <th>基準日後スロープ<br><span style="font-size:11px; font-weight:normal; color:#64748b;">(&ge; 基準日)</span></th>
+                            <th>後点数</th>
+                            <th>変化量 (後 - 前)<br><span style="font-size:11px; font-weight:normal; color:#64748b;">(&Delta;Slope)</span></th>
+                            <th>検査期間 (初回〜最終)</th>
+                            <th style="text-align: center;">個別グラフ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="batchTableBody"></tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 10px; font-size: 12px; color: #64748b; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                <span>※ 「👁️ グラフ確認」ボタンをクリックすると、該当患者のデータを個別解析画面に読み込んでグラフや詳細を表示できます。</span>
+                <span>※ スロープが -4.0 以下の急速低下は <span style="background:#fee2e2; color:#991b1b; padding:1px 5px; border-radius:3px; font-weight:bold;">赤色強調</span> されます。</span>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal-overlay" id="helpModal" onclick="closeModal(event)">
@@ -491,6 +716,13 @@
                 </ul>
             </li>
             <li><strong>結果のコピー:</strong> 「数値のみコピー」ボタンをクリックすると、算出したスロープ値がタブ区切りでクリップボードに保存されます。Excelのセルに直接貼り付けると横方向へ展開されます。</li>
+            <li><strong>複数患者一括解析（バッチ算出）:</strong>
+                <ul>
+                    <li>上部の「複数患者一括解析」タブに切り替えると、Excelからコピーした1行1患者のデータシートを一括で処理できます。</li>
+                    <li>「eGFR全期間」列のみの場合は全期間スロープを算出し、「採血日（基準日）」列がある場合はその前後のスロープおよび変化量も全自動で算出します。</li>
+                    <li>結果は「Excel貼り付け用コピー」で一括ペースト可能なほか、「👁️ グラフ確認」ボタンで該当患者を個別解析画面に即座に読み込んで詳細分析できます。</li>
+                </ul>
+            </li>
         </ul>
 
         <h3 style="margin-top: 30px;">最小二乗法によるスロープ算出について</h3>
@@ -1734,6 +1966,518 @@
     window.addEventListener('DOMContentLoaded', () => {
         setupCanvasTooltip();
     });
+
+    // ==========================================
+    // アプリ機能切り替えタブ制御
+    // ==========================================
+    function switchAppTab(tabName) {
+        const singleTabBtn = document.getElementById('tabSingleBtn');
+        const batchTabBtn = document.getElementById('tabBatchBtn');
+        const singleView = document.getElementById('singleAnalysisView');
+        const batchView = document.getElementById('batchAnalysisView');
+
+        if (tabName === 'batch') {
+            singleTabBtn.classList.remove('active');
+            batchTabBtn.classList.add('active');
+            singleView.style.display = 'none';
+            batchView.style.display = 'block';
+        } else {
+            batchTabBtn.classList.remove('active');
+            singleTabBtn.classList.add('active');
+            batchView.style.display = 'none';
+            singleView.style.display = 'block';
+        }
+    }
+
+    // ==========================================
+    // 複数患者一括解析 (Batch Slope Analysis)
+    // ==========================================
+    let lastBatchResults = [];
+
+    function loadBatchSampleData() {
+        const sampleText = `採血日\teGFR全期間
+2015/1/14\t2015/01/14: 9, 2015/01/12: 8, 2015/01/10: 12, 2015/01/09: 9, 2015/01/07: 8, 2015/01/06: 10, 2015/01/05: 20, 2015/01/05: 8, 2015/01/04: 9, 2015/01/02: 9, 2014/12/31: 8, 2014/12/29: 7, 2014/12/26: 8, 2014/12/25: 11, 2014/12/22: 7, 2014/12/19: 9, 2014/12/15: 21, 2014/12/15: 7, 2014/12/12: 8, 2014/12/08: 7, 2014/12/05: 8, 2014/12/01: 6, 2014/11/28: 7, 2014/11/25: 8, 2014/11/22: 9, 2014/11/21: 6, 2014/11/20: 9, 2014/11/18: 6, 2014/11/17: 4, 2014/11/15: 7, 2014/11/14: 5, 2014/11/10: 11, 2014/11/10: 4, 2014/11/07: 5, 2014/11/03: 4, 2014/10/31: 4, 2014/10/29: 4, 2014/10/27: 10, 2014/10/27: 4, 2014/10/25: 6, 2013/05/27: 13, 2013/05/24: 14, 2013/05/22: 15, 2013/05/21: 11
+2015/1/19\t2015/01/19: 104, 2015/01/14: 112, 2015/01/13: 138
+2015/1/22\t2015/01/22: 129, 2015/01/15: 100, 2014/12/26: 126, 2014/12/18: 123, 2014/12/09: 115, 2014/12/02: 123, 2014/11/28: 132, 2014/11/26: 129, 2014/11/12: 154, 2014/09/08: 135, 2014/08/25: 154`;
+        document.getElementById('batchDataInput').value = sampleText;
+    }
+
+    function clearBatchData() {
+        document.getElementById('batchDataInput').value = '';
+        document.getElementById('batchResultsSection').style.display = 'none';
+        lastBatchResults = [];
+        document.getElementById('batchDataInput').focus();
+    }
+
+    // シートデータのパース処理
+    function parseBatchSheetData(rawText) {
+        if (!rawText || !rawText.trim()) return [];
+
+        const normalized = convertToHalfWidth(rawText).trim();
+        const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length === 0) return [];
+
+        // 区切り文字とデータ構造の検出
+        const firstLine = lines[0];
+        let delim = null;
+        let isSingleEgfr = false;
+
+        if (firstLine.includes('\t')) {
+            delim = '\t';
+        } else {
+            const dateMatches = firstLine.match(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/g);
+            if (dateMatches && dateMatches.length > 1) {
+                isSingleEgfr = true;
+            } else if (firstLine.includes(',')) {
+                delim = ',';
+            } else {
+                isSingleEgfr = true;
+            }
+        }
+
+        const parsedPatients = [];
+
+        if (isSingleEgfr) {
+            // 単一列（eGFR全期間のみ）
+            lines.forEach((line, rowIdx) => {
+                const points = parseRawData(line);
+                parsedPatients.push({
+                    index: rowIdx + 1,
+                    id: `患者-${rowIdx + 1}`,
+                    rawRefDate: '',
+                    refDate: null,
+                    rawEgfrStr: line,
+                    points: points
+                });
+            });
+            return parsedPatients;
+        }
+
+        // マルチカラム処理
+        const headerKeywords = ['採血日', '基準日', 'イベント日', '介入日', '日付', 'egfr', '全期間', 'id', '患者', 'patient', 'date', 'value'];
+        const firstCols = firstLine.toLowerCase().split(delim).map(c => c.trim());
+        const isHeader = firstCols.some(col => headerKeywords.some(kw => col.includes(kw)));
+
+        let header = null;
+        let dataLines = lines;
+        if (isHeader) {
+            header = firstLine.split(delim).map(c => c.trim());
+            dataLines = lines.slice(1);
+        }
+
+        dataLines.forEach((line, rowIdx) => {
+            const cols = line.split(delim).map(c => c.trim());
+            let idVal = `患者-${rowIdx + 1}`;
+            let refDateStr = '';
+            let egfrStr = '';
+
+            if (header) {
+                header.forEach((h, cIdx) => {
+                    const val = cols[cIdx] || '';
+                    const hLow = h.toLowerCase();
+                    if (/^(id|患者|patient|no)/i.test(hLow)) {
+                        if (val) idVal = val;
+                    } else if (/^(採血日|基準日|イベント日|介入日|日付|date)/i.test(hLow)) {
+                        if (val) refDateStr = val;
+                    } else if (/(egfr|全期間|検査値|value|時系列)/i.test(hLow)) {
+                        if (val) egfrStr = val;
+                    }
+                });
+            }
+
+            // ヘッダーでマッピングされなかった場合の自動推測
+            if (!egfrStr) {
+                let maxPairs = 0;
+                let bestIdx = -1;
+                cols.forEach((colVal, cIdx) => {
+                    const matches = colVal.match(/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/g);
+                    const count = matches ? matches.length : 0;
+                    if (count > maxPairs) {
+                        maxPairs = count;
+                        bestIdx = cIdx;
+                    }
+                });
+
+                if (bestIdx !== -1) {
+                    egfrStr = cols[bestIdx];
+                    cols.forEach((colVal, cIdx) => {
+                        if (cIdx === bestIdx) return;
+                        if (!refDateStr && /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(colVal)) {
+                            refDateStr = colVal;
+                        } else if (idVal === `患者-${rowIdx + 1}` && colVal && !/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(colVal)) {
+                            idVal = colVal;
+                        }
+                    });
+                } else if (cols.length === 1) {
+                    egfrStr = cols[0];
+                } else if (cols.length >= 2) {
+                    refDateStr = cols[0];
+                    egfrStr = cols[1];
+                }
+            }
+
+            const points = parseRawData(egfrStr);
+            let refDateObj = null;
+            if (refDateStr) {
+                const cleanD = refDateStr.replace(/-/g, '/').trim();
+                const dObj = new Date(cleanD);
+                if (!isNaN(dObj.getTime())) {
+                    refDateObj = dObj;
+                    refDateStr = formatDateToString(dObj);
+                }
+            }
+
+            parsedPatients.push({
+                index: rowIdx + 1,
+                id: idVal,
+                rawRefDate: refDateStr,
+                refDate: refDateObj,
+                rawEgfrStr: egfrStr,
+                points: points
+            });
+        });
+
+        return parsedPatients;
+    }
+
+    // 一括解析の実行
+    function executeBatchAnalysis() {
+        const rawText = document.getElementById('batchDataInput').value;
+        const patients = parseBatchSheetData(rawText);
+
+        if (patients.length === 0) {
+            alert("有効な患者データが見つかりませんでした。入力形式を確認してください。");
+            return;
+        }
+
+        const boundaryMode = document.getElementById('batchBoundaryMode').value;
+        const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
+
+        const results = patients.map(p => {
+            if (p.points.length === 0) {
+                return {
+                    ...p,
+                    overallSlope: null,
+                    totalCount: 0,
+                    preSlope: null,
+                    preCount: 0,
+                    postSlope: null,
+                    postCount: 0,
+                    deltaSlope: null,
+                    firstDateStr: '-',
+                    lastDateStr: '-',
+                    durationYears: 0,
+                    status: 'データなし'
+                };
+            }
+
+            const minDate = p.points[0].date;
+            const maxDate = p.points[p.points.length - 1].date;
+            const durationYears = (maxDate - minDate) / msPerYear;
+
+            // 全期間スロープ
+            const overallCalc = calculateSlopeForSegment(p.points, minDate);
+            const overallSlope = overallCalc ? overallCalc.slope : null;
+
+            // 基準日前後のスロープ
+            let preSlope = null;
+            let postSlope = null;
+            let preCount = 0;
+            let postCount = 0;
+            let deltaSlope = null;
+
+            if (p.refDate) {
+                let prePoints = [];
+                let postPoints = [];
+
+                if (boundaryMode === 'inclusive') {
+                    prePoints = p.points.filter(pt => pt.date <= p.refDate);
+                    postPoints = p.points.filter(pt => pt.date >= p.refDate);
+                } else if (boundaryMode === 'exclusive_post') {
+                    prePoints = p.points.filter(pt => pt.date <= p.refDate);
+                    postPoints = p.points.filter(pt => pt.date > p.refDate);
+                } else if (boundaryMode === 'exclusive_pre') {
+                    prePoints = p.points.filter(pt => pt.date < p.refDate);
+                    postPoints = p.points.filter(pt => pt.date >= p.refDate);
+                }
+
+                preCount = prePoints.length;
+                postCount = postPoints.length;
+
+                if (preCount >= 2) {
+                    const preCalc = calculateSlopeForSegment(prePoints, minDate);
+                    if (preCalc) preSlope = preCalc.slope;
+                }
+
+                if (postCount >= 2) {
+                    const postCalc = calculateSlopeForSegment(postPoints, minDate);
+                    if (postCalc) postSlope = postCalc.slope;
+                }
+
+                if (preSlope !== null && postSlope !== null) {
+                    deltaSlope = postSlope - preSlope;
+                }
+            }
+
+            return {
+                ...p,
+                overallSlope: overallSlope,
+                totalCount: p.points.length,
+                preSlope: preSlope,
+                preCount: preCount,
+                postSlope: postSlope,
+                postCount: postCount,
+                deltaSlope: deltaSlope,
+                firstDateStr: formatDateToString(minDate),
+                lastDateStr: formatDateToString(maxDate),
+                durationYears: durationYears,
+                status: overallSlope !== null ? '計算完了' : '点数不足'
+            };
+        });
+
+        lastBatchResults = results;
+        renderBatchResultsUI(results);
+    }
+
+    // 一括解析結果UIのレンダリング
+    function renderBatchResultsUI(results) {
+        const resultsSection = document.getElementById('batchResultsSection');
+        resultsSection.style.display = 'block';
+
+        const totalPatients = results.length;
+        const validOverall = results.filter(r => r.overallSlope !== null);
+        const validOverallCount = validOverall.length;
+        const validPre = results.filter(r => r.preSlope !== null);
+        const validPost = results.filter(r => r.postSlope !== null);
+        const validDelta = results.filter(r => r.deltaSlope !== null);
+
+        let avgOverallText = '-';
+        if (validOverallCount > 0) {
+            const sum = validOverall.reduce((acc, r) => acc + r.overallSlope, 0);
+            avgOverallText = (sum / validOverallCount).toFixed(2);
+        }
+
+        // サマリーメトリクスカードの生成
+        const cardsContainer = document.getElementById('batchMetricCards');
+        cardsContainer.innerHTML = `
+            <div class="batch-metric-card" style="border-left-color: #0056b3;">
+                <div class="batch-metric-label">👥 解析対象患者数</div>
+                <div class="batch-metric-val" style="color: #0056b3;">${totalPatients} <span style="font-size:14px; color:#64748b;">名</span></div>
+            </div>
+            <div class="batch-metric-card" style="border-left-color: #28a745;">
+                <div class="batch-metric-label">✅ 全期間スロープ算出成功</div>
+                <div class="batch-metric-val" style="color: #28a745;">${validOverallCount} / ${totalPatients} <span style="font-size:14px; color:#64748b;">名</span></div>
+            </div>
+            <div class="batch-metric-card" style="border-left-color: #fd7e14;">
+                <div class="batch-metric-label">📈 全期間平均スロープ</div>
+                <div class="batch-metric-val" style="color: #fd7e14;">${avgOverallText} <span style="font-size:13px; color:#64748b;">mL/min/1.73m²/yr</span></div>
+            </div>
+            <div class="batch-metric-card" style="border-left-color: #6f42c1;">
+                <div class="batch-metric-label">🎯 基準日前後スロープ算出</div>
+                <div class="batch-metric-val" style="color: #6f42c1; font-size: 20px; margin-top: 10px;">
+                    前: ${validPre.length}名 / 後: ${validPost.length}名
+                    <div style="font-size: 11px; color: #64748b; font-weight: normal; margin-top: 2px;">(変化量算出: ${validDelta.length}名)</div>
+                </div>
+            </div>
+        `;
+
+        // 結果テーブル行の生成
+        const tbody = document.getElementById('batchTableBody');
+        tbody.innerHTML = '';
+
+        results.forEach((r, idx) => {
+            const tr = document.createElement('tr');
+            if (idx % 2 === 1) tr.classList.add('odd');
+
+            // 急速進行強調 (スロープ <= -4.0)
+            if (r.overallSlope !== null && r.overallSlope <= -4.0) {
+                tr.classList.add('rapid-decline');
+            }
+
+            const formatSlopeVal = (slope, count) => {
+                if (slope === null) {
+                    return count >= 1 ? `<span style="color:#94a3b8; font-size:12px;">点数不足 (n=${count})</span>` : `<span style="color:#cbd5e1;">-</span>`;
+                }
+                const color = slope <= -4.0 ? '#dc2626' : (slope > 0 ? '#d97706' : '#1e293b');
+                return `<strong style="color:${color}; font-size:14px;">${slope.toFixed(3)}</strong> <span style="font-size:11px; color:#64748b;">(n=${count})</span>`;
+            };
+
+            const deltaText = r.deltaSlope !== null 
+                ? `<strong style="color:${r.deltaSlope >= 0 ? '#16a34a' : '#dc2626'}; font-size:13px;">${r.deltaSlope >= 0 ? '+' : ''}${r.deltaSlope.toFixed(3)}</strong>` 
+                : `<span style="color:#94a3b8;">-</span>`;
+
+            tr.innerHTML = `
+                <td style="text-align: center; font-weight: bold; color: #64748b;">${r.index}</td>
+                <td><strong style="color: #0f172a;">${escapeHTML(r.id)}</strong></td>
+                <td>${r.rawRefDate ? `<span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:12px;">📅 ${escapeHTML(r.rawRefDate)}</span>` : '<span style="color:#94a3b8;">なし</span>'}</td>
+                <td>${formatSlopeVal(r.overallSlope, r.totalCount)}</td>
+                <td style="text-align: center;">${r.totalCount}</td>
+                <td>${r.refDate ? formatSlopeVal(r.preSlope, r.preCount) : '<span style="color:#cbd5e1;">-</span>'}</td>
+                <td style="text-align: center;">${r.refDate ? r.preCount : '-'}</td>
+                <td>${r.refDate ? formatSlopeVal(r.postSlope, r.postCount) : '<span style="color:#cbd5e1;">-</span>'}</td>
+                <td style="text-align: center;">${r.refDate ? r.postCount : '-'}</td>
+                <td style="text-align: center;">${deltaText}</td>
+                <td style="font-size: 12px; color: #64748b;">
+                    ${r.totalCount >= 1 ? `${r.firstDateStr} 〜 ${r.lastDateStr} (${r.durationYears.toFixed(1)}年)` : '-'}
+                </td>
+                <td style="text-align: center;">
+                    <button type="button" class="btn-mini-view" onclick="loadPatientToSingleView(${r.index})" title="個別解析タブでグラフと詳細を表示">
+                        👁️ グラフ確認
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // テーブルへスムーズスクロール
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag));
+    }
+
+    // 個別解析画面へ患者データを転送・ロード
+    function loadPatientToSingleView(index) {
+        const patient = lastBatchResults.find(p => p.index === index);
+        if (!patient) return;
+
+        // 個別解析タブへ切り替え
+        switchAppTab('single');
+
+        // 個別解析フォームへデータをセット
+        document.getElementById('dataInput').value = patient.rawEgfrStr;
+        if (patient.rawRefDate) {
+            document.getElementById('eventDates').value = patient.rawRefDate;
+        } else {
+            document.getElementById('eventDates').value = '';
+        }
+
+        // 解析を実行
+        executeAnalysis();
+
+        // メイン結果エリアへスクロール
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // 一括結果のExcel用クリップボードコピー (TSV)
+    function copyBatchResultsToClipboard() {
+        if (!lastBatchResults || lastBatchResults.length === 0) {
+            alert("コピーする解析結果がありません。");
+            return;
+        }
+
+        const headers = [
+            "患者No",
+            "患者ID",
+            "基準日(採血日)",
+            "全期間スロープ(mL/min/1.73m2/yr)",
+            "全点数",
+            "基準日前スロープ",
+            "前点数",
+            "基準日後スロープ",
+            "後点数",
+            "スロープ変化量(後-前)",
+            "初回検査日",
+            "最終検査日",
+            "検査期間(年)"
+        ];
+
+        const rows = lastBatchResults.map(r => [
+            r.index,
+            r.id,
+            r.rawRefDate || "",
+            r.overallSlope !== null ? r.overallSlope.toFixed(3) : "",
+            r.totalCount,
+            r.preSlope !== null ? r.preSlope.toFixed(3) : "",
+            r.refDate ? r.preCount : "",
+            r.postSlope !== null ? r.postSlope.toFixed(3) : "",
+            r.refDate ? r.postCount : "",
+            r.deltaSlope !== null ? r.deltaSlope.toFixed(3) : "",
+            r.totalCount >= 1 ? r.firstDateStr : "",
+            r.totalCount >= 1 ? r.lastDateStr : "",
+            r.totalCount >= 1 ? r.durationYears.toFixed(2) : ""
+        ]);
+
+        const tsv = [headers.join('\t'), ...rows.map(row => row.join('\t'))].join('\r\n');
+
+        navigator.clipboard.writeText(tsv).then(() => {
+            const btn = document.getElementById('batchCopyBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "✓ コピー完了！(Excel貼付可)";
+            btn.style.backgroundColor = "#17a2b8";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.backgroundColor = "#28a745";
+            }, 2000);
+        }).catch(err => {
+            alert("クリップボードへのコピーに失敗しました。ブラウザの権限を確認してください。");
+        });
+    }
+
+    // 一括結果のCSVダウンロード
+    function downloadBatchResultsCSV() {
+        if (!lastBatchResults || lastBatchResults.length === 0) {
+            alert("ダウンロードする解析結果がありません。");
+            return;
+        }
+
+        const headers = [
+            "患者No",
+            "患者ID",
+            "基準日(採血日)",
+            "全期間スロープ(mL/min/1.73m2/yr)",
+            "全点数",
+            "基準日前スロープ",
+            "前点数",
+            "基準日後スロープ",
+            "後点数",
+            "スロープ変化量(後-前)",
+            "初回検査日",
+            "最終検査日",
+            "検査期間(年)"
+        ];
+
+        const escapeCSV = (val) => {
+            const str = String(val === null || val === undefined ? '' : val);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        const rows = lastBatchResults.map(r => [
+            r.index,
+            r.id,
+            r.rawRefDate || "",
+            r.overallSlope !== null ? r.overallSlope.toFixed(3) : "",
+            r.totalCount,
+            r.preSlope !== null ? r.preSlope.toFixed(3) : "",
+            r.refDate ? r.preCount : "",
+            r.postSlope !== null ? r.postSlope.toFixed(3) : "",
+            r.refDate ? r.postCount : "",
+            r.deltaSlope !== null ? r.deltaSlope.toFixed(3) : "",
+            r.totalCount >= 1 ? r.firstDateStr : "",
+            r.totalCount >= 1 ? r.lastDateStr : "",
+            r.totalCount >= 1 ? r.durationYears.toFixed(2) : ""
+        ]);
+
+        const csvContent = [headers.map(escapeCSV).join(','), ...rows.map(row => row.map(escapeCSV).join(','))].join('\r\n');
+        // Excel文字化け防止のためBOM (\uFEFF) を付加
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        link.download = `eGFR_batch_slopes_${nowStr}.csv`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }
 </script>
 
 </body>
