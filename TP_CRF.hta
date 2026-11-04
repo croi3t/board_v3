@@ -1220,6 +1220,7 @@
     function saveAndRender() {
         saveDataToFile();
         updateWardCheckboxes();
+        updateHeaderFilters(true);
         renderTable();
     }
 
@@ -1306,7 +1307,8 @@
         var deptMap = {};
         for (var key in patientData) {
             if(patientData.hasOwnProperty(key)) {
-                var dep = patientData[key].department || "(未登録)";
+                var p = patientData[key];
+                var dep = (p.currentDept !== undefined && p.currentDept !== null && p.currentDept !== "") ? p.currentDept : (p.department || "(未登録)");
                 deptMap[dep] = true;
             }
         }
@@ -1363,11 +1365,12 @@
         var otherWards = {};
         
         for (var key in patientData) {
-            if (patientData.hasOwnProperty(key) && patientData[key].ward) {
-                var w = patientData[key].ward;
+            if (patientData.hasOwnProperty(key)) {
+                var p = patientData[key];
+                var w = p.currentWard || p.ward;
+                if (!w) continue;
                 if (w === "3A" || w === "3B") {
                     w = "3A・3B";
-                    patientData[key].ward = "3A・3B";
                 }
                 var found = false;
                 for(var j=0; j<predefinedOrder.length; j++) {
@@ -1407,18 +1410,24 @@
             return;
         }
 
-        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟,診療科,担当医師,対象薬品,投与回数,投与開始,投与終了,採血予定日,冷凍日,ステータス,タブ,備考\n";
+        var csvContent = "患者ID,氏名,年齢,年齢区分,病棟(処方時),病棟(最新),診療科(処方時),診療科(最新),担当医師(処方時),担当医師(最新),対象薬品,投与回数,投与開始,投与終了,採血予定日,冷凍日,ステータス,タブ,備考\n";
         
         var keys = getFilteredKeys();
         for (var k = 0; k < keys.length; k++) {
             var p = patientData[keys[k]];
             
-            var currentWard = p.currentWard || p.ward;
-            var currentDept = (p.currentDept !== undefined && p.currentDept !== null && p.currentDept !== "") ? p.currentDept : p.department;
-            var currentDoctor = (p.currentDoctor !== undefined && p.currentDoctor !== null && p.currentDoctor !== "") ? p.currentDoctor : p.doctor;
+            var origWard = p.ward || "";
+            var currWard = p.currentWard || p.ward || "";
+            var origDept = p.department || "";
+            var currDept = (p.currentDept !== undefined && p.currentDept !== null && p.currentDept !== "") ? p.currentDept : (p.department || "");
+            var origDoctor = p.doctor || "";
+            var currDoctor = (p.currentDoctor !== undefined && p.currentDoctor !== null && p.currentDoctor !== "") ? p.currentDoctor : (p.doctor || "");
 
             var rowArray = [
-                p.id, p.name, p.age, p.ageGroup, currentWard, currentDept, currentDoctor,
+                p.id, p.name, p.age, p.ageGroup,
+                origWard, currWard,
+                origDept, currDept,
+                origDoctor, currDoctor,
                 p.drug, p.freq ? p.freq + "回/日" : "", p.start, p.end, p.sampleDate,
                 p.freezeDate || "",
                 p.status === "" ? "未選択" : p.status, 
@@ -1562,9 +1571,11 @@
             if (searchInput !== "" && searchText.indexOf(searchInput) === -1) continue;
 
             if (selectedWards.length > 0) {
+                var effWard = p.currentWard || p.ward;
+                if (effWard === "3A" || effWard === "3B") effWard = "3A・3B";
                 var wardMatch = false;
                 for(var j=0; j<selectedWards.length; j++) {
-                    if (p.ward === selectedWards[j]) wardMatch = true;
+                    if (effWard === selectedWards[j]) wardMatch = true;
                 }
                 if (!wardMatch) continue;
             }
@@ -1572,7 +1583,7 @@
             if (hasKeys(msFilters.age) && !msFilters.age[p.ageGroup]) continue;
             if (hasKeys(msFilters.drug) && !msFilters.drug[p.drug]) continue;
             if (hasKeys(msFilters.status) && !msFilters.status[p.status]) continue;
-            var safeDept = p.department || "(未登録)";
+            var safeDept = (p.currentDept !== undefined && p.currentDept !== null && p.currentDept !== "") ? p.currentDept : (p.department || "(未登録)");
             if (hasKeys(msFilters.dept) && !msFilters.dept[safeDept]) continue;
 
             keys.push(key);
@@ -1580,15 +1591,23 @@
 
         if (currentSortCol !== "") {
             keys.sort(function(a, b) {
-                var vA = patientData[a][currentSortCol];
-                var vB = patientData[b][currentSortCol];
+                var pA = patientData[a];
+                var pB = patientData[b];
+                var vA, vB;
                 
-                if (vA === null || vA === undefined) vA = "";
-                if (vB === null || vB === undefined) vB = "";
-                
-                if (currentSortCol === 'age') {
-                    vA = parseInt(vA, 10); if(isNaN(vA)) vA = -1;
-                    vB = parseInt(vB, 10); if(isNaN(vB)) vB = -1;
+                if (currentSortCol === 'ward') {
+                    vA = pA.currentWard || pA.ward || "";
+                    vB = pB.currentWard || pB.ward || "";
+                    if (vA === "3A" || vA === "3B") vA = "3A・3B";
+                    if (vB === "3A" || vB === "3B") vB = "3A・3B";
+                } else if (currentSortCol === 'age') {
+                    vA = parseInt(pA.age, 10); if(isNaN(vA)) vA = -1;
+                    vB = parseInt(pB.age, 10); if(isNaN(vB)) vB = -1;
+                } else {
+                    vA = pA[currentSortCol];
+                    vB = pB[currentSortCol];
+                    if (vA === null || vA === undefined) vA = "";
+                    if (vB === null || vB === undefined) vB = "";
                 }
 
                 if(vA < vB) return currentSortAsc ? -1 : 1;
@@ -1897,6 +1916,8 @@
                     
                     if (needsSave) {
                         saveDataToFile();
+                        updateWardCheckboxes();
+                        updateHeaderFilters(true);
                         renderTable();
                     }
                     
