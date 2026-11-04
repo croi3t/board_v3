@@ -1,0 +1,40 @@
+/* Print Styles */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    
+    #resultSection, #resultSection * {
+        visibility: visible;
+    }
+    
+    #resultSection {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        background-color: white;
+    }
+    
+    header, form, #csvPreview, #resultSection h2, #resultSection p, button {
+        display: none !important;
+    }
+    
+    #qrcode {
+        margin: 20px auto;
+        border: none !important;     
+    }
+    
+    /* Show a simple instruction on print */
+    #qrcode::before {
+        content: "退院時処方データ QRコード";
+        display: block;
+        text-align: center;
+        margin-bottom: 20px;
+        font-weight: bold;
+        font-size: 16px;
+    }
+}

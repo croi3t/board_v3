@@ -1,0 +1,6 @@
+- [x] index.html に `qrcode-generator.js` を追加
+- [x] app.js で全データの XOR パリティ（全バイトの排他的論理和）計算を実装
+- [x] app.js で `addData` に渡すためのバイナリ文字列変換を実装（s.charCodeAt エラー対策）
+- [x] app.js の `setStructuredAppend` 有無に応じたフォールバック（個別ヘッダー方式への自動切り替え）を実装
+- [x] 動作確認（プリセット、および分割時のデータ構成検証）
+- [x] walkthrough.md の更新
