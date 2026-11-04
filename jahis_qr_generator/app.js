@@ -146,6 +146,20 @@ document.addEventListener('DOMContentLoaded', () => {
             rowDiv.querySelector('.med-unit').value = unit;
             rowDiv.querySelector('.med-code').value = code;
             rowDiv.querySelector('.med-usage').value = usage;
+
+            // 手動編集されたら自動補完フラグ・強調スタイルを解除
+            ['.med-dose', '.med-unit', '.med-usage'].forEach(sel => {
+                const el = rowDiv.querySelector(sel);
+                if (el) {
+                    el.addEventListener('input', function() {
+                        delete this.dataset.supplemented;
+                        this.classList.remove('supplemented-field');
+                        this.style.border = '';
+                        this.style.backgroundColor = '';
+                        this.style.color = '';
+                    });
+                }
+            });
             const memoEl = rowDiv.querySelector('.med-memo');
             if (memoEl) {
                 memoEl.value = memo;
@@ -179,6 +193,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const bulkInput = document.getElementById('bulkInput');
     if (bulkInput) {
         bulkInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight + 2) + 'px';
+        });
+    }
+
+    const globalMemoInput = document.getElementById('globalMemo');
+    if (globalMemoInput) {
+        globalMemoInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight + 2) + 'px';
         });
@@ -431,8 +453,45 @@ document.addEventListener('DOMContentLoaded', () => {
             group.meds.forEach(med => {
                 // codeType: YJコードあり→4, なし→1（JAHIS仕様: 空文字ではなく"1"を使用）
                 const codeType = med.code ? '4' : '1';
+                const rowEl = medItems[med.originalIndex];
+                const doseEl = rowEl ? rowEl.querySelector('.med-dose') : null;
+                const unitEl = rowEl ? rowEl.querySelector('.med-unit') : null;
+
+                let isDoseSupp = !med.dose || (doseEl && doseEl.dataset.supplemented === 'true');
+                let isUnitSupp = !med.unit || (unitEl && unitEl.dataset.supplemented === 'true');
+
+                const doseOut = med.dose || '1';
+                const unitOut = med.unit || '錠';
+
+                // 自動補完された値をデータおよび元の入力欄にも反映（プレビューと一致させる）
+                med.dose = doseOut;
+                med.unit = unitOut;
+                med.doseSupplemented = isDoseSupp;
+                med.unitSupplemented = isUnitSupp;
+
+                if (doseEl) {
+                    doseEl.value = doseOut;
+                    if (isDoseSupp) {
+                        doseEl.dataset.supplemented = 'true';
+                        doseEl.classList.add('supplemented-field');
+                        doseEl.style.border = '2px solid #dc2626';
+                        doseEl.style.backgroundColor = '#fee2e2';
+                        doseEl.style.color = '#991b1b';
+                    }
+                }
+                if (unitEl) {
+                    unitEl.value = unitOut;
+                    if (isUnitSupp) {
+                        unitEl.dataset.supplemented = 'true';
+                        unitEl.classList.add('supplemented-field');
+                        unitEl.style.border = '2px solid #dc2626';
+                        unitEl.style.backgroundColor = '#fee2e2';
+                        unitEl.style.color = '#991b1b';
+                    }
+                }
+
                 // 201: 薬品レコード (カンマは必ず7個 = 8項目)
-                lines.push(`201,${rpNo},${med.name},${med.dose},${med.unit},${codeType},${med.code},1`);
+                lines.push(`201,${rpNo},${med.name},${doseOut},${unitOut},${codeType},${med.code},1`);
                 
                 // メモを1行ずつ個別レコード化
                 med.memos.forEach(memoLine => {
@@ -443,28 +502,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            if (group.rawUsage) {
-                let q = "", u = "", name = group.rawUsage;
-                const rx = /([0-9０-９\.]+)\s*(日分|回分|枚|包|本|個|錠|カプセル|T|調剤|式)[\s　]*$/i;
-                const match = group.rawUsage.match(rx);
-                if (match) { 
-                    q = toHalfWidth(match[1]); 
-                    u = match[2]; 
-                    name = group.rawUsage.replace(rx, "").trim(); 
-                }
-                const isExternal = /枚|貼付|塗布|調剤|軟膏|クリーム|点眼|点耳|点鼻|スプレー|ローション|ゲル|液|外用/.test(group.rawUsage) || group.meds.some(m => /軟膏|クリーム|点眼|点耳|点鼻|スプレー|ローション|ゲル|液|外用/.test(m.name));
-                const typeCode1 = isExternal ? '3' : '1'; 
-                const typeCode2 = '1';
-                
-                // JAHIS読取エラー回避: 用法用量・単位が抽出できなかった場合、1調剤 / 1日分 を補完する
-                if (!q) {
-                    q = '1';
-                    u = isExternal ? '調剤' : '日分';
-                }
-
-                // 301: 用法レコード (カンマは必ず8個 = 9項目)
-                lines.push(`301,${rpNo},${name},${q},${u},${typeCode1},${typeCode2},,1`);
+            // 301: 用法レコード (JAHIS仕様上、各Rpに301レコードは必須)
+            const rawUsageStr = group.rawUsage || '';
+            let q = "", u = "", name = rawUsageStr;
+            const rx = /([0-9０-９\.]+)\s*(日分|回分|枚|包|本|個|錠|カプセル|T|調剤|式)[\s　]*$/i;
+            const match = rawUsageStr.match(rx);
+            if (match) { 
+                q = toHalfWidth(match[1]); 
+                u = match[2]; 
+                name = rawUsageStr.replace(rx, "").trim(); 
             }
+            const isExternal = /枚|貼付|塗布|調剤|軟膏|クリーム|点眼|点耳|点鼻|スプレー|ローション|ゲル|液|外用/.test(rawUsageStr) || group.meds.some(m => /軟膏|クリーム|点眼|点耳|点鼻|スプレー|ローション|ゲル|液|外用/.test(m.name));
+            const typeCode1 = isExternal ? '3' : '1'; 
+            const typeCode2 = '1';
+            
+            // JAHIS読取エラー回避: 用法名称・調剤量・単位が抽出できなかった場合の補完
+            let usageSupplemented = false;
+            let newlySupplemented = false;
+            if (!name) {
+                name = '医師の指示通り';
+                newlySupplemented = true;
+            }
+            if (!q) {
+                q = '1';
+                u = isExternal ? '調剤' : '日分';
+                newlySupplemented = true;
+            }
+
+            // 前回自動補完され、まだ手動修正されていない場合も強調を維持
+            const alreadySupplemented = group.meds.some(med => {
+                const rowEl = medItems[med.originalIndex];
+                const uEl = rowEl ? rowEl.querySelector('.med-usage') : null;
+                return uEl && uEl.dataset.supplemented === 'true';
+            });
+
+            usageSupplemented = newlySupplemented || alreadySupplemented;
+            group.usageSupplemented = usageSupplemented;
+
+            // 用法に自動補完が入った場合、プレビューおよび元の入力欄にも補完後の文字列を反映する
+            if (newlySupplemented) {
+                group.rawUsage = `${name} ${q}${u}`;
+            }
+            if (usageSupplemented) {
+                group.meds.forEach(med => {
+                    const rowEl = medItems[med.originalIndex];
+                    const uEl = rowEl ? rowEl.querySelector('.med-usage') : null;
+                    if (uEl) {
+                        uEl.value = group.rawUsage;
+                        uEl.dataset.supplemented = 'true';
+                        uEl.classList.add('supplemented-field');
+                        uEl.style.border = '2px solid #dc2626';
+                        uEl.style.backgroundColor = '#fee2e2';
+                        uEl.style.color = '#991b1b';
+                    }
+                });
+            }
+
+            // 301: 用法レコード (カンマは必ず8個 = 9項目)
+            lines.push(`301,${rpNo},${name},${q},${u},${typeCode1},${typeCode2},,1`);
         });
 
         // 全体コメント: 薬剤名「コメント」＋JAHISコードなし（種別=1）＋281にコメント本文
@@ -638,12 +733,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const patientName = document.getElementById('patientName').value.trim() || '未設定';
         const patientDob = document.getElementById('patientDob').value.trim() || '';
         const patientGender = document.querySelector('input[name="patientSex"]:checked').value;
-        const dispenseDate = document.getElementById('dispenseDate').value;
+        const dispenseDateRaw = document.getElementById('dispenseDate').value;
+        const dispenseDate = dispenseDateRaw ? dispenseDateRaw.replace(/[^0-9]/g, '') : '';
         const prescHospitalName = document.getElementById('prescHospitalName').value.trim();
 
         let genderStr = patientGender === "1" ? "男" : patientGender === "2" ? "女" : "不明";
 
-        let html = `
+        const hasAnySupplemented = rpGroups.some(rp => rp.usageSupplemented || rp.meds.some(m => m.doseSupplemented || m.unitSupplemented));
+
+        let html = '';
+        if (hasAnySupplemented) {
+            html += `
+                <div class="supplemented-banner" style="background-color: #fef2f2; border: 2px solid #dc2626; color: #991b1b; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-weight: bold; display: flex; align-items: center; gap: 10px;">
+                    <span class="text-xl">⚠️</span>
+                    <div>
+                        <div style="font-size: 0.9rem;">未入力または日数・単位不足のため、自動補完された項目があります（赤枠部分）。</div>
+                        <div class="text-xs font-normal mt-0.5" style="color: #b91c1c;">内容をご確認の上、変更が必要な場合は赤枠部分をクリックして直接修正してください。</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `
             <div class="bg-white p-3 rounded border border-gray-200 mb-3 shadow-sm">
                 <div class="flex flex-wrap gap-x-6 gap-y-2 items-center mb-2 border-b border-gray-100 pb-2">
                     <div>
@@ -671,17 +782,30 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `<div class="text-center text-gray-500 py-4">処方データがありません</div>`;
         }
 
+        const suppInputStyle = 'border: 2px solid #dc2626 !important; background-color: #fee2e2 !important; color: #991b1b !important; border-radius: 4px !important; padding: 2px 6px !important; font-weight: bold !important;';
+        const suppBadgeStyle = 'display: inline-flex; align-items: center; background-color: #dc2626; color: #ffffff; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 9999px; margin-left: 4px; white-space: nowrap;';
+
         rpGroups.forEach((rp, idx) => {
-            html += `<div class="bg-white border border-gray-200 rounded p-3 mb-3 shadow-sm">`;
+            const rpHasSupp = rp.usageSupplemented || rp.meds.some(m => m.doseSupplemented || m.unitSupplemented);
+            const rpCardBorderStyle = rpHasSupp ? 'border: 2px solid #f87171;' : '';
+            html += `<div class="bg-white border border-gray-200 rounded p-3 mb-3 shadow-sm" style="${rpCardBorderStyle}">`;
             html += `<div class="font-bold text-blue-700 text-sm border-b border-gray-200 pb-1 mb-2">Rp.${idx + 1}</div>`;
             
             rp.meds.forEach(med => {
+                const doseSuppClass = med.doseSupplemented ? 'supplemented-field' : '';
+                const unitSuppClass = med.unitSupplemented ? 'supplemented-field' : '';
+                const doseInlineStyle = med.doseSupplemented ? suppInputStyle : '';
+                const unitInlineStyle = med.unitSupplemented ? suppInputStyle : '';
+                const medSuppBadge = (med.doseSupplemented || med.unitSupplemented)
+                    ? `<span class="supplemented-badge" style="${suppBadgeStyle}">⚠️自動補完(要確認)</span>`
+                    : '';
                 html += `
                     <div class="flex flex-wrap items-center gap-1 mb-1 pl-2">
                         <span class="text-sm">💊</span>
                         <input type="text" class="preview-input font-bold text-sm flex-grow min-w-[200px]" data-med-index="${med.originalIndex}" data-med-field="name" value="${med.name}">
-                        <input type="text" class="preview-input text-sm w-12 text-right" data-med-index="${med.originalIndex}" data-med-field="dose" value="${med.dose}">
-                        <input type="text" class="preview-input text-sm w-12" data-med-index="${med.originalIndex}" data-med-field="unit" value="${med.unit}">
+                        <input type="text" class="preview-input text-sm w-12 text-right ${doseSuppClass}" style="${doseInlineStyle}" data-med-index="${med.originalIndex}" data-med-field="dose" value="${med.dose}" title="${med.doseSupplemented ? '用量が未入力だったため自動補完されました' : ''}">
+                        <input type="text" class="preview-input text-sm w-12 ${unitSuppClass}" style="${unitInlineStyle}" data-med-index="${med.originalIndex}" data-med-field="unit" value="${med.unit}" title="${med.unitSupplemented ? '単位が未入力だったため自動補完されました' : ''}">
+                        ${medSuppBadge}
                     </div>
                 `;
                 if (med.memos && med.memos.length > 0) {
@@ -693,27 +817,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            if (rp.rawUsage) {
-                // 同じRpグループの全ての薬剤の用法を一括更新するためのインデックスリスト
-                const medIndices = rp.meds.map(m => m.originalIndex).join(',');
-                html += `
-                    <div class="pl-2 mt-2 text-green-700 font-bold text-sm flex items-start gap-1">
+            // 同じRpグループの全ての薬剤の用法を一括更新するためのインデックスリスト
+            const medIndices = rp.meds.map(m => m.originalIndex).join(',');
+            const usageSuppClass = rp.usageSupplemented ? 'supplemented-field' : '';
+            const usageInlineStyle = rp.usageSupplemented ? suppInputStyle : '';
+            const usageSuppBadge = rp.usageSupplemented
+                ? `<div class="pl-7 mb-1"><span class="supplemented-badge" style="${suppBadgeStyle} margin-left:0;">⚠️用法・日数が自動補完されました（要確認）</span></div>`
+                : '';
+            html += `
+                <div class="mt-2">
+                    ${usageSuppBadge}
+                    <div class="pl-2 text-green-700 font-bold text-sm flex items-start gap-1">
                         <span class="mt-1">📝</span>
-                        <textarea class="preview-area w-full font-bold" data-rp-indices="${medIndices}" rows="1">${rp.rawUsage}</textarea>
+                        <textarea class="preview-area w-full font-bold ${usageSuppClass}" style="${usageInlineStyle}" data-rp-indices="${medIndices}" rows="1" placeholder="用法を入力...">${rp.rawUsage || ''}</textarea>
                     </div>
-                `;
-            }
+                </div>
+            `;
             html += `</div>`;
         });
 
         // 処方全体のコメント（申し送り事項）ブロック
         const globalMemo = document.getElementById('globalMemo').value;
+        const globalMemoLines = globalMemo ? globalMemo.split(/\r\n|\r|\n/).length : 1;
         html += `
             <div class="bg-gray-100 border border-gray-300 rounded p-3 mb-3 shadow-sm mt-4">
                 <div class="font-bold text-gray-700 text-sm mb-2 flex items-center gap-1">
                     <span>📋</span> 処方全体へのコメント（申し送り事項）
                 </div>
-                <textarea class="preview-area w-full text-sm text-gray-800 bg-white" data-target="globalMemo" rows="${globalMemo ? Math.max(2, globalMemo.split('\\n').length) : 2}" placeholder="ここに全体コメントを入力して追加できます...">${globalMemo}</textarea>
+                <textarea class="preview-area w-full text-sm text-gray-800 bg-white overflow-hidden" data-target="globalMemo" rows="${Math.max(2, globalMemoLines)}" placeholder="ここに全体コメントを入力して追加できます...">${globalMemo}</textarea>
             </div>
         `;
 
@@ -721,17 +852,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const updateArea = document.getElementById('previewUpdateArea');
         if (updateArea) updateArea.classList.add('hidden');
 
+        // 初期表示時および入力時のTextarea自動リサイズ関数
+        const autoResizeTextarea = (el) => {
+            el.style.height = 'auto';
+            if (el.scrollHeight > 0) {
+                el.style.height = (el.scrollHeight + 4) + 'px';
+            }
+        };
+
         // イベントリスナー: 何か編集されたら更新ボタンを表示する
         const inputs = content.querySelectorAll('input, textarea');
         inputs.forEach(input => {
-            input.addEventListener('input', () => {
+            input.addEventListener('input', function() {
                 if (updateArea) updateArea.classList.remove('hidden');
+                // プレビュー上で編集されたら edited フラグを立て、赤枠強調を解除
+                this.dataset.edited = 'true';
+                this.classList.remove('supplemented-field');
+                this.style.border = '';
+                this.style.backgroundColor = '';
+                this.style.color = '';
             });
-            // Textareaの自動リサイズ
+            // Textareaの自動リサイズ（初期描画時＆入力時）
             if (input.tagName.toLowerCase() === 'textarea') {
+                autoResizeTextarea(input);
+                requestAnimationFrame(() => autoResizeTextarea(input));
                 input.addEventListener('input', function() {
-                    this.style.height = 'auto';
-                    this.style.height = (this.scrollHeight + 2) + 'px';
+                    autoResizeTextarea(this);
                 });
             }
         });
@@ -747,10 +893,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const simpleTargets = ['patientName', 'patientDob', 'dispenseDate', 'prescHospitalName', 'globalMemo'];
             simpleTargets.forEach(id => {
                 const input = content.querySelector(`[data-target="${id}"]`);
-                if (input && document.getElementById(id)) {
-                    document.getElementById(id).value = input.value;
+                const targetEl = document.getElementById(id);
+                if (input && targetEl) {
+                    if (id === 'dispenseDate') {
+                        // <input type="date"> には YYYY-MM-DD 形式でセットする必要がある
+                        const d8 = parseDateTo8Digits(input.value);
+                        if (/^\d{8}$/.test(d8)) {
+                            targetEl.value = `${d8.slice(0, 4)}-${d8.slice(4, 6)}-${d8.slice(6, 8)}`;
+                        } else {
+                            targetEl.value = input.value;
+                        }
+                    } else if (id === 'patientDob') {
+                        targetEl.value = parseDateTo8Digits(input.value);
+                    } else {
+                        targetEl.value = input.value;
+                        if (id === 'globalMemo') {
+                            targetEl.style.height = 'auto';
+                            targetEl.style.height = (targetEl.scrollHeight + 2) + 'px';
+                        }
+                    }
                 }
             });
+
+            if (typeof formatDob === 'function') formatDob();
+            if (typeof formatName === 'function') formatName();
+            if (typeof formatKana === 'function') formatKana();
 
             // 2. 薬品情報（名前・用量・単位・メモ）の反映
             const medItems = document.querySelectorAll('.med-item');
@@ -760,8 +927,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 const field = input.getAttribute('data-med-field');
                 if (medItems[idx]) {
                     if (field === 'name') medItems[idx].querySelector('.med-name').value = input.value;
-                    if (field === 'dose') medItems[idx].querySelector('.med-dose').value = input.value;
-                    if (field === 'unit') medItems[idx].querySelector('.med-unit').value = input.value;
+                    if (field === 'dose') {
+                        const el = medItems[idx].querySelector('.med-dose');
+                        el.value = input.value;
+                        if (input.dataset.edited === 'true') {
+                            delete el.dataset.supplemented;
+                            el.classList.remove('supplemented-field');
+                            el.style.border = '';
+                            el.style.backgroundColor = '';
+                            el.style.color = '';
+                        }
+                    }
+                    if (field === 'unit') {
+                        const el = medItems[idx].querySelector('.med-unit');
+                        el.value = input.value;
+                        if (input.dataset.edited === 'true') {
+                            delete el.dataset.supplemented;
+                            el.classList.remove('supplemented-field');
+                            el.style.border = '';
+                            el.style.backgroundColor = '';
+                            el.style.color = '';
+                        }
+                    }
                     if (field === 'memo') medItems[idx].querySelector('.med-memo').value = input.value;
                 }
             });
@@ -771,11 +958,20 @@ document.addEventListener('DOMContentLoaded', () => {
             usageInputs.forEach(input => {
                 const indices = input.getAttribute('data-rp-indices').split(',');
                 const val = input.value;
+                const isEdited = input.dataset.edited === 'true';
                 indices.forEach(idxStr => {
                     if (!idxStr) return;
                     const idx = parseInt(idxStr, 10);
                     if (medItems[idx]) {
-                        medItems[idx].querySelector('.med-usage').value = val;
+                        const el = medItems[idx].querySelector('.med-usage');
+                        el.value = val;
+                        if (isEdited) {
+                            delete el.dataset.supplemented;
+                            el.classList.remove('supplemented-field');
+                            el.style.border = '';
+                            el.style.backgroundColor = '';
+                            el.style.color = '';
+                        }
                     }
                 });
             });
