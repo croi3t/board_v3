@@ -144,6 +144,25 @@ function isHistoryItem(colName) {
     return (colName.indexOf("全期間") !== -1 || colName.indexOf("全履歴") !== -1);
 }
 
+// 見出しの「採血日」「採血日2」「採血日:eGFR」等を除外するための判定
+function isBloodDateHeader(colName) {
+    if (!colName) return false;
+    if (colName === "採血日" || colName === "採血値") return true;
+    if (/^採血日\d*[:：]?/.test(colName)) return true;
+    return false;
+}
+
+// 見出しの「開始日」「服用期間」等を除外するための判定（案Bの検索見出し「開始日:〇〇」等は除く）
+function isMedDateHeader(colName) {
+    if (!colName) return false;
+    if (colName === "開始日" || colName === "服用期間" || colName === "服用期間(日)" || colName === "使用期間" || colName === "使用期間(日)") return true;
+    if (/^(?:開始日|服用期間|使用期間)\d*[:：]?/.test(colName)) {
+        if (isMedStartOnlyItem(colName) || isMedDurationOnlyItem(colName)) return false;
+        return true;
+    }
+    return false;
+}
+
 function normalizeItemName(name) {
     if (!name) return "";
     var s = name;
@@ -613,14 +632,14 @@ function processNext() {
         }
         for (var k = 2; k < currentCols.length; k++) {
             var colName = trimStr(currentCols[k]);
-            if (colName && colName !== "採血日" && colName !== "採血値" && colName !== "開始日" && colName !== "服用期間" && colName !== "服用期間(日)" && colName !== "使用期間" && colName !== "使用期間(日)") {
+            if (colName && !isBloodDateHeader(colName) && !isMedDateHeader(colName)) {
                 targetItems.push(colName);
                 headerRow.push(colName);
                 if (isMedSearchItem(colName)) {
                     headerRow.push("開始日");
                     headerRow.push("服用期間(日)");
                 } else if (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isHistoryItem(colName)) {
-                    headerRow.push("採血日");
+                    headerRow.push("採血日:" + colName);
                 }
             }
         }
@@ -643,7 +662,7 @@ function processNext() {
         if (currentCols.length > 2) {
             for (var k = 2; k < currentCols.length; k++) {
                 var colName = trimStr(currentCols[k]);
-                if (colName && !(fetchAgeEnabled && colName === "年齢") && !(fetchByomeiEnabled && isByomeiAllItem(colName)) && !(fetchMedEnabled && isMedAllItem(colName))) {
+                if (colName && !isBloodDateHeader(colName) && !isMedDateHeader(colName) && !(fetchAgeEnabled && colName === "年齢") && !(fetchByomeiEnabled && isByomeiAllItem(colName)) && !(fetchMedEnabled && isMedAllItem(colName))) {
                     targetItems.push(colName);
                 }
             }
@@ -1083,7 +1102,7 @@ function parseMedOrdersFromDoc(doc) {
             var rawL = (p < preLines.length) ? preLines[p] : "Rp999999";
             var trimmedL = trimStr(rawL);
 
-            if (/^Rp\d+/.test(trimmedL)) {
+            if (/^Rp\d+/i.test(trimmedL)) {
                 if (inRp && rpDrugs.length > 0) {
                     var effEnd = addDaysStr(orderDate, (rpDuration > 1 ? rpDuration - 1 : 0));
                     var skipRp = false;
@@ -1099,6 +1118,7 @@ function parseMedOrdersFromDoc(doc) {
                         orders.push({
                             orderDate: orderDate,
                             effectiveEndDate: effEnd,
+                            duration: rpDuration,
                             drugs: rpDrugs
                         });
                     }
@@ -1112,25 +1132,32 @@ function parseMedOrdersFromDoc(doc) {
 
             if (!inRp) continue;
 
-            // 全角スペース1個で始まる行＝薬剤名行
-            if (/^\u3000[^\s\u3000]/.test(rawL)) {
+            // 全角数字を半角数字に統一
+            var normL = rawL.replace(/[０-９]/g, function(m) { return String.fromCharCode(m.charCodeAt(0) - 0xFEE0); });
+
+            // 【中止】YYYY年MM月DD日 の検出
+            var stopMatch = normL.match(/【中止】\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
+            if (stopMatch) {
+                rpStopDate = padDateStr(stopMatch[1] + "/" + stopMatch[2] + "/" + stopMatch[3]);
+            }
+
+            // 用法・処方日数（例: 14日分、14日、14回分 など）の検出
+            // ※ 【中止】の日付に誤マッチしないよう除外して検索
+            var lWithoutStop = normL.replace(/【中止】[^\n]*/g, "");
+            var durMatch = lWithoutStop.match(/(?:^|[^\d/])(\d+)\s*(?:日分|日|回分)(?:[^\d]|$)/);
+            if (durMatch) {
+                var dNum = parseInt(durMatch[1], 10);
+                if (!isNaN(dNum) && dNum > rpDuration) {
+                    rpDuration = dNum;
+                }
+            }
+
+            // 薬剤名行の判定（用法キーワードや中止表記でない行）
+            var isUsageOrStop = /(?:分[1-9]|食後|食前|眠前|就寝|頓用|適時|指示通り|日分|【中止】|----)/.test(normL);
+            if (!isUsageOrStop && trimmedL !== "") {
                 var dName = cleanDrugName(rawL);
                 if (dName && dName.indexOf("----") === -1) {
                     rpDrugs.push(dName);
-                }
-            } else if (/^\u3000{2}/.test(rawL)) {
-                // 用法・日数行（例: 　　分２　(朝・夕)食後    14日分）
-                var durMatch = rawL.match(/(\d+)\s*日分/);
-                if (durMatch) {
-                    var dNum = parseInt(durMatch[1], 10);
-                    if (!isNaN(dNum) && dNum > rpDuration) {
-                        rpDuration = dNum;
-                    }
-                }
-                // 【中止】YYYY年MM月DD日
-                var stopMatch = rawL.match(/【中止】\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
-                if (stopMatch) {
-                    rpStopDate = padDateStr(stopMatch[1] + "/" + stopMatch[2] + "/" + stopMatch[3]);
                 }
             }
         }
@@ -1236,11 +1263,18 @@ function getMedItemColumns(colName) {
             if (earliestStartDate === "" || mOrd.orderDate < earliestStartDate) {
                 earliestStartDate = mOrd.orderDate;
             }
-            var cappedEnd = (mOrd.effectiveEndDate > currentTargetDate) ? currentTargetDate : mOrd.effectiveEndDate;
-            if (cappedEnd < mOrd.orderDate) cappedEnd = mOrd.orderDate;
+            // ★処方日数（duration）を加味した終了日を使用（基準日で日数を切り捨てない）
+            var dur = (mOrd.duration && mOrd.duration > 0) ? mOrd.duration : (diffDaysStr(mOrd.orderDate, mOrd.effectiveEndDate) + 1);
+            if (dur < 1) dur = 1;
+            var realEnd = addDaysStr(mOrd.orderDate, dur - 1);
+            if (mOrd.effectiveEndDate && mOrd.effectiveEndDate < realEnd) {
+                // 中止オーダー等で短縮された場合は中止日を反映
+                realEnd = mOrd.effectiveEndDate;
+            }
             matchedIntervals.push({
                 start: mOrd.orderDate,
-                end: cappedEnd
+                end: realEnd,
+                duration: dur
             });
         }
     }
