@@ -280,6 +280,16 @@ function isFirstLabItem(colName) {
     return (colName.indexOf("入院時") !== -1 || colName.indexOf("初回") !== -1);
 }
 
+// 採血項目の修飾（全期間、:退院時、:入院時など）を除去して基本検査項目名（eGFR, HbA1cなど）を抽出
+function extractBaseLabItemName(rawName) {
+    if (!rawName) return "";
+    var s = trimStr(rawName);
+    s = s.replace(/全期間|全履歴|推移/g, "");
+    s = s.replace(/退院時|入院時|初回|最終/g, "");
+    s = s.replace(/^[:：\s]+|[:：\s]+$/g, "");
+    return trimStr(s);
+}
+
 // 見出しの「採血日」「採血日2」「採血日:eGFR」等を除外するための判定
 function isBloodDateHeader(colName) {
     if (!colName) return false;
@@ -2732,9 +2742,9 @@ function waitForIeLoad() {
                 var reqLabMap = {};
                 for (var ti = 0; ti < targetItems.length; ti++) {
                     var reqRaw = targetItems[ti];
-                    if (isProfileItem(reqRaw) || isByomeiItem(reqRaw) || isMedItem(reqRaw)) continue;
+                    if (isProfileItem(reqRaw) || isByomeiItem(reqRaw) || isMedItem(reqRaw) || isNyuinItem(reqRaw)) continue;
                     var isHist = isHistoryItem(reqRaw);
-                    var sItem = reqRaw.replace("全期間", "").replace("全履歴", "").replace("推移", "");
+                    var sItem = extractBaseLabItemName(reqRaw);
                     var nReq = normalizeItemName(sItem);
                     if (nReq) {
                         if (!reqLabMap[nReq]) reqLabMap[nReq] = { needHistory: false };
@@ -2958,15 +2968,13 @@ function buildAndPushRow(valueMap, dateCols) {
 
         if (searchItem.indexOf("全期間") !== -1 || searchItem.indexOf("全履歴") !== -1 || searchItem.indexOf("推移") !== -1) {
             isHistory = true;
-            searchItem = searchItem.replace(/全期間|全履歴|推移/g, "");
         } else if (searchItem.indexOf("退院時") !== -1 || searchItem.indexOf("最終") !== -1) {
             isLastVal = true;
-            searchItem = searchItem.replace(/退院時|最終/g, "").replace(/^[:：]|[:：]$/g, "");
         } else if (searchItem.indexOf("入院時") !== -1 || searchItem.indexOf("初回") !== -1) {
             isFirstVal = true;
-            searchItem = searchItem.replace(/入院時|初回/g, "").replace(/^[:：]|[:：]$/g, "");
         }
         
+        searchItem = extractBaseLabItemName(searchItem);
         var normReq = normalizeItemName(searchItem);
         var valObj = valueMap[normReq] || valueMap[searchItem];
         
@@ -2983,11 +2991,11 @@ function buildAndPushRow(valueMap, dateCols) {
             if (!valObj) {
                 finalDate = "結果なし";
                 finalVal = "";
-            } else if (isPeriodRow && isLastVal) {
+            } else if (isLastVal) {
                 finalVal = valObj.last || "";
                 finalDate = valObj.lastDate || "結果なし";
-            } else if (isPeriodRow) {
-                // 案A: 入院期間指定時は初回（入院時）値を出力
+            } else if (isFirstVal || isPeriodRow) {
+                // 入院時（初回）値を出力
                 finalVal = valObj.first || "";
                 finalDate = valObj.firstDate || "結果なし";
             } else {
