@@ -563,12 +563,15 @@ window.onload = function() {
     disableIeScriptTimeoutWarning();
     loadDictionary();
     updateHeaderPreviewDisplay();
+    updateInputHeaderAndScroll();
+    updatePreviewHeaderAndScroll();
     syncTextareasHeight();
     updateTopBarMargin();
     initButtonHelp();
 };
 window.onresize = function() {
     updateTopBarMargin();
+    syncTextareasHeight();
 };
 
 var lines = [];
@@ -613,6 +616,7 @@ function updatePreview() {
     if (countSpan) {
         countSpan.innerText = outputLines.length > 0 ? "（現在 " + outputLines.length + " 行）" : "";
     }
+    updatePreviewHeaderAndScroll();
     syncTextareasHeight();
 }
 
@@ -735,6 +739,9 @@ function startProcess() {
     currentPeriodEnd = "";
     currentPeriodDisp = "";
     document.getElementById("previewText").value = "";
+    var prevHead = document.getElementById("previewHeaderBox");
+    if (prevHead) prevHead.value = "";
+    updatePreviewHeaderAndScroll();
     if (document.getElementById("copyBtn")) document.getElementById("copyBtn").disabled = true;
     if (document.getElementById("previewCount")) document.getElementById("previewCount").innerText = "";
     if (document.getElementById("copyStatus")) document.getElementById("copyStatus").innerText = "";
@@ -887,6 +894,8 @@ function appendHeaderItem(itemName) {
         }
     }
     updateHeaderPreviewDisplay();
+    updateInputHeaderAndScroll();
+    syncTextareasHeight();
     showGuideMessage("「" + itemName + "」を見出しに追加しました");
 }
 
@@ -905,11 +914,15 @@ function removeLastHeaderItem() {
         linesArr[0] = cols.join("\t");
         inputEl.value = linesArr.join("\n");
         updateHeaderPreviewDisplay();
+        updateInputHeaderAndScroll();
+        syncTextareasHeight();
         showGuideMessage("「" + removed + "」を取り消しました");
     } else {
         linesArr.shift();
         inputEl.value = linesArr.join("\n");
         updateHeaderPreviewDisplay();
+        updateInputHeaderAndScroll();
+        syncTextareasHeight();
         showGuideMessage("見出し行をクリアしました");
     }
 }
@@ -926,6 +939,8 @@ function clearHeaderRow() {
         linesArr.shift();
         inputEl.value = linesArr.join("\n");
         updateHeaderPreviewDisplay();
+        updateInputHeaderAndScroll();
+        syncTextareasHeight();
         showGuideMessage("見出し行をクリアしました");
     }
 }
@@ -967,7 +982,7 @@ function resetHelp() {
             box.style.backgroundColor = "#fff3e0";
             box.style.borderColor = "#ffb74d";
         } else {
-            box.innerHTML = "💡 各ボタンにマウスを合わせると、機能説明と具体例が表示されます。";
+            box.innerHTML = "💡 各ボタンにマウスを合わせると、機能説明と具体例が表示されます。<br><span style='color:#555; font-size:10px;'>修飾ボタンをクリックしてから項目ボタンを選ぶと、見出しが自動合成されます。</span>";
             box.style.backgroundColor = "#ffffff";
             box.style.borderColor = "#9fa8da";
         }
@@ -1261,6 +1276,73 @@ function updateTopBarMargin() {
         var h = topBar.offsetHeight || 80;
         mainArea.style.marginTop = (h + 8) + "px";
     }
+    syncTextareasHeight();
+}
+
+var isSyncingScroll = false;
+function onSyncScroll(type, source) {
+    if (isSyncingScroll) return;
+    isSyncingScroll = true;
+    try {
+        var topWrap = document.getElementById(type + "TopScrollWrap");
+        var headBox = document.getElementById(type + "HeaderBox");
+        var textBox = document.getElementById(type + "Text");
+        var sl = 0;
+        if (source === "top" && topWrap) {
+            sl = topWrap.scrollLeft;
+            if (headBox) headBox.scrollLeft = sl;
+            if (textBox) textBox.scrollLeft = sl;
+        } else if (source === "head" && headBox) {
+            sl = headBox.scrollLeft;
+            if (topWrap) topWrap.scrollLeft = sl;
+            if (textBox) textBox.scrollLeft = sl;
+        } else if (source === "body" && textBox) {
+            sl = textBox.scrollLeft;
+            if (topWrap) topWrap.scrollLeft = sl;
+            if (headBox) headBox.scrollLeft = sl;
+        }
+    } catch(e) {}
+    isSyncingScroll = false;
+}
+
+function updateInputHeaderAndScroll() {
+    var inEl = document.getElementById("inputText");
+    var headEl = document.getElementById("inputHeaderBox");
+    var trackEl = document.getElementById("inputTopScrollTrack");
+    var topWrap = document.getElementById("inputTopScrollWrap");
+    if (!inEl) return;
+    
+    var inVal = inEl.value || "";
+    var firstLine = "";
+    if (inVal) {
+        var idx = inVal.indexOf("\n");
+        firstLine = idx !== -1 ? inVal.substring(0, idx) : inVal;
+        firstLine = firstLine.replace(/\r/g, "");
+    }
+    if (headEl) {
+        headEl.value = firstLine;
+        headEl.scrollLeft = inEl.scrollLeft;
+    }
+    var sw = Math.max(inEl.scrollWidth || 0, inEl.clientWidth || 0, 500);
+    if (trackEl) trackEl.style.width = (sw + 20) + "px";
+    if (topWrap) topWrap.scrollLeft = inEl.scrollLeft;
+}
+
+function updatePreviewHeaderAndScroll() {
+    var prevEl = document.getElementById("previewText");
+    var headEl = document.getElementById("previewHeaderBox");
+    var trackEl = document.getElementById("previewTopScrollTrack");
+    var topWrap = document.getElementById("previewTopScrollWrap");
+    if (!prevEl) return;
+    
+    var firstLine = (outputLines && outputLines.length > 0) ? outputLines[0] : "";
+    if (headEl) {
+        headEl.value = firstLine;
+        headEl.scrollLeft = prevEl.scrollLeft;
+    }
+    var sw = Math.max(prevEl.scrollWidth || 0, prevEl.clientWidth || 0, 500);
+    if (trackEl) trackEl.style.width = (sw + 20) + "px";
+    if (topWrap) topWrap.scrollLeft = prevEl.scrollLeft;
 }
 
 function syncTextareasHeight() {
@@ -1270,22 +1352,29 @@ function syncTextareasHeight() {
     
     var inVal = inputEl.value;
     var inLines = inVal ? inVal.split("\n").length : 0;
-    var outLines = outputLines ? outputLines.length : 0;
-    
-    var maxLines = Math.max(inLines, outLines, 25);
-    var h = Math.max(480, maxLines * 19 + 40);
-    
-    inputEl.style.height = h + "px";
-    previewEl.style.height = h + "px";
-    
     var inCountSpan = document.getElementById("inputRowCount");
     if (inCountSpan) {
         inCountSpan.innerText = inLines > 0 ? "（" + inLines + " 行）" : "";
     }
+    
+    var topBar = document.getElementById("fixedTopBar");
+    var topH = topBar ? (topBar.offsetHeight || 80) : 80;
+    var winH = document.documentElement.clientHeight || document.body.clientHeight || window.innerHeight || 700;
+    
+    // ウィンドウ全体の高さから固定上部バー、上部スクロールバー、見出し固定行、マージンを差し引いてフィット
+    var availH = winH - topH - 95;
+    if (availH < 220) availH = 220;
+    
+    inputEl.style.height = availH + "px";
+    previewEl.style.height = availH + "px";
+    
+    updateInputHeaderAndScroll();
+    updatePreviewHeaderAndScroll();
 }
 
 function onInputChange() {
     updateHeaderPreviewDisplay();
+    updateInputHeaderAndScroll();
     syncTextareasHeight();
 }
 
@@ -2147,6 +2236,7 @@ function getMedItemColumns(colName) {
             isWithinWindow = (startDate === "" || mOrd.effectiveEndDate >= startDate);
         }
 
+        var hasTargetDrug = false;
         for (var md = 0; md < mOrd.drugs.length; md++) {
             var dName = mOrd.drugs[md];
             if (doesDrugMatchKeywords(dName, keywords)) {
@@ -2949,8 +3039,10 @@ function appendErrorRow(errMsg) {
 }
 </script>
 <style>
-    body { font-family: 'Meiryo UI', sans-serif; background-color: #f4f6f9; padding: 0 12px 25px 12px; margin: 0; font-size: 13px; }
-    textarea { width: 100%; min-height: 480px; font-size: 12px; font-family: 'MS Gothic', monospace; white-space: pre; word-wrap: normal; overflow-x: auto; overflow-y: hidden; border: 1px solid #b0bec5; padding: 6px; box-sizing: border-box; line-height: 1.45; }
+    body { font-family: 'Meiryo UI', sans-serif; background-color: #f4f6f9; padding: 0 12px 10px 12px; margin: 0; font-size: 13px; overflow-y: auto; }
+    .top-scroll-wrap { width: 100%; height: 16px; overflow-x: scroll; overflow-y: hidden; background-color: #eceff1; border: 1px solid #b0bec5; border-bottom: none; box-sizing: border-box; }
+    .header-box { width: 100%; height: 26px; min-height: 26px; max-height: 26px; font-size: 12px; font-weight: bold; font-family: 'MS Gothic', monospace; white-space: pre; word-wrap: normal; overflow-x: hidden; overflow-y: hidden; border: 1px solid #b0bec5; padding: 4px 6px; box-sizing: border-box; line-height: 1.4; resize: none; }
+    .data-box { width: 100%; min-height: 200px; font-size: 12px; font-family: 'MS Gothic', monospace; white-space: pre; word-wrap: normal; overflow-x: scroll; overflow-y: scroll; border: 1px solid #b0bec5; border-top: none; padding: 6px; box-sizing: border-box; line-height: 1.45; }
     button { cursor: pointer; font-family: 'Meiryo UI', sans-serif; }
     button:disabled { background-color: #ccc !important; cursor: not-allowed !important; color: #666 !important; }
     .control-panel { background-color: #fff; padding: 10px; border: 1px solid #ddd; margin-bottom: 8px; line-height: 1.8; }
@@ -3009,9 +3101,9 @@ function appendErrorRow(errMsg) {
                 <button type="button" id="mod_drug_period" class="btn-mode" onclick="setModifierMode('DRUG_PERIOD')">＋〇〇期間(使用期間)</button>
                 <button type="button" id="mod_byomei" class="btn-mode" onclick="setModifierMode('BYOMEI')">＋病名:〇〇</button>
                 <button type="button" id="mod_nyuin" class="btn-mode" onclick="setModifierMode('NYUIN')">＋入院:〇〇期間</button>
-                <!-- 説明文スペース（全ボタン対応・高速表示） -->
-                <div id="modHelpBox" style="margin-top: 4px; padding: 4px 8px; background-color: #ffffff; border: 1px solid #9fa8da; border-radius: 3px; font-size: 11px; color: #1a237e; min-height: 20px; line-height: 1.4;">
-                    💡 ボタンにマウスを合わせると、各機能の詳しい説明と具体例が表示されます。
+                <!-- 説明文スペース（全ボタン対応・高さ40px固定でブレ防止） -->
+                <div id="modHelpBox" style="margin-top: 4px; padding: 4px 8px; background-color: #ffffff; border: 1px solid #9fa8da; border-radius: 3px; font-size: 11px; color: #1a237e; height: 40px; min-height: 40px; max-height: 40px; box-sizing: border-box; overflow: hidden; line-height: 1.35;">
+                    💡 各ボタンにマウスを合わせると、機能説明と具体例が表示されます。<br><span style="color:#555; font-size:10px;">修飾ボタンをクリックしてから項目ボタンを選ぶと、見出しが自動合成されます。</span>
                 </div>
             </div>
 
@@ -3140,7 +3232,7 @@ function appendErrorRow(errMsg) {
     </div>
 
     <!-- メインコンテンツエリア：縦2列（左右2列）配置 -->
-    <div id="mainContentArea" style="margin-top: 85px; padding-bottom: 25px;">
+    <div id="mainContentArea" style="margin-top: 85px; padding-bottom: 10px;">
         <table style="width: 100%; border-collapse: separate; border-spacing: 10px 0; table-layout: fixed;">
             <colgroup>
                 <col style="width: 50%;">
@@ -3148,13 +3240,21 @@ function appendErrorRow(errMsg) {
             </colgroup>
             <tr>
                 <td style="vertical-align: top; padding: 0;">
-                    <div style="font-weight: bold; color: #0d47a1; margin-bottom: 4px; font-size: 12px; display: table; width: 100%;">
+                    <div style="font-weight: bold; color: #0d47a1; margin-bottom: 3px; font-size: 12px; display: table; width: 100%;">
                         <div style="display: table-cell;">📥 入力データ（JUSTcalc貼り付け） <span id="inputRowCount" style="font-size: 11px; font-weight: normal; color: #555;"></span></div>
                         <div style="display: table-cell; text-align: right;">
                             <button type="button" onclick="clearInputData()" data-help="入力欄（データシート）の貼り付け内容をすべてクリアします" style="padding: 1px 6px; font-size: 10px; background-color: #90a4ae; color: white; border: none; border-radius: 2px;">入力クリア</button>
                         </div>
                     </div>
-                    <textarea id="inputText" wrap="off" 
+                    <!-- 上部横スクロールバー -->
+                    <div id="inputTopScrollWrap" class="top-scroll-wrap" onscroll="onSyncScroll('input', 'top')" title="上部横スクロールバー">
+                        <div id="inputTopScrollTrack" style="height: 1px; width: 1000px;"></div>
+                    </div>
+                    <!-- 固定見出し行（1行目） -->
+                    <textarea id="inputHeaderBox" class="header-box" readonly wrap="off" onscroll="onSyncScroll('input', 'head')" style="background-color: #e8eaf6; color: #1a237e; border-color: #90caf9; border-bottom: 2px solid #1976d2;" placeholder="（1行目の見出しがここに固定表示されます）"></textarea>
+                    <!-- 入力データ本体 -->
+                    <textarea id="inputText" class="data-box" wrap="off" 
+                        onscroll="onSyncScroll('input', 'body')"
                         onkeyup="onInputChange()" 
                         onchange="onInputChange()" 
                         onpaste="setTimeout(onInputChange, 50)" 
@@ -3175,7 +3275,7 @@ function appendErrorRow(errMsg) {
 0123456	2024/05/10 - 2024/05/25"></textarea>
                 </td>
                 <td style="vertical-align: top; padding: 0;">
-                    <div style="font-weight: bold; color: #2e7d32; margin-bottom: 4px; font-size: 12px; display: table; width: 100%;">
+                    <div style="font-weight: bold; color: #2e7d32; margin-bottom: 3px; font-size: 12px; display: table; width: 100%;">
                         <div style="display: table-cell;">📊 取得結果プレビュー（リアルタイム出力） <span id="previewCount" style="font-size: 11px; font-weight: normal; color: #555;"></span></div>
                         <div style="display: table-cell; text-align: right;">
                             <label style="font-weight: normal; font-size: 11px; cursor: pointer; color: #555;">
@@ -3183,7 +3283,16 @@ function appendErrorRow(errMsg) {
                             </label>
                         </div>
                     </div>
-                    <textarea id="previewText" wrap="off" readonly style="background-color: #fafafa;"
+                    <!-- 上部横スクロールバー -->
+                    <div id="previewTopScrollWrap" class="top-scroll-wrap" onscroll="onSyncScroll('preview', 'top')" title="上部横スクロールバー">
+                        <div id="previewTopScrollTrack" style="height: 1px; width: 1000px;"></div>
+                    </div>
+                    <!-- 固定見出し行（1行目） -->
+                    <textarea id="previewHeaderBox" class="header-box" readonly wrap="off" onscroll="onSyncScroll('preview', 'head')" style="background-color: #e8f5e9; color: #1b5e20; border-color: #a5d6a7; border-bottom: 2px solid #2e7d32;" placeholder="（取得結果の見出し行がここに固定表示されます）"></textarea>
+                    <!-- プレビュー本体 -->
+                    <textarea id="previewText" class="data-box" wrap="off" readonly 
+                        onscroll="onSyncScroll('preview', 'body')"
+                        style="background-color: #fafafa;"
                         placeholder="ここに実行結果がリアルタイムで全件出力されます。
 実行完了・一時停止時に「📋 結果をコピー」でJUSTcalcへそのまま貼り付けられます。"></textarea>
                 </td>
