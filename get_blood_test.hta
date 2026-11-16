@@ -322,24 +322,110 @@ function normalizeItemName(name) {
         'ﾊ':'ハ','ﾋ':'ヒ','ﾌ':'フ','ﾍ':'ヘ','ﾎ':'ホ','ﾏ':'マ','ﾐ':'ミ','ﾑ':'ム','ﾒ':'メ','ﾓ':'モ',
         'ﾔ':'ヤ','ﾕ':'ユ','ﾖ':'ヨ','ﾗ':'ラ','ﾘ':'リ','ﾙ':'ル','ﾚ':'レ','ﾛ':'ロ','ﾜ':'ワ','ｦ':'ヲ','ﾝ':'ン'
     };
-    var reg = new RegExp(Object.keys(kanaMap).join('|'), 'g');
-    s = s.replace(reg, function(match){ return kanaMap[match]; });
+    for (var k in kanaMap) {
+        if (kanaMap.hasOwnProperty(k)) {
+            s = s.split(k).join(kanaMap[k]);
+        }
+    }
     s = s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(m) { return String.fromCharCode(m.charCodeAt(0) - 0xFEE0); });
     s = s.toUpperCase();
+    s = s.replace(/[（]/g, "(").replace(/[）]/g, ")");
+    s = s.replace(/[－―‐]/g, "-");
+    s = s.replace(/／/g, "/");
     s = s.replace(/[\s\u3000]+/g, "");
+    s = s.replace(/[Γγ]/g, "G");
 
-    if (s === "EGFRCREA" || s === "EGFR(CRE)") s = "EGFR"; 
-    if (s === "LD(IFCC)" || s === "LDH") s = "LD";   
-    if (s === "ALP(IFCC)") s = "ALP"; 
-    if (s === "HBA1C(NGSP)" || s === "HBA1C(JDS)") s = "HBA1C"; 
-    if (s === "Γ-GTP" || s === "Γ-GT" || s === "ΓGTP" || s === "G-GTP" || s === "G-GT" || s === "GGTP") s = "G-GTP";  
-    if (s === "CPK") s = "CK";        
-    if (s === "CRE" || s === "CR" || s === "CREA") s = "CREA";
-    if (s === "HB" || s === "HGB") s = "HGB";
-    if (s === "TBIL" || s === "T.BIL" || s === "T-BIL") s = "T-BIL";
-    if (s === "DBIL" || s === "D.BIL" || s === "D-BIL") s = "D-BIL";
-    if (s === "GLU" || s === "BS" || s === "GLUCOSE") s = "GLUCOSE";
-    
+    // 血算・血液像の接頭辞を正規化
+    if (s.indexOf("血算") === 0) {
+        var sub = s.substring(2);
+        if (sub === "WBC" || sub === "RBC" || sub === "HB" || sub === "HGB" || sub === "HT" || sub === "MCV" || sub === "MCH" || sub === "MCHC" || sub === "PLT") {
+            s = sub;
+        } else if (sub === "総リンパ球数") {
+            s = "T-LY";
+        } else if (sub === "総好中球数") {
+            s = "T-NEU";
+        }
+    }
+    if (s.indexOf("血液像") === 0) {
+        var sub2 = s.substring(3);
+        if (sub2 === "NEU" || sub2 === "STAB" || sub2 === "SEG" || sub2 === "EOS" || sub2 === "BAS" || sub2 === "MON" || sub2 === "LY" || sub2 === "異型LY" || sub2 === "MBL" || sub2 === "PROMY" || sub2 === "MY" || sub2 === "META") {
+            s = sub2;
+        } else if (sub2 === "有核赤血球") {
+            s = "EBL";
+        }
+    }
+
+    // 頻用検査項目・マスター項目の同義語（略称 ⇔ 正式名称）の統一
+    if (s === "EGFR" || s === "EGFRCREA" || s === "EGFR(CREA)" || s === "EGFRCRE" || s === "EGFR(CRE)" || s === "推算GFR" || s === "推算GFR(CRE)" || s === "推算GFR(CREA)") return "EGFR"; 
+    if (s === "CRE" || s === "CR" || s === "CREA" || s === "SCR" || s === "クレアチニン" || s === "血清クレアチニン") return "CREA";
+    if (s === "HBA1C" || s === "HBA1C(NGSP)" || s === "HBA1C(JDS)" || s === "ヘモグロビンA1C" || s === "A1C") return "HBA1C"; 
+    if (s === "GLU" || s === "BS" || s === "GLUCOSE" || s === "血糖" || s === "グルコース") return "GLUCOSE";
+    if (s === "AST" || s === "GOT") return "AST";
+    if (s === "ALT" || s === "GPT") return "ALT";
+    if (s === "ALB" || s === "アルブミン") return "ALB";
+    if (s === "PLT" || s === "血小板" || s === "血小板数") return "PLT";
+    if (s === "HB" || s === "HGB" || s === "血色素" || s === "ヘモグロビン") return "HGB";
+    if (s === "HT" || s === "ヘマトクリット") return "HT";
+    if (s === "LD" || s === "LDH" || s === "LD(IFCC)" || s === "乳酸脱水素酵素") return "LD";   
+    if (s === "ALP" || s === "ALP(IFCC)" || s === "アルカリフォスファターゼ") return "ALP"; 
+    if (s === "G-GTP" || s === "GGTP" || s === "G-GT" || s === "ガンマGTP") return "G-GTP";  
+    if (s === "CK" || s === "CPK" || s === "クレアチンキナーゼ") return "CK";        
+    if (s === "T-BIL" || s === "TBIL" || s === "T.BIL" || s === "総ビリルビン" || s === "総BIL") return "T-BIL";
+    if (s === "D-BIL" || s === "DBIL" || s === "D.BIL" || s === "直接ビリルビン" || s === "直BIL") return "D-BIL";
+    if (s === "TG" || s === "中性脂肪" || s === "トリグリセリド" || s === "トリグリセライド") return "TG";
+    if (s === "LDL" || s === "LDLC" || s === "LDL-C" || s === "LDLコレステロール") return "LDL-C";
+    if (s === "HDL" || s === "HDLC" || s === "HDL-C" || s === "HDLコレステロール") return "HDL-C";
+    if (s === "TC" || s === "T-CHO" || s === "総コレステロール") return "TC";
+    if (s === "UA" || s === "尿酸") return "UA";
+    if (s === "CRP" || s === "C反応性蛋白" || s === "C反応性タンパク") return "CRP";
+    if (s === "WBC" || s === "白血球" || s === "白血球数") return "WBC";
+    if (s === "RBC" || s === "赤血球" || s === "赤血球数") return "RBC";
+    if (s === "TP" || s === "総蛋白" || s === "総タンパク") return "TP";
+    if (s === "BUN" || s === "尿素窒素") return "BUN";
+    if (s === "NA" || s === "ナトリウム") return "NA";
+    if (s === "CL" || s === "クロール" || s === "塩素") return "CL";
+    if (s === "K" || s === "カリウム") return "K";
+    if (s === "CA" || s === "カルシウム") return "CA";
+    if (s === "補正CA" || s === "補正カルシウム") return "補正CA";
+    if (s === "IP" || s === "I-P" || s === "無機リン" || s === "無機P" || s === "リン") return "IP";
+    if (s === "A/G" || s === "AG比" || s === "A/G比" || s === "AG") return "A/G";
+    if (s === "AMY" || s === "アミラーゼ") return "AMY";
+    if (s === "NH3" || s === "アンモニア") return "NH3";
+    if (s === "溶血" || s === "溶血結果") return "溶血";
+    if (s === "乳ビ" || s === "乳糜" || s === "乳糜結果") return "乳ビ";
+    if (s === "FREE-T3" || s === "FREET3" || s === "FT3" || s === "FREET-3") return "FT3";
+    if (s === "FREE-T4" || s === "FREET4" || s === "FT4" || s === "FREET-4") return "FT4";
+    if (s === "FT3/FT4比" || s === "FT3/FT4") return "FT3/FT4比";
+    if (s === "RPR" || s === "梅毒定性RPR" || s === "梅毒RPR") return "RPR";
+    if (s === "TPLA" || s === "梅毒定性TPLA" || s === "梅毒TPLA") return "TPLA";
+    if (s === "TPLAC.O.I" || s === "TPLACOI" || s === "TPLACUTOFF" || s === "TPLAカットオフ") return "TPLA_CUTOFF";
+    if (s === "RPRC.O.I" || s === "RPRCOI" || s === "RPRCUTOFF" || s === "RPRカットオフ") return "RPR_CUTOFF";
+    if (s === "HBSAG" || s === "HBS抗原") return "HBSAG";
+    if (s === "HBS抗原定量値" || s === "HBSAG定量値" || s === "HBS抗原定量") return "HBSAG定量値";
+    if (s === "HCV抗体" || s === "HCVコウタイ" || s === "HCVAB") return "HCV抗体";
+    if (s === "判定HCV抗体" || s === "HCV抗体判定") return "判定HCV抗体";
+    if (s === "網赤血球数" || s === "網赤血球" || s === "レチクロ") return "RET";
+    if (s === "網赤血球数(ΜL)" || s === "網赤血球数(UL)" || s === "レチクロ(ΜL)" || s === "レチクロ(UL)") return "RET_UL";
+    if (s === "INR" || s === "PT-INR" || s === "PTINR") return "INR";
+    if (s === "D-DIMER" || s === "DDIMER" || s === "Dダイマー") return "D-DIMER";
+    if (s === "IGM-HBC抗体" || s === "IGM-HBCAB" || s === "IGMHBCAB") return "IGM-HBC抗体";
+    if (s === "HA-IGM抗体" || s === "HA-IGMAB" || s === "HAIGMAB") return "HA-IGM抗体";
+    if (s === "サイトメガロIGG" || s === "CMV.IGG" || s === "CMVIGG") return "サイトメガロIGG";
+    if (s === "サイトメガロIGM" || s === "CMV.IGM" || s === "CMVIGM") return "サイトメガロIGM";
+    if (s === "判定サイトメガロIGG" || s === "サイトメガロIGG判定") return "判定サイトメガロIGG";
+    if (s === "判定サイトメガロIGM" || s === "サイトメガロIGM判定") return "判定サイトメガロIGM";
+    if (s === "抗体指数サイトメガロIGM" || s === "サイトメガロIGM抗体指数") return "抗体指数サイトメガロIGM";
+    if (s === "EIA価サイトメガロIGG" || s === "サイトメガロIGGEIA価") return "EIA価サイトメガロIGG";
+    if (s === "S/COIGM-HA抗体" || s === "IGM-HA抗体S/CO") return "S/COIGM-HA抗体";
+    if (s === "EBV抗VCAIGM(EIA)" || s === "EBVVCAIGM" || s === "EBV-VCA-IGM") return "EBV_VCA_IGM";
+    if (s === "EBV抗VCAIGG(EIA)" || s === "EBVVCAIGG" || s === "EBV-VCA-IGG") return "EBV_VCA_IGG";
+    if (s === "AMA" || s === "抗ミトコンドリア抗体" || s === "抗ミトコンドリア抗体(AMA)") return "抗ミトコンドリア抗体";
+    if (s === "抗ミトコンドリアM2抗体" || s === "抗ミトコンドリアM2" || s === "抗ミトコンM2" || s === "抗ミトコン") return "抗ミトコンドリアM2抗体";
+    if (s === "判定抗ミトコンドリアM2抗体" || s === "判定抗ミトコンM2" || s === "判定抗ミトコン" || s === "抗ミトコンドリアM2判定" || s === "抗ミトコンM2判定") return "判定抗ミトコンドリアM2抗体";
+    if (s === "定量抗ミトコンドリアM2抗体" || s === "定量抗ミトコンM2" || s === "定量抗ミトコン" || s === "抗ミトコンドリアM2定量" || s === "抗ミトコンM2定量") return "定量抗ミトコンドリアM2抗体";
+    if (s === "ANA" || s === "抗核抗体" || s === "抗核抗体(ANA)" || s === "コウカクコウタイ") return "抗核抗体";
+    if (s === "抗核抗体価" || s === "コウタイカ" || s === "ANA抗体価" || s === "ANA価") return "抗核抗体価";
+
     return s;
 }
 
@@ -2599,7 +2685,7 @@ function proceedToBloodOrFinish() {
 
     // kentai_kekka_menu.php の MakeKentaiDispFlgs() 仕様に基づくフラグ文字列:
     // [0] disp_kensu_gentei_flg = 0 (0:日付期間指定を有効化 / 1:件数限定・日付期間は無視される)
-    // [1] disp_koumoku_name_kind = 1 (カタカナ・英数字を半角で表示)
+    // [1] disp_koumoku_name_kind = 0 (0:登録されている名称をそのまま表示 / 1:カタカナ・英数字を半角で表示)
     // [2] disp_column = 11101 (単位:1, 参考値:1, 判定:1, コメント:0, 日付:1)
     // [3] disp_result_order_kind = 1 (降順: 新しい日付が左)
     // [4] disp_graph_order_kind = 1
@@ -2607,9 +2693,9 @@ function proceedToBloodOrFinish() {
     // [6] disp_date_kind = 0 (YYYY/MM/DD 4桁年表記)
     // [7] disp_result_set_code = 1 (00.全件)
     // [8] select_section_code_str = ""
-    // [9] disp_only_login_user = 0
+    // [9] disp_only_login_user = ""
     // [10] disp_row_flgtbl = 00
-    var dispFlgs = "0/1/11101/1/1/1/0/1//0/00";
+    var dispFlgs = "0/0/11101/1/1/1/0/1///00";
 
     var url = "http://10.5.171.42:8082/karte/kentai_kekka_karte.php"
             + "?kanja_id=" + currentId
@@ -2619,8 +2705,11 @@ function proceedToBloodOrFinish() {
             + "&disp_kekka_start_date=" + startDate
             + "&disp_kekka_end_date=" + endDate
             + "&disp_zoom=80"
+            + "&disp_kensu_gentei_flg=0"
             + "&disp_kensu_count=9999"
-            + "&disp_koumoku_name_kind=1"
+            + "&disp_koumoku_name_kind=0"
+            + "&disp_column_unit=1"
+            + "&disp_column_sanko=1"
             + "&disp_column_tani=1"
             + "&disp_column_sankouchi=1"
             + "&disp_column_hantei=1"
@@ -2630,6 +2719,9 @@ function proceedToBloodOrFinish() {
             + "&disp_main_value_kind=1"
             + "&disp_date_kind=0"
             + "&disp_result_set_code=1"
+            + "&select_section_code_str="
+            + "&select_section_name_str="
+            + "&disp_row_flgtbl=00"
             + "&_t=" + new Date().getTime();
 
     try {
@@ -3148,6 +3240,11 @@ function appendErrorRow(errMsg) {
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('Alb')" title="基準日直近のアルブミン値と採血日を取得します">＋ Alb</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('Plt')" title="基準日直近の血小板数と採血日を取得します">＋ Plt</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('Hb')" title="基準日直近のヘモグロビン値と採血日を取得します">＋ Hb</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('CRP')" title="基準日直近のCRP値と採血日を取得します">＋ CRP</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('WBC')" title="基準日直近の白血球数(WBC)と採血日を取得します">＋ WBC</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('BUN')" title="基準日直近の尿素窒素(BUN)と採血日を取得します">＋ BUN</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('AMA')" title="抗ミトコンドリア抗体（AMA）を取得します">＋ AMA</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('抗ミトコンドリアM2抗体')" title="抗ミトコンドリアM2抗体（抗ﾐﾄｺﾝ）を取得します">＋ 抗ミトコンドリアM2</button>
             </div>
 
             <div style="margin-bottom: 3px; background-color: #fffde7; padding: 2px 5px; border-radius: 3px; border: 1px solid #fff59d;">
