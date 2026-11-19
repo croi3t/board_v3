@@ -25,15 +25,23 @@ function padDateStr(dateStr) {
     return y + "/" + m + "/" + d;
 }
 
-// 任意の日付表記（YYYY/MM/DD, YYYY-MM-DD, YYYY年MM月DD日など）から YYYY/MM/DD を抽出・正規化
+// 任意の日付表記（YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD, YYYY年MM月DD日, YY/MM/DD など）から YYYY/MM/DD を抽出・正規化
 function cleanDateStr(rawStr) {
     if (!rawStr) return "";
-    var s = trimStr(rawStr).replace(/[年月]/g, "/").replace(/日/g, "");
+    var s = trimStr(rawStr).replace(/[年月]/g, "/").replace(/日/g, "").replace(/\./g, "/");
     var m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
     if (m) {
         var mm = m[2].length === 1 ? "0" + m[2] : m[2];
         var dd = m[3].length === 1 ? "0" + m[3] : m[3];
         return m[1] + "/" + mm + "/" + dd;
+    }
+    var m2 = s.match(/(\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (m2) {
+        var yr = parseInt(m2[1], 10);
+        var fullYr = (yr >= 70 ? "19" : "20") + m2[1];
+        var mm2 = m2[2].length === 1 ? "0" + m2[2] : m2[2];
+        var dd2 = m2[3].length === 1 ? "0" + m2[3] : m2[3];
+        return fullYr + "/" + mm2 + "/" + dd2;
     }
     return "";
 }
@@ -42,12 +50,18 @@ function cleanDateStr(rawStr) {
 function parseDatePeriod(rawStr) {
     if (!rawStr) return null;
     var s = trimStr(rawStr);
-    var norm = s.replace(/[年月]/g, "/").replace(/日/g, "");
-    var m = norm.match(/(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\s*[-〜~～―ー/]\s*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})?/);
+    var norm = s.replace(/[年月]/g, "/").replace(/日/g, "").replace(/\./g, "/");
+    var m = norm.match(/(\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2})\s*[-〜~～―ー/]\s*(\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2})?/);
     if (m) {
         var sDate = cleanDateStr(m[1]);
         var eDate = m[2] ? cleanDateStr(m[2]) : getTodayStr();
         if (sDate) {
+            // もし開始日と終了日が逆順に入力されていた場合は自動的に並び替え
+            if (eDate && sDate > eDate) {
+                var tmp = sDate;
+                sDate = eDate;
+                eDate = tmp;
+            }
             return {
                 start: sDate,
                 end: eDate,
@@ -1596,37 +1610,44 @@ function processNext() {
     var col0 = currentCols[0];
     var col1 = currentCols.length > 1 ? currentCols[1] : "";
 
-    var pMatch0 = parseDatePeriod(col0);
-    var pMatch1 = parseDatePeriod(col1);
+    // 入院期間（1列ハイフン形式）がどの列に含まれているかを全列走査
+    var periodColIdx = -1;
+    var periodMatch = null;
+    for (var pi = 0; pi < currentCols.length; pi++) {
+        var pm = parseDatePeriod(currentCols[pi]);
+        if (pm) {
+            periodColIdx = pi;
+            periodMatch = pm;
+            break;
+        }
+    }
 
     isPeriodRow = false;
     currentPeriodStart = "";
     currentPeriodEnd = "";
     currentPeriodDisp = "";
 
-    if (pMatch0 && !pMatch1) {
-        // 1列目が期間、2列目が患者ID
+    if (periodMatch) {
         isPeriodRow = true;
-        currentId = col1 || "0";
-        currentPeriodStart = pMatch0.start;
-        currentPeriodEnd = pMatch0.end;
-        currentPeriodDisp = pMatch0.raw;
+        currentPeriodStart = periodMatch.start;
+        currentPeriodEnd = periodMatch.end;
+        currentPeriodDisp = periodMatch.raw;
         currentTargetDate = currentPeriodEnd;
-        currentCols[0] = currentId;
-        currentCols[1] = currentPeriodDisp;
-    } else if (pMatch1) {
-        // 1列目が患者ID、2列目が期間
-        isPeriodRow = true;
-        currentId = col0;
-        currentPeriodStart = pMatch1.start;
-        currentPeriodEnd = pMatch1.end;
-        currentPeriodDisp = pMatch1.raw;
-        currentTargetDate = currentPeriodEnd;
-        currentCols[0] = currentId;
-        currentCols[1] = currentPeriodDisp;
+
+        if (periodColIdx === 0) {
+            currentId = col1 || "0";
+            currentCols[0] = currentId;
+            currentCols[1] = currentPeriodDisp;
+        } else {
+            currentId = col0;
+            currentCols[0] = currentId;
+            if (periodColIdx === 1) {
+                currentCols[1] = currentPeriodDisp;
+            }
+        }
     } else {
-        var isCol0Date = /^\d{4}[\/\-年]\d{1,2}[\/\-月]\d{1,2}/.test(col0);
-        var isCol1Date = /^\d{4}[\/\-年]\d{1,2}[\/\-月]\d{1,2}/.test(col1);
+        var isCol0Date = /^\d{2,4}[\/\-年\.]\d{1,2}[\/\-月\.]\d{1,2}/.test(col0);
+        var isCol1Date = /^\d{2,4}[\/\-年\.]\d{1,2}[\/\-月\.]\d{1,2}/.test(col1);
 
         var rowDateFirst = isDateFirstMode;
         if (isCol0Date && !isCol1Date) {
@@ -2664,21 +2685,20 @@ function proceedToBloodOrFinish() {
         }
     }
 
-    // ★入院期間指定時（1列ハイフン形式）は、その入院期間内（開始日〜終了日）を厳密に対象とする
-    // ★通常時で「全期間」指定がある場合は、基準日や探索期間に関係なくカルテ上の全期間（1990/01/01〜本日）を取得する
-    // ★通常の採血項目のみの場合は、探索期間〜基準日で取得する
+    // ★全期間（〇〇全期間）指定時は、カルテ側での日付足切り（SQLの時刻比較による退院日除外や入院前採血の除外）を防ぐため、
+    // 常に全期間（1990/01/01〜本日）をカルテから取得し、メモリ上で指定期間の推移を確実に抽出する
     var startDate = "1990/01/01";
     var endDate = currentTargetDate;
-    if (isPeriodRow && currentPeriodStart && currentPeriodEnd) {
-        startDate = currentPeriodStart;
-        endDate = currentPeriodEnd;
-    } else if (needAllPeriod) {
+    if (needAllPeriod) {
         var now = new Date();
         var yy = now.getFullYear();
         var mm = now.getMonth() + 1;
         var dd = now.getDate();
         var todayStr = yy + "/" + (mm < 10 ? "0" + mm : mm) + "/" + (dd < 10 ? "0" + dd : dd);
         endDate = (currentTargetDate > todayStr) ? currentTargetDate : todayStr;
+    } else if (isPeriodRow && currentPeriodStart && currentPeriodEnd) {
+        startDate = getPastDateStr(currentPeriodStart, 7); // 入院前検査も考慮して7日前から
+        endDate = addDaysStr(currentPeriodEnd, 1);          // 退院日当日が時分で除外されないよう+1日
     } else if (searchDays !== "" && !isNaN(searchDays)) {
         startDate = getPastDateStr(currentTargetDate, searchDays); 
     }
@@ -2733,10 +2753,10 @@ function proceedToBloodOrFinish() {
     }
 }
 
-// 検体検査の日付列文字列（例: "2026/10/25", "26/10/25", "2026/10/25(1)" 等）から YYYY/MM/DD を抽出
+// 検体検査の日付列文字列（例: "2026/10/25", "26/10/25", "2026/10/25(1)", "2026.10.25" 等）から YYYY/MM/DD を抽出
 function extractLabDateStr(rawDateTxt) {
     if (!rawDateTxt) return "";
-    var s = trimStr(rawDateTxt);
+    var s = trimStr(rawDateTxt).replace(/\./g, "/");
     var m4 = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
     if (m4) {
         return padDateStr(m4[1] + "/" + m4[2] + "/" + m4[3]);
@@ -2768,25 +2788,29 @@ function waitForIeLoad() {
             var dateCols = [];
             var zenkenRowIdx = -1;
 
-            // 1. 「全件」行を探し、日付列を取得
-            for (var r = 1; r < trChunks.length; r++) {
-                var firstCellMatch = trChunks[r].match(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/i);
-                if (!firstCellMatch) continue;
-                var firstCellTxt = trimStr(stripHtmlTags(firstCellMatch[1]));
-                if (firstCellTxt === "全件") {
-                    zenkenRowIdx = r;
-                    var dCells = extractRowCellsFromTrHtml(trChunks[r]);
-                    for (var c = 3; c < dCells.length; c += 2) {
-                        var dText = dCells[c];
-                        if (dText) {
-                            var normD = extractLabDateStr(dText);
-                            dateCols.push({
+            // 1. 日付列を含むヘッダ行を全行走査して探索し、日付列のみを抽出
+            for (var r = 0; r < trChunks.length; r++) {
+                var dCells = extractRowCellsFromTrHtml(trChunks[r]);
+                if (dCells.length < 2) continue;
+                var tempDates = [];
+                for (var c = 1; c < dCells.length; c++) {
+                    var dText = dCells[c];
+                    if (dText) {
+                        var normD = extractLabDateStr(dText);
+                        // ★重要: 単位や参考値等の非日付セルは完全に除外（日付として有効なもののみ登録）
+                        if (normD) {
+                            tempDates.push({
                                 colIdx: c,
                                 dateStr: dText,
-                                normDate: normD || dText
+                                normDate: normD
                             });
                         }
                     }
+                }
+                // 日付が1件以上検出された行を日付ヘッダ行として確定
+                if (tempDates.length > 0) {
+                    zenkenRowIdx = r;
+                    dateCols = tempDates;
                     break;
                 }
             }
@@ -2809,15 +2833,33 @@ function waitForIeLoad() {
 
             // 期間指定時または基準日通常時用（降順ソート：新しい日付が先頭）
             var validDateCols = [];
+            var preAdmissionBufferDays = 7; // 入院前検査（外来での術前検査・入院前採血など）の許容バッファ日数
+            var periodBufferStart = isPeriodRow && currentPeriodStart ? getPastDateStr(currentPeriodStart, preAdmissionBufferDays) : "";
+
             for (var dc = 0; dc < allDateCols.length; dc++) {
                 var dcItem = allDateCols[dc];
                 if (/^\d{4}\/\d{2}\/\d{2}$/.test(dcItem.normDate)) {
-                    if (isPeriodRow && currentPeriodEnd && dcItem.normDate > currentPeriodEnd) continue;
-                    if (isPeriodRow && currentPeriodStart && dcItem.normDate < currentPeriodStart) continue;
-                    if (!isPeriodRow && dcItem.normDate > currentTargetDate) continue;
-                    if (!isPeriodRow && filterStartDate !== "" && dcItem.normDate < filterStartDate) continue;
+                    if (isPeriodRow) {
+                        if (currentPeriodEnd && dcItem.normDate > currentPeriodEnd) continue;
+                        if (currentPeriodStart && dcItem.normDate < currentPeriodStart) continue;
+                    } else {
+                        if (dcItem.normDate > currentTargetDate) continue;
+                        if (filterStartDate !== "" && dcItem.normDate < filterStartDate) continue;
+                    }
                 }
                 validDateCols.push(dcItem);
+            }
+
+            // ★もし指定された入院期間内（厳密一致）に採血が1件もない場合、入院直前7日以内の入院前検査（外来術前採血等）を自動救済
+            if (isPeriodRow && validDateCols.length === 0 && currentPeriodStart) {
+                for (var dc2 = 0; dc2 < allDateCols.length; dc2++) {
+                    var dcItem2 = allDateCols[dc2];
+                    if (/^\d{4}\/\d{2}\/\d{2}$/.test(dcItem2.normDate)) {
+                        if (currentPeriodEnd && dcItem2.normDate > currentPeriodEnd) continue;
+                        if (periodBufferStart && dcItem2.normDate < periodBufferStart) continue;
+                    }
+                    validDateCols.push(dcItem2);
+                }
             }
 
             // 初回（入院時）値検索用（昇順ソート：古い日付が先頭）
@@ -2848,20 +2890,32 @@ function waitForIeLoad() {
                     }
                 }
 
-                // 2. メモリ上の各行の先頭セル（項目名）だけを確認し、必要な項目の行だけセルを展開して値を抽出
+                // 2. メモリ上の各行から項目名を確認し、必要な項目の行だけ値を抽出
                 var startRow = (zenkenRowIdx !== -1) ? zenkenRowIdx + 1 : 1;
                 for (var i = startRow; i < trChunks.length; i++) {
-                    var fMatch = trChunks[i].match(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/i);
-                    if (!fMatch) continue;
-                    var itemName = trimStr(stripHtmlTags(fMatch[1]));
-                    if (itemName === "" || itemName === "全件" || itemName === "検査項目") continue;
+                    var rowCells = extractRowCellsFromTrHtml(trChunks[i]);
+                    if (rowCells.length < 2) continue;
+
+                    var itemName = rowCells[0];
+                    if (!itemName || itemName === "全件" || itemName === "検査項目") {
+                        if (rowCells.length > 1) itemName = rowCells[1];
+                    }
+                    if (!itemName || itemName === "全件" || itemName === "検査項目") continue;
 
                     var normKey = normalizeItemName(itemName);
                     var reqInfo = reqLabMap[normKey] || reqLabMap[itemName];
-                    if (!reqInfo) continue; // 要求されていない検査項目行はセル展開せず即スキップ
-
-                    var rowCells = extractRowCellsFromTrHtml(trChunks[i]);
-                    if (rowCells.length <= 3) continue;
+                    if (!reqInfo) {
+                        if (rowCells.length > 1 && rowCells[1] !== itemName) {
+                            var item2 = rowCells[1];
+                            var normKey2 = normalizeItemName(item2);
+                            reqInfo = reqLabMap[normKey2] || reqLabMap[item2];
+                            if (reqInfo) {
+                                itemName = item2;
+                                normKey = normKey2;
+                            }
+                        }
+                    }
+                    if (!reqInfo) continue;
 
                     var needHist = reqInfo.needHistory || (reqLabMap[normKey] && reqLabMap[normKey].needHistory) || (reqLabMap[itemName] && reqLabMap[itemName].needHistory);
                     var itemLatestVal = "";
