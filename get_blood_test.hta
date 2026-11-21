@@ -197,6 +197,8 @@ function isMedPeriodTargetItem(colName) {
 function isDrugPeriodInfoItem(colName) {
     if (!colName) return false;
     if (isMedDurationOnlyItem(colName)) return false;
+    if (isHistoryItem(colName)) return false;
+    if (isNyuinAllItem(colName) || isNyuinPeriodTargetItem(colName) || isNyuinDaysItem(colName)) return false;
     if (/^期間[:：].+/.test(colName)) return true;
     if (/.+期間$/.test(colName) && !isMedPeriodTargetItem(colName) && !isByomeiPeriodTargetItem(colName)) return true;
     if (/.+使用期間$/.test(colName)) return true;
