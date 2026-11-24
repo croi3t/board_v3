@@ -193,22 +193,24 @@ function isMedPeriodTargetItem(colName) {
     return false;
 }
 
-// 薬剤の使用期間そのものの出力列（例：「DOAC期間」「期間:DOAC」「DOAC使用期間」）
+// 薬剤の使用期間そのものの出力列（新標準：「処方期間:DOAC」 / 互換：「DOAC期間」「期間:DOAC」「DOAC使用期間」）
 function isDrugPeriodInfoItem(colName) {
     if (!colName) return false;
     if (isMedDurationOnlyItem(colName)) return false;
     if (isHistoryItem(colName)) return false;
     if (isNyuinAllItem(colName) || isNyuinPeriodTargetItem(colName) || isNyuinDaysItem(colName)) return false;
-    if (/^期間[:：].+/.test(colName)) return true;
+    if (/^(?:処方期間|期間)[:：].+/.test(colName)) return true;
     if (/.+期間$/.test(colName) && !isMedPeriodTargetItem(colName) && !isByomeiPeriodTargetItem(colName)) return true;
     if (/.+使用期間$/.test(colName)) return true;
     return false;
 }
 
-// 見出しから対象薬剤の指定キーワードを抽出（例: "併用薬:DOAC期間" -> "DOAC", "DOAC併存疾患" -> "DOAC", "DOAC期間" -> "DOAC", "入院期間:DOAC期間" -> "DOAC"）
+// 見出しから対象薬剤の指定キーワードを抽出（例: "処方期間:DOAC" -> "DOAC", "併用薬:DOAC期間" -> "DOAC", "DOAC併存疾患" -> "DOAC", "DOAC期間" -> "DOAC", "入院:DOAC期間" -> "DOAC"）
 function extractPeriodDrugKeyword(colName) {
     if (!colName) return "";
     var s = trimStr(colName);
+    var m0 = s.match(/^(?:処方期間|期間)[:：](.+)$/);
+    if (m0) return trimStr(m0[1]);
     var m1 = s.match(/^(?:併用薬|処方薬|内服薬|薬|薬剤)[:：](.+)期間$/);
     if (m1) return trimStr(m1[1]);
     var m2 = s.match(/^(?:併存疾患|病名|有効病名|疾患)[:：](.+)期間$/);
@@ -217,8 +219,6 @@ function extractPeriodDrugKeyword(colName) {
     if (m3) return trimStr(m3[1]);
     var m4 = s.match(/^(.+?)併存疾患$/);
     if (m4) return trimStr(m4[1]);
-    var m5 = s.match(/^期間[:：](.+)$/);
-    if (m5) return trimStr(m5[1]);
     var m6 = s.match(/^(.+?)(?:使用)?期間$/);
     if (m6) return trimStr(m6[1]);
     var m7 = s.match(/^(?:入院|入院期間)[:：](.+)期間$/);
@@ -283,23 +283,43 @@ function isMedItem(colName) {
 
 function isHistoryItem(colName) {
     if (!colName) return false;
-    return (colName.indexOf("全期間") !== -1 || colName.indexOf("全履歴") !== -1 || colName.indexOf("推移") !== -1);
+    if (colName.indexOf("全期間") !== -1 || colName.indexOf("全履歴") !== -1 || colName.indexOf("推移") !== -1) return true;
+    if (/[:：]全$/.test(colName)) return true;
+    return false;
 }
 
 function isLastLabItem(colName) {
     if (!colName) return false;
-    return (colName.indexOf("退院時") !== -1 || colName.indexOf("最終") !== -1);
+    if (colName.indexOf("退院時") !== -1 || colName.indexOf("最終") !== -1) return true;
+    if (/[:：](?:退|終)$/.test(colName)) return true;
+    return false;
 }
 
 function isFirstLabItem(colName) {
     if (!colName) return false;
-    return (colName.indexOf("入院時") !== -1 || colName.indexOf("初回") !== -1);
+    if (colName.indexOf("入院時") !== -1 || colName.indexOf("初回") !== -1) return true;
+    if (/[:：](?:入|初)$/.test(colName)) return true;
+    return false;
 }
 
-// 採血項目の修飾（全期間、:退院時、:入院時など）を除去して基本検査項目名（eGFR, HbA1cなど）を抽出
+function isLabColumnItem(colName) {
+    if (!colName) return false;
+    return (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isNyuinItem(colName) && !isBloodDateHeader(colName) && !isMedDateHeader(colName));
+}
+
+// 画面の「採血標準モード(defaultLabMode)」も考慮して、その列が推移（全件）出力かどうか判定
+function isEffectiveHistoryItem(colName) {
+    if (!colName || !isLabColumnItem(colName)) return false;
+    if (isHistoryItem(colName)) return true;
+    if (typeof defaultLabMode !== "undefined" && defaultLabMode === "HISTORY" && !isFirstLabItem(colName) && !isLastLabItem(colName)) return true;
+    return false;
+}
+
+// 採血項目の修飾（:推移、:全、全期間、:退院時、:退、:入院時、:入など）を除去して基本検査項目名（eGFR, HbA1cなど）を抽出
 function extractBaseLabItemName(rawName) {
     if (!rawName) return "";
     var s = trimStr(rawName);
+    s = s.replace(/[:：](?:推移|全期間|全履歴|全|退院時|最終|退|終|入院時|初回|入|初)$/g, "");
     s = s.replace(/全期間|全履歴|推移/g, "");
     s = s.replace(/退院時|入院時|初回|最終/g, "");
     s = s.replace(/^[:：\s]+|[:：\s]+$/g, "");
@@ -632,6 +652,100 @@ function parseDictionaryMap() {
             }
         }
     }
+    rebuildDrugWordSet();
+}
+
+var parsedDrugWordSet = {};
+function rebuildDrugWordSet() {
+    parsedDrugWordSet = {};
+    for (var k in parsedDictMap) {
+        if (!parsedDictMap.hasOwnProperty(k)) continue;
+        parsedDrugWordSet[k] = true;
+        var arr = parsedDictMap[k];
+        if (arr && arr.length) {
+            for (var i = 0; i < arr.length; i++) {
+                var nv = normalizeDictKey(arr[i]);
+                if (nv) parsedDrugWordSet[nv] = true;
+            }
+        }
+    }
+}
+
+function isKnownDrugKeyword(kw) {
+    if (!kw) return false;
+    var nk = normalizeDictKey(kw);
+    if (!nk) return false;
+    if (parsedDrugWordSet[nk]) return true;
+    var st = stripClassSuffix(nk);
+    if (st && parsedDrugWordSet[st]) return true;
+    return false;
+}
+
+var KNOWN_LAB_KEY_SET = {
+    "EGFR":1,"CREA":1,"HBA1C":1,"GLUCOSE":1,"AST":1,"ALT":1,"ALB":1,"PLT":1,"HGB":1,"HT":1,
+    "LD":1,"ALP":1,"G-GTP":1,"CK":1,"T-BIL":1,"D-BIL":1,"TG":1,"LDL-C":1,"HDL-C":1,"TC":1,
+    "UA":1,"CRP":1,"WBC":1,"RBC":1,"TP":1,"BUN":1,"NA":1,"CL":1,"K":1,"CA":1,"補正CA":1,
+    "IP":1,"A/G":1,"AMY":1,"NH3":1,"FT3":1,"FT4":1,"TSH":1,"INR":1,"APTT":1,"PT":1,
+    "D-DIMER":1,"HBSAG":1,"HCV抗体":1,"抗ミトコンドリア抗体":1,"抗ミトコンドリアM2抗体":1,
+    "抗核抗体":1,"抗核抗体価":1,"MCV":1,"MCH":1,"MCHC":1,"NEU":1,"LY":1,"EOS":1,"MON":1,"BAS":1
+};
+
+function isKnownLabKeyword(kw) {
+    if (!kw) return false;
+    var nk = normalizeItemName(kw);
+    return !!(nk && KNOWN_LAB_KEY_SET[nk]);
+}
+
+// 見出し1列の妥当性（修飾と項目種別の組み合わせエラー）を検証し、問題があれば警告文を返す
+function validateHeaderItem(colName) {
+    if (!colName) return "";
+    var s = trimStr(colName);
+    if (!s || isBloodDateHeader(s) || isMedDateHeader(s)) return "";
+
+    // 1. 採血用修飾（:推移 / :退院時 / :入院時 / :全 / :退 / :入 / 全期間 等）が付いている場合
+    if (isHistoryItem(s) || isLastLabItem(s) || isFirstLabItem(s)) {
+        var base = extractBaseLabItemName(s);
+        if (!base) {
+            return "「" + s + "」は修飾のみで検査項目名が空です。";
+        }
+        if (isProfileItem(base) || isByomeiItem(base) || isMedItem(base) || isNyuinItem(base)) {
+            return "「" + s + "」は採血項目ではないため、採血用修飾（:推移 / :退院時 / :入院時）は使えません。";
+        }
+        if (isKnownDrugKeyword(base)) {
+            return "「" + base + "」は薬剤のため採血用修飾は使えません。「薬剤:" + base + "」「処方期間:" + base + "」「併用薬:" + base + "期間」等を使用してください。";
+        }
+        return "";
+    }
+
+    // 2. 薬剤用修飾が付いているのに、対象が明らかな採血項目の場合
+    if (isMedSearchItem(s) || isMedStartOnlyItem(s) || isMedDurationOnlyItem(s) || isMedPeriodTargetItem(s) || isDrugPeriodInfoItem(s)) {
+        var medKw = "";
+        if (isMedPeriodTargetItem(s) || isDrugPeriodInfoItem(s)) {
+            medKw = extractPeriodDrugKeyword(s);
+        } else {
+            medKw = s.replace(/^[^:：]+[:：]/, "");
+        }
+        if (medKw && isKnownLabKeyword(medKw)) {
+            return "「" + medKw + "」は採血項目のため薬剤用修飾は使えません。「" + medKw + "」「" + medKw + ":推移」「" + medKw + ":退院時」等を使用してください。";
+        }
+        return "";
+    }
+
+    // 3. 病名用修飾が付いているのに、対象が明らかな採血項目の場合
+    if (isByomeiSearchItem(s) || isByomeiPeriodTargetItem(s)) {
+        var bKw = isByomeiPeriodTargetItem(s) ? extractPeriodDrugKeyword(s) : s.replace(/^[^:：]+[:：]/, "");
+        if (bKw && isKnownLabKeyword(bKw)) {
+            return "「" + bKw + "」は採血項目のため病名用修飾は使えません。";
+        }
+        return "";
+    }
+
+    // 4. 修飾なしの裸のワードで、採血扱いになっているが既知の薬剤名・薬効分類の場合
+    if (isLabColumnItem(s) && isKnownDrugKeyword(s) && !isKnownLabKeyword(s)) {
+        return "「" + s + "」は薬剤ですが接頭辞がありません。薬剤を取得するには「薬剤:" + s + "」または「処方期間:" + s + "」と指定してください。";
+    }
+
+    return "";
 }
 
 // 見出しの検索キーワード（例: "フィブラート" や "ARB|アムロジピン"）を辞書で展開して返す
@@ -698,6 +812,7 @@ var isPeriodRow = false;         // 期間指定列（入院期間）が存在�
 var currentPeriodStart = "";     // 入院期間の開始日
 var currentPeriodEnd = "";       // 入院期間の終了日
 var currentPeriodDisp = "";      // 入院期間の元の表記
+var defaultLabMode = "NORMAL";   // 採血の標準取得モード（NORMAL:基準日直近/入院時, LAST:退院時/最終, HISTORY:推移全件）
 var searchDays = ""; // 採血探索期間（初期値空欄）
 var medSearchDays = 30; // 併用薬探索期間（初期値30日）
 var medGapDays = 30; // 服用期間算出時の許容空白期間（初期値30日）
@@ -793,10 +908,28 @@ function startProcess() {
     fetchByomeiEnabled = document.getElementById("fetchByomeiChk") ? document.getElementById("fetchByomeiChk").checked : false;
     excludeSuspectedEnabled = document.getElementById("excludeSuspectedChk") ? document.getElementById("excludeSuspectedChk").checked : false;
     fetchMedEnabled = document.getElementById("fetchMedChk") ? document.getElementById("fetchMedChk").checked : false;
+    defaultLabMode = document.getElementById("defaultLabModeSel") ? document.getElementById("defaultLabModeSel").value : "NORMAL";
 
     // 画面上の辞書内容を反映・自動保存
     saveDictionary(true);
     disableIeScriptTimeoutWarning();
+
+    // 実行前に見出し行の組み合わせエラー（例: ビグアナイド:退院時、薬剤:eGFR 等）を検証
+    var preLines = text.split("\n");
+    if (preLines.length > 0) {
+        var preCols = preLines[0].split("\t");
+        if (isHeaderRowLine(preCols)) {
+            var headerWarns = [];
+            for (var wk = 2; wk < preCols.length; wk++) {
+                var wMsg = validateHeaderItem(preCols[wk]);
+                if (wMsg) headerWarns.push("・" + wMsg);
+            }
+            if (headerWarns.length > 0) {
+                var ok = confirm("⚠ 見出し行に修飾と項目の組み合わせエラーが見つかりました：\n\n" + headerWarns.join("\n") + "\n\nこのまま実行しますか？（「キャンセル」して修正することを推奨します）");
+                if (!ok) return;
+            }
+        }
+    }
     
     try {
         if(!ie) {
@@ -969,13 +1102,9 @@ function showGuideMessage(msg) {
 function cleanItemPrefix(name) {
     if (!name) return "";
     var s = trimStr(name);
-    s = s.replace(/^(?:薬剤|薬|処方薬|内服薬)[:：]/, "");
-    s = s.replace(/^(?:併用薬)[:：]/, "");
-    s = s.replace(/^(?:病名|疾患)[:：]/, "");
-    s = s.replace(/^(?:併存疾患)[:：]/, "");
-    s = s.replace(/^(?:入院|入院期間)[:：]/, "");
-    s = s.replace(/期間$/, "");
-    s = s.replace(/全期間$/, "");
+    s = s.replace(/^(?:処方期間|期間|薬剤|薬|処方薬|内服薬|併用薬|病名|疾患|併存疾患|入院|入院期間)[:：]/, "");
+    s = s.replace(/[:：](?:推移|全期間|全履歴|全|退院時|最終|退|終|入院時|初回|入|初)$/, "");
+    s = s.replace(/(?:全期間|全履歴|推移|使用期間|期間)$/, "");
     return trimStr(s);
 }
 
@@ -1064,15 +1193,54 @@ function copyHeaderToClipboard() {
     showGuideMessage("見出し行をクリップボードにコピーしました！JUSTcalcに貼り付けられます。");
 }
 
+// 見出し行に含まれるすべての採血項目に一括で修飾（:推移 / :退院時 / 修飾解除）を適用
+function bulkModifyLabHeaders(mode) {
+    var inputEl = document.getElementById("inputText");
+    if (!inputEl) return;
+    var text = inputEl.value;
+    if (!text) return;
+    var linesArr = text.split("\n");
+    if (linesArr.length === 0) return;
+    var cols = linesArr[0].split("\t");
+    if (!isHeaderRowLine(cols)) {
+        alert("1行目に見出し行がありません。");
+        return;
+    }
+    var changedCount = 0;
+    for (var k = 2; k < cols.length; k++) {
+        var c = trimStr(cols[k]);
+        if (!c || !isLabColumnItem(c)) continue;
+        var base = extractBaseLabItemName(c);
+        if (!base) continue;
+        var nextName = base;
+        if (mode === "HISTORY") nextName = base + ":推移";
+        else if (mode === "LAST") nextName = base + ":退院時";
+        else if (mode === "FIRST") nextName = base + ":入院時";
+        cols[k] = nextName;
+        changedCount++;
+    }
+    if (changedCount === 0) {
+        showGuideMessage("対象の採血見出しが見つかりませんでした");
+        return;
+    }
+    linesArr[0] = cols.join("\t");
+    inputEl.value = linesArr.join("\n");
+    updateHeaderPreviewDisplay();
+    updateInputHeaderAndScroll();
+    syncTextareasHeight();
+    var label = (mode === "HISTORY") ? ":推移" : (mode === "LAST" ? ":退院時" : "修飾なし");
+    showGuideMessage("採血見出し " + changedCount + " 列を一括で「" + label + "」に変更しました");
+}
+
 // 2クリック付随修飾モード管理
 var currentModifierMode = "NORMAL";
 var modDescriptions = {
     "NORMAL": "<b>【通常モード】</b>修飾を付けず、クリックした項目名そのままを見出しに追加します（例: eGFR, 年齢, 性別）。入院期間指定時は<b>初回（入院時）値</b>を取得します。",
-    "ALL_HISTORY": "<b>【全期間モード】</b>採血項目に「全期間」を付与。<b>入院期間指定時は入院中の全採血推移</b>を、通常時は過去すべての採血履歴を取得します（例: eGFR全期間）。",
-    "PERIOD_LAST": "<b>【退院時/最終モード】</b>指定した入院期間中の最後の採血検査値（退院直前）を取得します（例: eGFR:退院時、Cre:退院時）。",
+    "ALL_HISTORY": "<b>【:推移モード (採血全件)】</b>採血項目に「:推移」を付与。<b>入院期間指定時は入院中の全採血推移</b>を、通常時は過去すべての採血履歴を取得します（例: eGFR:推移 / 短縮: eGFR:全）。",
+    "PERIOD_LAST": "<b>【:退院時モード (採血最終)】</b>指定した入院期間中の最後の採血検査値（退院直前）を取得します（例: eGFR:退院時 / 短縮: eGFR:退）。",
     "MED_PERIOD": "<b>【併用薬:〇〇期間モード】</b>指定した薬剤（DOACやSGLT2等）を服用していた全期間（初回開始日〜最終処方終了日）中に処方されていた他の併用薬を一括抽出します（例: 併用薬:DOAC期間、併用薬:SGLT2期間）。",
     "MED_3COL": "<b>【薬剤:〇〇 (3列モード)】</b>指定した薬剤（分類）について、「処方有無」「初回開始日」「総服用日数」の3列を一括取得します（例: 薬剤:SGLT2、薬剤:経口糖尿病薬）。",
-    "DRUG_PERIOD": "<b>【〇〇期間 (使用期間モード)】</b>指定した薬剤を服用していた全期間（YYYY/MM/DD - YYYY/MM/DD）を1つのセルに出力します（例: DOAC期間、SGLT2期間）。",
+    "DRUG_PERIOD": "<b>【処方期間:〇〇モード】</b>指定した薬剤を服用していた全期間（YYYY/MM/DD - YYYY/MM/DD）を1つのセルに出力します（例: 処方期間:DOAC、処方期間:SGLT2）。",
     "BYOMEI": "<b>【病名:〇〇モード】</b>指定した疾患の確定病名があるかを検索し、「あり／なし」と「開始日」を取得します（例: 病名:糖尿病、病名:高血圧）。",
     "NYUIN": "<b>【入院:〇〇期間モード】</b>指定した薬剤を服用していた期間中に発生した入院のみを抽出して出力します（例: 入院:DOAC期間、入院:SGLT2期間）。"
 };
@@ -1119,13 +1287,13 @@ function showComboHelp(actionType) {
     if (actionType === "RAW") {
         msg = "<b>【そのまま追加】</b>「" + (kw || "入力した項目名") + "」を修飾なしで見出しに追加します。";
     } else if (actionType === "ALL") {
-        msg = "<b>【〇〇全期間】</b>「" + dispKw + "全期間」を追加します（過去すべての採血履歴を一括展開。入院期間指定時は入院中の全採血）。";
+        msg = "<b>【〇〇:推移】</b>「" + dispKw + ":推移」を追加します（過去すべての採血履歴を一括展開。入院期間指定時は入院中の全採血）。";
     } else if (actionType === "MED_3COL") {
         msg = "<b>【薬剤:〇〇 (3列)】</b>「薬剤:" + dispKw + "」を追加します（処方有無・開始日・服用日数の3列を取得）。";
     } else if (actionType === "MED_PERIOD") {
         msg = "<b>【併用薬:〇〇期間】</b>「併用薬:" + dispKw + "期間」を追加します（" + dispKw + "服用中に処方された併用薬のみ抽出）。";
     } else if (actionType === "DRUG_PERIOD") {
-        msg = "<b>【〇〇期間】</b>「" + dispKw + "期間」を追加します（" + dispKw + "の服用全期間 YYYY/MM/DD - YYYY/MM/DD を出力）。";
+        msg = "<b>【処方期間:〇〇】</b>「処方期間:" + dispKw + "」を追加します（" + dispKw + "の服用全期間 YYYY/MM/DD - YYYY/MM/DD を出力）。";
     } else if (actionType === "BYOMEI") {
         msg = "<b>【病名:〇〇】</b>「病名:" + dispKw + "」を追加します（" + dispKw + "の確定病名有無と開始日を取得）。";
     } else if (actionType === "BYOMEI_PERIOD") {
@@ -1193,11 +1361,11 @@ function makeButtonHoverHandler(btn) {
             var txt = trimStr(btn.innerText || btn.textContent).replace(/^＋\s*/, "");
             var clean = cleanItemPrefix(txt);
             var res = "";
-            if (currentModifierMode === "ALL_HISTORY") res = clean + "全期間";
+            if (currentModifierMode === "ALL_HISTORY") res = clean + ":推移";
             else if (currentModifierMode === "PERIOD_LAST") res = clean + ":退院時";
             else if (currentModifierMode === "MED_PERIOD") res = "併用薬:" + clean + "期間";
             else if (currentModifierMode === "MED_3COL") res = "薬剤:" + clean;
-            else if (currentModifierMode === "DRUG_PERIOD") res = clean + "期間";
+            else if (currentModifierMode === "DRUG_PERIOD") res = "処方期間:" + clean;
             else if (currentModifierMode === "BYOMEI") res = "病名:" + clean;
             else if (currentModifierMode === "NYUIN") res = "入院:" + clean + "期間";
             if (res) {
@@ -1218,7 +1386,7 @@ function onPaletteItemClick(itemName) {
     if (currentModifierMode !== "NORMAL") {
         var clean = cleanItemPrefix(finalItem);
         if (currentModifierMode === "ALL_HISTORY") {
-            finalItem = clean + "全期間";
+            finalItem = clean + ":推移";
         } else if (currentModifierMode === "PERIOD_LAST") {
             finalItem = clean + ":退院時";
         } else if (currentModifierMode === "MED_PERIOD") {
@@ -1226,11 +1394,17 @@ function onPaletteItemClick(itemName) {
         } else if (currentModifierMode === "MED_3COL") {
             finalItem = "薬剤:" + clean;
         } else if (currentModifierMode === "DRUG_PERIOD") {
-            finalItem = clean + "期間";
+            finalItem = "処方期間:" + clean;
         } else if (currentModifierMode === "BYOMEI") {
             finalItem = "病名:" + clean;
         } else if (currentModifierMode === "NYUIN") {
             finalItem = "入院:" + clean + "期間";
+        }
+        var err = validateHeaderItem(finalItem);
+        if (err) {
+            alert("⚠ 修飾と項目の組み合わせエラー\n\n" + err);
+            setModifierMode("NORMAL");
+            return;
         }
         // 1回適用したら通常モードに戻す（2クリック完了）
         setModifierMode("NORMAL");
@@ -1266,13 +1440,13 @@ function applyComboAction(actionType) {
         if (actionType === "RAW") {
             target = kw;
         } else if (actionType === "ALL") {
-            target = cleanKw + (cleanKw.indexOf("全期間") === -1 ? "全期間" : "");
+            target = cleanKw + ":推移";
         } else if (actionType === "MED_3COL") {
             target = "薬剤:" + cleanKw;
         } else if (actionType === "MED_PERIOD") {
             target = "併用薬:" + cleanKw + "期間";
         } else if (actionType === "DRUG_PERIOD") {
-            target = cleanKw + "期間";
+            target = "処方期間:" + cleanKw;
         } else if (actionType === "BYOMEI") {
             target = "病名:" + cleanKw;
         } else if (actionType === "BYOMEI_PERIOD") {
@@ -1281,16 +1455,26 @@ function applyComboAction(actionType) {
             target = "入院:" + cleanKw + "期間";
         }
         if (target) {
+            var err = validateHeaderItem(target);
+            if (err) {
+                alert("⚠ 修飾と項目の組み合わせエラー\n\n" + err);
+                continue;
+            }
             appendHeaderItem(target);
         }
     }
 }
 
-// 現在の見出し行プレビューバッジ表示の更新
+// 現在の見出し行プレビューバッジ表示の更新（種別色分け＋エラー自動検知）
 function updateHeaderPreviewDisplay() {
     var inputEl = document.getElementById("inputText");
     var dispEl = document.getElementById("headerPreviewDisp");
+    var warnEl = document.getElementById("headerWarningBox");
     if (!dispEl) return;
+    if (warnEl) {
+        warnEl.style.display = "none";
+        warnEl.innerHTML = "";
+    }
     if (!inputEl) {
         dispEl.innerHTML = '<span style="color:#888;">(入力欄が見つかりません)</span>';
         return;
@@ -1299,45 +1483,87 @@ function updateHeaderPreviewDisplay() {
     var linesArr = text.split("\n");
     if (linesArr.length === 0 || (linesArr.length === 1 && trimStr(linesArr[0]) === "")) {
         dispEl.innerHTML = '<span style="color:#888;">(見出し行は未設定です。下のボタンをクリックすると追加されます)</span>';
+        updateTopBarMargin();
         return;
     }
     var cols = linesArr[0].split("\t");
     if (!isHeaderRowLine(cols)) {
         dispEl.innerHTML = '<span style="color:#e65100; font-weight:bold;">※ データ行から始まっています（下のボタンをクリックすると見出し行を先頭に挿入できます）</span>';
+        updateTopBarMargin();
         return;
     }
     var html = [];
+    var warnMsgs = [];
     for (var i = 0; i < cols.length; i++) {
         var c = trimStr(cols[i]);
         if (!c) continue;
+        var err = (i >= 2) ? validateHeaderItem(c) : "";
         var bg = "#e3f2fd";
         var border = "#90caf9";
         var col = "#0d47a1";
+        var label = c;
         if (i === 0 || i === 1) {
             bg = "#eceff1";
             border = "#b0bec5";
             col = "#37474f";
-        } else if (c.indexOf("全期間") !== -1) {
-            bg = "#fce4ec";
-            border = "#f48fb1";
-            col = "#880e4f";
-        } else if (c.indexOf("DOAC") !== -1 || c.indexOf("SGLT2") !== -1 || c.indexOf("薬剤:") !== -1 || c.indexOf("併用薬:") !== -1) {
+        } else if (err) {
+            bg = "#ffebee";
+            border = "#e53935";
+            col = "#b71c1c";
+            label = "⚠ " + c;
+            warnMsgs.push(err);
+        } else if (isMedItem(c)) {
             bg = "#e8f5e9";
-            border = "#a5d6a7";
+            border = "#81c784";
             col = "#1b5e20";
-        } else if (c.indexOf("病名:") !== -1 || c === "有効病名") {
+        } else if (isByomeiItem(c)) {
             bg = "#fff3e0";
-            border = "#ffcc80";
+            border = "#ffb74d";
             col = "#e65100";
-        } else if (c.indexOf("入院") !== -1) {
+        } else if (isNyuinItem(c) || isProfileItem(c)) {
             bg = "#ede7f6";
             border = "#b39ddb";
             col = "#4a148c";
+        } else if (isHistoryItem(c)) {
+            bg = "#fce4ec";
+            border = "#f48fb1";
+            col = "#880e4f";
+        } else if (isLastLabItem(c) || isFirstLabItem(c)) {
+            bg = "#e1f5fe";
+            border = "#4fc3f7";
+            col = "#01579b";
         }
-        html.push('<span style="display:inline-block; background:' + bg + '; border:1px solid ' + border + '; color:' + col + '; padding:1px 5px; border-radius:3px; margin:1px 2px; font-weight:bold;">' + c + '</span>');
+        var titleAttr = err ? (' title="' + err.replace(/"/g, "&quot;") + '"') : "";
+        html.push('<span' + titleAttr + ' style="display:inline-block; background:' + bg + '; border:1px solid ' + border + '; color:' + col + '; padding:1px 5px; border-radius:3px; margin:1px 2px; font-weight:bold;">' + label + '</span>');
     }
     dispEl.innerHTML = html.length > 0 ? html.join("") : '<span style="color:#888;">(見出し列はありません)</span>';
+    if (warnEl && warnMsgs.length > 0) {
+        warnEl.innerHTML = "<b>⚠ 見出しエラー検知（このままでは正しく収集されません）：</b> " + warnMsgs.join(" ／ ");
+        warnEl.style.display = "block";
+    }
     updateTopBarMargin();
+}
+
+// ルール早見表パネルの開閉
+function toggleGuidePanel() {
+    var p = document.getElementById("guidePanel");
+    var btn = document.getElementById("toggleGuideBtn");
+    if (!p) return;
+    if (p.style.display === "none") {
+        p.style.display = "block";
+        if (btn) {
+            btn.innerHTML = "▲ ルール早見表を閉じる";
+            btn.style.backgroundColor = "#00695c";
+        }
+    } else {
+        p.style.display = "none";
+        if (btn) {
+            btn.innerHTML = "📖 ルール早見表";
+            btn.style.backgroundColor = "#00897b";
+        }
+    }
+    updateTopBarMargin();
+    syncTextareasHeight();
 }
 
 // パネル開閉およびマージン・テキストエリア高さ自動調整
@@ -1579,7 +1805,7 @@ function processNext() {
                 if (isMedSearchItem(colName)) {
                     headerRow.push("開始日");
                     headerRow.push("服用期間(日)");
-                } else if (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isNyuinItem(colName) && !isHistoryItem(colName)) {
+                } else if (!isProfileItem(colName) && !isByomeiItem(colName) && !isMedItem(colName) && !isNyuinItem(colName) && !isEffectiveHistoryItem(colName)) {
                     headerRow.push("採血日:" + colName);
                 }
             }
@@ -1601,7 +1827,7 @@ function processNext() {
                 if (isMedSearchItem(it)) {
                     autoHeader.push("開始日");
                     autoHeader.push("服用期間(日)");
-                } else if (!isProfileItem(it) && !isByomeiItem(it) && !isMedItem(it) && !isNyuinItem(it) && !isHistoryItem(it)) {
+                } else if (!isProfileItem(it) && !isByomeiItem(it) && !isMedItem(it) && !isNyuinItem(it) && !isEffectiveHistoryItem(it)) {
                     autoHeader.push("採血日:" + it);
                 }
             }
@@ -2687,10 +2913,10 @@ function proceedToBloodOrFinish() {
 
     document.getElementById("msg").innerText = currentLine + " 行目を処理中... (ID: " + currentId + " の採血結果を取得中)";
 
-    // 見出しに「全期間」「全履歴」が含まれるか判定
+    // 見出しに「:推移」「全期間」「全履歴」が含まれるか、または採血標準モードが推移(全件)か判定
     var needAllPeriod = false;
     for (var hi = 0; hi < targetItems.length; hi++) {
-        if (isHistoryItem(targetItems[hi])) {
+        if (isEffectiveHistoryItem(targetItems[hi])) {
             needAllPeriod = true;
             break;
         }
@@ -2903,7 +3129,7 @@ function waitForIeLoad() {
                 for (var ti = 0; ti < targetItems.length; ti++) {
                     var reqRaw = targetItems[ti];
                     if (isProfileItem(reqRaw) || isByomeiItem(reqRaw) || isMedItem(reqRaw) || isNyuinItem(reqRaw)) continue;
-                    var isHist = isHistoryItem(reqRaw);
+                    var isHist = isEffectiveHistoryItem(reqRaw);
                     var sItem = extractBaseLabItemName(reqRaw);
                     var nReq = normalizeItemName(sItem);
                     if (nReq) {
@@ -3138,12 +3364,19 @@ function buildAndPushRow(valueMap, dateCols) {
         var isLastVal = false;
         var isFirstVal = false;
 
-        if (searchItem.indexOf("全期間") !== -1 || searchItem.indexOf("全履歴") !== -1 || searchItem.indexOf("推移") !== -1) {
+        if (isHistoryItem(searchItem)) {
             isHistory = true;
-        } else if (searchItem.indexOf("退院時") !== -1 || searchItem.indexOf("最終") !== -1) {
+        } else if (isLastLabItem(searchItem)) {
             isLastVal = true;
-        } else if (searchItem.indexOf("入院時") !== -1 || searchItem.indexOf("初回") !== -1) {
+        } else if (isFirstLabItem(searchItem)) {
             isFirstVal = true;
+        } else {
+            // 個別修飾がない場合は、画面の「採血標準モード」を適用
+            if (defaultLabMode === "HISTORY") {
+                isHistory = true;
+            } else if (defaultLabMode === "LAST") {
+                isLastVal = true;
+            }
         }
         
         searchItem = extractBaseLabItemName(searchItem);
@@ -3207,7 +3440,7 @@ function appendErrorRow(errMsg) {
             }
         } else if (isNyuinItem(reqItemRaw)) {
             outRow.push(getNyuinItemValue(reqItemRaw));
-        } else if (isHistoryItem(reqItemRaw)) {
+        } else if (isEffectiveHistoryItem(reqItemRaw)) {
             outRow.push(errMsg);
         } else {
             outRow.push("");
@@ -3245,11 +3478,18 @@ function appendErrorRow(errMsg) {
                 <button id="btn" onclick="startProcess()" data-help="貼り付けられたデータの解析・一括情報収集を開始します（患者基本情報・有効病名・処方・入院・採血）" style="padding: 5px 16px; font-size: 13px; font-weight: bold; background-color: #0078D7; color: white; border: none; border-radius: 3px;">▶ 一括取得開始</button>
                 <button id="pauseBtn" onclick="togglePause()" disabled data-help="処理を一時停止または再開します。一時停止中も「結果をコピー」で途中までの結果を取得できます" style="padding: 5px 12px; font-size: 13px; font-weight: bold; background-color: #f57c00; color: white; border: none; border-radius: 3px; margin-left: 5px;">一時停止</button>
                 <button id="copyBtn" onclick="copyResult()" disabled data-help="取得結果をクリップボードにコピーします。JUSTcalcやExcelにそのまま貼り付けられます" style="padding: 5px 12px; font-size: 13px; font-weight: bold; background-color: #2e7d32; color: white; border: none; border-radius: 3px; margin-left: 5px;">📋 結果をコピー</button>
+                <span style="margin-left: 10px; font-size: 11px; color: #1a237e; font-weight: bold;">採血標準:</span>
+                <select id="defaultLabModeSel" style="font-size: 11px; padding: 2px 4px; border: 1px solid #90caf9; border-radius: 3px; background-color: #ffffff; color: #0d47a1; font-weight: bold;" title="修飾（:推移 や :退院時）を書いていない採血項目の標準取得モードを選びます。個別修飾がある列は個別指定が優先されます">
+                    <option value="NORMAL">標準(入院時/直近)</option>
+                    <option value="HISTORY">推移(全件・修飾不要)</option>
+                    <option value="LAST">退院時/最終(修飾不要)</option>
+                </select>
                 <span id="msg" style="color: #d32f2f; font-weight: bold; margin-left: 10px; font-size: 12px;">待機中...</span>
                 <span id="copyStatus" style="color: #2e7d32; font-weight: bold; margin-left: 8px; font-size: 12px;"></span>
             </div>
             <div style="display: table-cell; vertical-align: middle; text-align: right; white-space: nowrap;">
-                <button type="button" id="togglePaletteBtn" onclick="togglePalettePanel()" data-help="見出しパレットの表示／非表示を折りたたみ切り替えます" style="padding: 4px 10px; font-size: 11px; font-weight: bold; background-color: #0288d1; color: white; border: none; border-radius: 3px;">▲ 見出しパレットを閉じる</button>
+                <button type="button" id="toggleGuideBtn" onclick="toggleGuidePanel()" data-help="見出しの書き方ルール（採血・薬剤・病名・入院の色分けとOK/NG例）を一覧表示します" style="padding: 4px 10px; font-size: 11px; font-weight: bold; background-color: #00897b; color: white; border: none; border-radius: 3px;">📖 ルール早見表</button>
+                <button type="button" id="togglePaletteBtn" onclick="togglePalettePanel()" data-help="見出しパレットの表示／非表示を折りたたみ切り替えます" style="padding: 4px 10px; font-size: 11px; font-weight: bold; background-color: #0288d1; color: white; border: none; border-radius: 3px; margin-left: 5px;">▲ 見出しパレットを閉じる</button>
                 <button type="button" id="toggleSettingsBtn" onclick="toggleSettingsPanel()" data-help="探索期間や薬効分類辞書の設定パネルを開閉します" style="padding: 4px 10px; font-size: 11px; background-color: #546e7a; color: white; border: none; border-radius: 3px; margin-left: 5px;">▼ 探索期間・詳細設定</button>
             </div>
         </div>
@@ -3260,30 +3500,77 @@ function appendErrorRow(errMsg) {
                 <span style="color: #0d47a1; font-weight: bold; margin-right: 6px;">【見出し行】:</span>
                 <span id="headerPreviewDisp" style="color: #333;">(見出し行は未設定です)</span>
             </div>
-            <div style="display: table-cell; vertical-align: middle; text-align: right; white-space: nowrap; width: 220px;">
+            <div style="display: table-cell; vertical-align: middle; text-align: right; white-space: nowrap; width: 420px;">
+                <button type="button" onclick="bulkModifyLabHeaders('HISTORY')" data-help="見出し行にあるすべての採血項目に一括で「:推移」を付与します（1列ずつ手入力する手間を省けます）" style="padding: 2px 6px; font-size: 10px; background-color: #ad1457; color: white; border: none; border-radius: 2px;">採血→:推移</button>
+                <button type="button" onclick="bulkModifyLabHeaders('LAST')" data-help="見出し行にあるすべての採血項目に一括で「:退院時」を付与します" style="padding: 2px 6px; font-size: 10px; background-color: #e65100; color: white; border: none; border-radius: 2px; margin-left: 2px;">採血→:退院時</button>
+                <button type="button" onclick="bulkModifyLabHeaders('CLEAR')" data-help="見出し行にあるすべての採血項目から「:推移」「:退院時」等の修飾を一括解除します" style="padding: 2px 6px; font-size: 10px; background-color: #546e7a; color: white; border: none; border-radius: 2px; margin-left: 2px;">修飾解除</button>
+                <span style="border-left: 1px solid #cfd8dc; margin: 0 4px;"></span>
                 <button type="button" onclick="removeLastHeaderItem()" data-help="見出し行の末尾の列を1つ削除（取り消し）します" style="padding: 2px 7px; font-size: 10px; background-color: #ef5350; color: white; border: none; border-radius: 2px;">⌫ 1つ戻す</button>
                 <button type="button" onclick="copyHeaderToClipboard()" data-help="現在設定されている見出し行をクリップボードにコピーします。JUSTcalcの見出し行に貼り付けられます" style="padding: 2px 7px; font-size: 10px; background-color: #388e3c; color: white; border: none; border-radius: 2px; margin-left: 3px;">📋 見出しコピー</button>
                 <button type="button" onclick="clearHeaderRow()" data-help="現在設定されている見出し行をすべてクリアします" style="padding: 2px 7px; font-size: 10px; background-color: #78909c; color: white; border: none; border-radius: 2px; margin-left: 3px;">クリア</button>
             </div>
         </div>
+        <!-- リアルタイム見出しエラー警告バナー -->
+        <div id="headerWarningBox" style="display: none; margin-top: 3px; padding: 4px 8px; background-color: #ffebee; border: 1px solid #e53935; border-radius: 3px; font-size: 11px; color: #b71c1c; line-height: 1.4;"></div>
+
+        <!-- 折りたたみセクション0：見出しルール早見表 -->
+        <div id="guidePanel" style="display: none; margin-top: 5px; padding: 8px 10px; background-color: #ffffff; border: 2px solid #00897b; border-radius: 4px; font-size: 11px; line-height: 1.55;">
+            <div style="font-weight: bold; color: #00695c; margin-bottom: 4px; font-size: 12px;">📖 見出しルール早見表（色分け＝種別。採血は「末尾に :条件」、薬剤・病名・入院は「先頭に 種別:」）</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <tr style="background-color: #e3f2fd;">
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px; width: 95px; font-weight: bold; color: #0d47a1;">🔵 採血項目</td>
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px;">
+                        <code>eGFR</code>（通常/入院時） ／ <code>eGFR:推移</code>（短縮 <code>:全</code>・互換 <code>全期間</code>） ／ <code>eGFR:退院時</code>（短縮 <code>:退</code>） ／ <code>eGFR:入院時</code>（短縮 <code>:入</code>）<br>
+                        <span style="color:#00695c;">💡 省力ワザ：上部の<b>「採血標準」を「推移(全件)」</b>にすれば修飾不要。または<b>「採血→:推移」</b>ボタンで一括付与！</span>
+                    </td>
+                </tr>
+                <tr style="background-color: #e8f5e9;">
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px; font-weight: bold; color: #1b5e20;">🟢 薬剤関連</td>
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px;">
+                        <code>併用薬</code>（全件） ／ <code>薬剤:DOAC</code>（有無・開始日・日数の3列） ／ <code>処方期間:DOAC</code>（開始〜終了の1列・互換 <code>DOAC期間</code>） ／ <code>併用薬:DOAC期間</code>（服用中の他薬）
+                    </td>
+                </tr>
+                <tr style="background-color: #fff3e0;">
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px; font-weight: bold; color: #e65100;">🟠 病名関連</td>
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px;">
+                        <code>有効病名</code>（全件） ／ <code>病名:糖尿病</code>（有無・開始日） ／ <code>併存疾患:DOAC期間</code>（服用中に有効だった病名）
+                    </td>
+                </tr>
+                <tr style="background-color: #ede7f6;">
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px; font-weight: bold; color: #4a148c;">🟣 基本・入院</td>
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px;">
+                        <code>年齢</code> ／ <code>性別</code> ／ <code>生年月日</code> ／ <code>入院期間</code> ／ <code>入院回数</code> ／ <code>最新入院</code> ／ <code>在院日数</code> ／ <code>入院:DOAC期間</code>
+                    </td>
+                </tr>
+                <tr style="background-color: #ffebee;">
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px; font-weight: bold; color: #b71c1c;">⚠ NG例（自動検知）</td>
+                    <td style="border: 1px solid #cfd8dc; padding: 3px 6px; color: #b71c1c;">
+                        × <code>ビグアナイド:退院時</code>（薬剤に採血修飾） ／ × <code>薬剤:eGFR</code>（採血に薬剤修飾） ／ × <code>ビグアナイド</code>（接頭辞なし）→ 見出し行に赤い <b>⚠</b> で自動警告します。
+                    </td>
+                </tr>
+            </table>
+        </div>
 
         <!-- 折りたたみセクション1：見出し追加パレット -->
         <div id="palettePanel" style="display: block; margin-top: 5px; padding: 6px 8px; background-color: #f0f7ff; border: 1px solid #90caf9; border-radius: 3px; font-size: 11px; max-height: 290px; overflow-y: auto;">
-            <!-- 2クリック付随修飾モード -->
+            <!-- 2クリック付随修飾モード（種別色分け） -->
             <div style="background-color: #e8eaf6; padding: 4px 6px; border-radius: 3px; margin-bottom: 4px; font-size: 11px; border: 1px solid #c5cae9;">
                 <b style="color: #283593;">【2クリック付随修飾】:</b>
-                <span style="font-size: 11px; color: #555; margin-right: 4px;">修飾を選んでから項目をクリック:</span>
-                <button type="button" id="mod_normal" class="btn-mode" onclick="setModifierMode('NORMAL')" style="background-color: #1976d2; color: white; border-color: #1565c0; font-weight: bold;">通常(そのまま)</button>
-                <button type="button" id="mod_all" class="btn-mode" onclick="setModifierMode('ALL_HISTORY')">＋全期間(採血)</button>
-                <button type="button" id="mod_last" class="btn-mode" onclick="setModifierMode('PERIOD_LAST')">＋退院時/最終(採血)</button>
-                <button type="button" id="mod_med_period" class="btn-mode" onclick="setModifierMode('MED_PERIOD')">＋併用薬:〇〇期間</button>
-                <button type="button" id="mod_med_3col" class="btn-mode" onclick="setModifierMode('MED_3COL')">＋薬剤:〇〇(3列)</button>
-                <button type="button" id="mod_drug_period" class="btn-mode" onclick="setModifierMode('DRUG_PERIOD')">＋〇〇期間(使用期間)</button>
-                <button type="button" id="mod_byomei" class="btn-mode" onclick="setModifierMode('BYOMEI')">＋病名:〇〇</button>
-                <button type="button" id="mod_nyuin" class="btn-mode" onclick="setModifierMode('NYUIN')">＋入院:〇〇期間</button>
+                <button type="button" id="mod_normal" class="btn-mode" onclick="setModifierMode('NORMAL')" style="background-color: #1976d2; color: white; border-color: #1565c0; font-weight: bold;">通常</button>
+                <span style="color:#0d47a1; font-weight:bold; margin-left:4px;">🔵採血:</span>
+                <button type="button" id="mod_all" class="btn-mode" onclick="setModifierMode('ALL_HISTORY')" style="border-color:#64b5f6;">＋:推移</button>
+                <button type="button" id="mod_last" class="btn-mode" onclick="setModifierMode('PERIOD_LAST')" style="border-color:#64b5f6;">＋:退院時</button>
+                <span style="color:#1b5e20; font-weight:bold; margin-left:4px;">🟢薬剤:</span>
+                <button type="button" id="mod_med_3col" class="btn-mode" onclick="setModifierMode('MED_3COL')" style="border-color:#81c784;">＋薬剤:(3列)</button>
+                <button type="button" id="mod_drug_period" class="btn-mode" onclick="setModifierMode('DRUG_PERIOD')" style="border-color:#81c784;">＋処方期間:</button>
+                <button type="button" id="mod_med_period" class="btn-mode" onclick="setModifierMode('MED_PERIOD')" style="border-color:#81c784;">＋併用薬:〇〇期間</button>
+                <span style="color:#e65100; font-weight:bold; margin-left:4px;">🟠病名:</span>
+                <button type="button" id="mod_byomei" class="btn-mode" onclick="setModifierMode('BYOMEI')" style="border-color:#ffb74d;">＋病名:</button>
+                <span style="color:#4a148c; font-weight:bold; margin-left:4px;">🟣入院:</span>
+                <button type="button" id="mod_nyuin" class="btn-mode" onclick="setModifierMode('NYUIN')" style="border-color:#b39ddb;">＋入院:〇〇期間</button>
                 <!-- 説明文スペース（全ボタン対応・高さ40px固定でブレ防止） -->
                 <div id="modHelpBox" style="margin-top: 4px; padding: 4px 8px; background-color: #ffffff; border: 1px solid #9fa8da; border-radius: 3px; font-size: 11px; color: #1a237e; height: 40px; min-height: 40px; max-height: 40px; box-sizing: border-box; overflow: hidden; line-height: 1.35;">
-                    💡 各ボタンにマウスを合わせると、機能説明と具体例が表示されます。<br><span style="color:#555; font-size:10px;">修飾ボタンをクリックしてから項目ボタンを選ぶと、見出しが自動合成されます。</span>
+                    💡 各ボタンにマウスを合わせると、機能説明と具体例が表示されます。<br><span style="color:#555; font-size:10px;">🔵採血は末尾に「:推移 / :退院時」、🟢薬剤・🟠病名は先頭に「薬剤: / 病名:」を付けます（誤組み合わせは自動警告）。</span>
                 </div>
             </div>
 
@@ -3307,9 +3594,9 @@ function appendErrorRow(errMsg) {
             <div style="margin-bottom: 3px;">
                 <b style="color: #333; font-size: 11px;">【主要採血】: </b>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('eGFR')" title="基準日直近のeGFR値と採血日を取得します">＋ eGFR</button>
-                <button type="button" class="btn-palette" onclick="onPaletteItemClick('eGFR全期間')" style="color: #c2185b;" title="過去すべてのeGFR採血履歴を新しい順に全件展開します">＋ eGFR全期間</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('eGFR:推移')" style="color: #c2185b;" title="eGFRの採血履歴を新しい順に全件展開します（入院期間指定時は入院中の全採血）">＋ eGFR:推移</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('HbA1c')" title="基準日直近のHbA1c値と採血日を取得します">＋ HbA1c</button>
-                <button type="button" class="btn-palette" onclick="onPaletteItemClick('HbA1c全期間')" style="color: #c2185b;" title="過去すべてのHbA1c採血履歴を新しい順に全件展開します">＋ HbA1c全期間</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('HbA1c:推移')" style="color: #c2185b;" title="HbA1cの採血履歴を新しい順に全件展開します（入院期間指定時は入院中の全採血）">＋ HbA1c:推移</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('血糖')" title="基準日直近の血糖値(GLU)と採血日を取得します">＋ 血糖</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('Cre')" title="基準日直近の血清クレアチニン値と採血日を取得します">＋ Cre</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('AST')" title="基準日直近のAST値と採血日を取得します">＋ AST</button>
@@ -3338,13 +3625,13 @@ function appendErrorRow(errMsg) {
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('薬剤:SU')" title="SU薬（アマリール等）の処方有無・開始日・服用日数の3列を取得します">＋ 薬剤:SU</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('病名:糖尿病')" title="糖尿病の確定病名有無と開始日を取得します">＋ 病名:糖尿病</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('併用薬:SGLT2期間')" title="SGLT2阻害薬を服用していた全期間中に処方された併用薬を抽出します">＋ 併用薬:SGLT2期間</button>
-                <button type="button" class="btn-palette" onclick="onPaletteItemClick('SGLT2期間')" title="SGLT2阻害薬の服用全期間（YYYY/MM/DD - YYYY/MM/DD）を出力します">＋ SGLT2期間</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('処方期間:SGLT2')" title="SGLT2阻害薬の服用全期間（YYYY/MM/DD - YYYY/MM/DD）を出力します">＋ 処方期間:SGLT2</button>
             </div>
 
             <div style="margin-bottom: 3px;">
                 <b style="color: #333; font-size: 11px;">【DOAC・循環器等】: </b>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('併用薬:DOAC期間')" style="background-color: #e8f5e9; border-color: #a5d6a7; color: #1b5e20;" title="DOAC服用期間中に処方されていた併用薬を抽出します">＋ 併用薬:DOAC期間</button>
-                <button type="button" class="btn-palette" onclick="onPaletteItemClick('DOAC期間')" style="background-color: #e8f5e9; border-color: #a5d6a7; color: #1b5e20;" title="DOACの服用全期間（YYYY/MM/DD - YYYY/MM/DD）を出力します">＋ DOAC期間</button>
+                <button type="button" class="btn-palette" onclick="onPaletteItemClick('処方期間:DOAC')" style="background-color: #e8f5e9; border-color: #a5d6a7; color: #1b5e20;" title="DOACの服用全期間（YYYY/MM/DD - YYYY/MM/DD）を出力します">＋ 処方期間:DOAC</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('併存疾患:DOAC期間')" style="background-color: #e8f5e9; border-color: #a5d6a7; color: #1b5e20;" title="DOAC服用期間中に有効だった病名のみを抽出します">＋ 併存疾患:DOAC期間</button>
                 <button type="button" class="btn-palette" onclick="onPaletteItemClick('入院:DOAC期間')" style="background-color: #e8f5e9; border-color: #a5d6a7; color: #1b5e20;" title="DOAC服用期間中に生じた入院のみを抽出して出力します">＋ 入院:DOAC期間</button>
                 <span style="border-left: 1px solid #ccc; margin: 0 4px;"></span>
@@ -3374,10 +3661,10 @@ function appendErrorRow(errMsg) {
                 <div style="margin-top: 3px;">
                     <span style="color: #555; margin-right: 4px;">付随アクション:</span>
                     <button type="button" class="btn-action" onclick="applyComboAction('RAW')" onmouseover="showComboHelp('RAW')" onmouseout="resetModHelp()" title="キーワードをそのまま見出しに追加します">＋ そのまま追加</button>
-                    <button type="button" class="btn-action" onclick="applyComboAction('ALL')" onmouseover="showComboHelp('ALL')" onmouseout="resetModHelp()" title="キーワードに「全期間」を付加して追加します">＋ 〇〇全期間</button>
+                    <button type="button" class="btn-action" onclick="applyComboAction('ALL')" onmouseover="showComboHelp('ALL')" onmouseout="resetModHelp()" title="キーワードに「:推移」を付加して追加します">＋ 〇〇:推移</button>
                     <button type="button" class="btn-action" onclick="applyComboAction('MED_3COL')" onmouseover="showComboHelp('MED_3COL')" onmouseout="resetModHelp()" title="「薬剤:キーワード」の3列形式で見出しに追加します">＋ 薬剤:〇〇 (3列)</button>
                     <button type="button" class="btn-action" onclick="applyComboAction('MED_PERIOD')" onmouseover="showComboHelp('MED_PERIOD')" onmouseout="resetModHelp()" title="「併用薬:キーワード期間」の形式で見出しに追加します">＋ 併用薬:〇〇期間</button>
-                    <button type="button" class="btn-action" onclick="applyComboAction('DRUG_PERIOD')" onmouseover="showComboHelp('DRUG_PERIOD')" onmouseout="resetModHelp()" title="「キーワード期間」の形式で見出しに追加します">＋ 〇〇期間 (使用期間)</button>
+                    <button type="button" class="btn-action" onclick="applyComboAction('DRUG_PERIOD')" onmouseover="showComboHelp('DRUG_PERIOD')" onmouseout="resetModHelp()" title="「処方期間:キーワード」の形式で見出しに追加します">＋ 処方期間:〇〇</button>
                     <button type="button" class="btn-action" onclick="applyComboAction('BYOMEI')" onmouseover="showComboHelp('BYOMEI')" onmouseout="resetModHelp()" title="「病名:キーワード」の形式で見出しに追加します">＋ 病名:〇〇</button>
                     <button type="button" class="btn-action" onclick="applyComboAction('BYOMEI_PERIOD')" onmouseover="showComboHelp('BYOMEI_PERIOD')" onmouseout="resetModHelp()" title="「併存疾患:キーワード期間」の形式で見出しに追加します">＋ 併存疾患:〇〇期間</button>
                     <button type="button" class="btn-action" onclick="applyComboAction('NYUIN')" onmouseover="showComboHelp('NYUIN')" onmouseout="resetModHelp()" title="「入院:キーワード期間」の形式で見出しに追加します">＋ 入院:〇〇期間</button>
@@ -3456,7 +3743,7 @@ function appendErrorRow(errMsg) {
 0123457	2024/06/15
 
 【入力例2：特定入院期間のピンポイント収集】
-患者ID	入院期間	eGFR	eGFR全期間	eGFR:退院時	併用薬	有効病名	在院日数
+患者ID	入院期間	eGFR	eGFR:推移	eGFR:退院時	併用薬	有効病名	在院日数
 0123456	2024/05/10 - 2024/05/25"></textarea>
                 </td>
                 <td style="vertical-align: top; padding: 0;">
