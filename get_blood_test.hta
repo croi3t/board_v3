@@ -876,6 +876,48 @@ function togglePause() {
     }
 }
 
+// HTA内蔵の信頼済みiframe(application="yes")を用いたIE互換ブラウザアダプタ
+function createIframeBrowserAdapter() {
+    var fr = document.getElementById("karteFrame");
+    if (!fr) return null;
+    return {
+        Busy: false,
+        readyState: 4,
+        Document: null,
+        Navigate: function(url) {
+            this.Busy = true;
+            this.readyState = 1;
+            this.Document = null;
+            var self = this;
+            fr.onload = function() {
+                try {
+                    self.Document = fr.contentWindow ? fr.contentWindow.document : fr.contentDocument;
+                } catch(e) {
+                    self.Document = null;
+                }
+                self.Busy = false;
+                self.readyState = 4;
+            };
+            fr.onerror = function() {
+                self.Document = null;
+                self.Busy = false;
+                self.readyState = 4;
+            };
+            fr.src = url;
+        },
+        Quit: function() {
+            try {
+                fr.onload = null;
+                fr.onerror = null;
+                fr.src = "about:blank";
+            } catch(e) {}
+            this.Busy = false;
+            this.readyState = 4;
+            this.Document = null;
+        }
+    };
+}
+
 function startProcess() {
     var text = document.getElementById("inputText").value;
     if(!text) {
@@ -931,15 +973,20 @@ function startProcess() {
         }
     }
     
-    try {
-        if(!ie) {
-            ie = new ActiveXObject("InternetExplorer.Application");
-            ie.Visible = false;
-            try { ie.Silent = true; } catch(e2) {}
+    if (!ie) {
+        // Windows Update等で外部IE(iexplore.exe)が起動・自動化できない環境でも確実に動作するよう、
+        // HTA内蔵の信頼済みiframe(application="yes")を優先使用（外部IE起動不要・高速・Shift_JIS対応）
+        ie = createIframeBrowserAdapter();
+        if (!ie) {
+            try {
+                ie = new ActiveXObject("InternetExplorer.Application");
+                ie.Visible = false;
+                try { ie.Silent = true; } catch(e2) {}
+            } catch(e) {
+                alert("ブラウザの起動に失敗しました。\n詳細: " + (e.message || e));
+                return;
+            }
         }
-    } catch(e) {
-        alert("Internet Explorerの起動に失敗しました。");
-        return;
     }
 
     lines = text.split("\n");
@@ -3772,5 +3819,7 @@ function appendErrorRow(errMsg) {
             </tr>
         </table>
     </div>
+    <!-- カルテデータ取得用・HTA内蔵ブラウザフレーム（外部IE起動不要） -->
+    <iframe id="karteFrame" application="yes" style="display:none; width:1px; height:1px; border:0;"></iframe>
 </body>
 </html>
