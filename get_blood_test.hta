@@ -3211,7 +3211,8 @@ function waitForIeLoad() {
                         var hCol = targetHistoryCols[hd].colIdx;
                         var hValTxt = (hCol < rowCells.length) ? rowCells[hCol] : "";
                         if (hValTxt !== "") {
-                            var hEntry = targetHistoryCols[hd].dateStr + ": " + hValTxt;
+                            // ★表計算ソフト（Excel / JUSTcalc等）で1件のみのセルが「日付: 数値」→時刻と誤認識されるのを防ぐため [日付] 値 形式にする
+                            var hEntry = "[" + targetHistoryCols[hd].dateStr + "] " + hValTxt;
                             if (!historyMap[hEntry]) {
                                 historyMap[hEntry] = true;
                                 historyArr.push(hEntry);
